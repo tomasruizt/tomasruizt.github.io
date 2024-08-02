@@ -1,4 +1,4 @@
 run:
-	bundle exec jekyll serve
+	jekyll serve --watch
 clean:
 	bundle exec jekyll clean
