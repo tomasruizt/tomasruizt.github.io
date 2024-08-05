@@ -38,7 +38,7 @@ During fine-tuning, we modify the probabilities that the LLM assigns to the toke
 
 $$
 \begin{align*}
-p'(y | x_{1:t}) &= s(logits_t + W z_t) \\
+\underbrace{p'(y | x_{1:t})}_{hello} &= s(logits_t + W z_t) \\
 \implies \log p' &= logits_t + W z_t
 \end{align*}
 $$
