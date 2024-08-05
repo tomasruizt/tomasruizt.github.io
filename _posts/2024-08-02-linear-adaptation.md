@@ -25,20 +25,21 @@ In the original language model, the probability vector $$y$$ has the same size o
 
 $$
 \begin{aligned}
-p(y | x_{1:t}) 
-&= s(\text{logits}_t) \\
-&= s(A z_t + b)
+\underbrace{p(y | x_{1:t})}_{(1,V)}
+&= \text{softmax}(\underbrace{\text{logits}_t}_{(1,V)}) \\
+&= \text{softmax}(\underbrace{z_t}_{(1,d)} \underbrace{A}_{(d,V)} + \underbrace{b}_{(1,V)})
 \end{aligned}
 $$
 
-where $$s()$$ is the softmax function, $$z_t$$ is the hidden state for the last token (dimension $$d$$), and $$A$$ and $$b$$ are the weights and bias of the last linear layer. The loss for this model is defined as the distance between these probabilites and our true labels, which is a set of binary labels $$Y = \{y_1, y_2, ..., y_N \}$$, $$Y \in \mathbb{R}^{(N, 2)}$$
+where $$z_t$$ is the hidden state for the last token, and $$A$$ and $$b$$ are the weights and bias of the last linear layer. The loss for this model is defined as the distance between these probabilites and our true labels, which is a set of binary labels $$Y = \begin{bmatrix} y_1 \\ ... \\ y_N \end{bmatrix} \in \mathbb{R}^{(N, 2)}$$
 
-During fine-tuning, we modify the probabilities that the LLM assigns to the tokens for ``yes/no`` by changing the logits that are passed to the softmax function. Here is where the learned transformation $$W$$ comes into play. We will tweak $$W$$ to approximate the dataset $$Y$$. The fine-tuned probabilities $$p'$$ are given by:
+During fine-tuning, we modify the probabilities that the LLM assigns to the tokens for ``yes/no`` by changing the logits that are passed to the softmax function. Here is where the learned transformation $$W$$ comes into play. We will tweak $$W$$ to approximate the dataset $$Y$$ with the fine-tuned probabilities $$p'$$, which are given by:
 
 $$
 \begin{aligned}
-p'(y | x_{1:t}) &= s(logits_t + W z_t) \\
-\implies \log p' &= logits_t + W z_t
+p'(y | x_{1:t}) &= \text{softmax}(\text{logits}_t + z_t W) \\
+\implies \underbrace{\log p'}_{(1, V)} 
+&= \underbrace{\text{logits}_t}_{(1,V)} + \underbrace{z_t}_{(1,d)} \underbrace{W}_{(d,V)}
 \end{aligned}
 $$
 
@@ -46,18 +47,31 @@ In vectorized form (one row per datapoint $$N$$) this can be written as:
 
 $$
 \begin{aligned}
-\log P' &= L + Z_t W^T
+\underbrace{\log P'}_{(N,V)} 
+&= \underbrace{L_t}_{(N,V)} + \underbrace{Z_t}_{(N,d)} \underbrace{W}_{(d,V)}
 \end{aligned}
 $$
 
-where:
-* predicted probabilities: $$P' \in \mathbb{R}^{(N,V)}$$
-* stacked logits: $$L \in \mathbb{R}^{(N,V)}$$, and 
-* stacked hidden states: $$Z_t \in \mathbb{R}^{(N,d)}$$.
+Solving for $$W$$ exactly only works for non-singular matrices $$Z_t$$. For general matrices, this problem is solved by minimizing the is a squared distance:
 
-We can enforce compliance to the binary task by only evaluating the logits for the ``yes/no`` tokens. This reduces the size of the probability vector and of the logits to only 2. 
+$$W = \argmin_W || Z_t W - (\log P' - L_t) ||^2_2 $$
 
+This is a least squares problem, whose solution is given by the **Moore-Penrose Inverse**:
 
+$$W = (Z_t^T Z_t)^{-1} Z_t^T (\log P' - L_t)$$
+
+Or equivalently, by solving the following linear system with $$V$$ columns.
+
+$$W = \text{linsolve}(\underbrace{Z_t^T Z_t}_{(d,d)}, \space \underbrace{Z_t^T (\log P' - L_t)}_{(d,V)})$$
+
+Solving $$V$$ linear systems of order $$O(d)$$ is prohibitively expensive ($$V=128k, d=4k$$ in LLama3 8B). However, we can exploit the structure of the binary classification problem, by only evaluating the logits $$L_t$$ and probabilities $$P'$$ for the ``yes/no`` tokens. This reduces the size of the probability matrix $$P'$$ from $$(N,V)$$ to $$(N,2)$$, and the size of the learned matrix $$W$$ from $$(d,V)$$ to $$(d,2)$$. 
+
+As a result, we need to solve only 2 linear systems, each with a dimension that scales as $$O(d)$$, and is constant in the vocabulary size $$V$$ and in the number of datapoints in our traning dataset $$N$$. Additionally, the output of the fine-tuned model the compliant by design, as it cannot output any other logits than for ``yes/no``.
+
+### Inference
+At inference time, the matrix $$W$$ stays constant, while the logits change for each input.
+
+$$p'(y|x_{1:t}) = \text{softmax}(z_t(x_{1:t})(A + W) + b)$$
 
 ## References
 [1] Hu, Edward J., et al. "Lora: Low-rank adaptation of large language models." arXiv preprint arXiv:2106.09685 (2021).
