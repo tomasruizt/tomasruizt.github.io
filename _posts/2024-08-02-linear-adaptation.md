@@ -1,13 +1,13 @@
 ---
 layout: post
-title:  "The Pseudoinverse Method to Fine-Tune LLMs for Binary Classification"
+title:  "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification"
 date:   2024-08-02 15:26:31 +0200
 katex: true
 ---
 
-Large Language Models (LLMs) are excellent baseline models for **zero-shot** classification, i.e. without any labeled examples. Most often than not, one has a small labeled dataset representative of the task, and is interested in improving the performance over this baseline. 
+# Summary
 
-The quickest way to use this labeled data is to provide the labeled examples as part of the classification prompt (**few-shot** classification). The next step one can take is to fine-tune the model on the labeled dataset. There are several ways to fine-tune LLMs: e.g. optimizing all network parameters, optimizing only the parameters of the final layer, or freezing all parameters but introduce a new smaller set of tunable parameters [1]. Training all parameters requires significant GPU memory for large models, throwing aways the last layer and seems wasteful if the baseline model already performs better than random.
+In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because it makes this approach computationally efficient. The new linear transformation (green) $$W$$ is shown in figure 1.
 
 <div style="text-align: center;">
   <img 
@@ -15,10 +15,20 @@ The quickest way to use this labeled data is to provide the labeled examples as 
     alt="Learned Linear Transformation"
     style="width: 70%;"
   >
-  <p><strong>Figure 1:</strong><em>The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge by the model. Both are the summed to make the logits, which are passed to the softmax function.</em></p>
+  <p><strong>Figure 1:</strong><em>The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function.</em></p>
 </div>
 
-In this post, I focus on binary classification. This means that the model must only answer ``yes/no`` or ``0/1`` to the prompt. The multiclass classification case can be reduced to a set binary classification problems. Furthermore, the binary case is easier to anaylze with metrics like the F1 score. After fine-tuning we can also interpret the changed model by looking at the answers that flipped between ``yes/no`` and vice-versa [2]. We will see that the binary problem structure can be leveraged for compute efficient fine-tuning. Concretely, one can fine-tune the LLM by adding only one additional learned linear transformation $$W$$ before the softmax, as shown in figure 1. This transformation accepts a closed-form solution given by the Moore-Penrose Inverse. The fine-tuned model is mathematically equivalent to adding a linear layer before the logits and training it with gradient descent, but must perform a lot less computation.
+# About Fine-Tuning
+
+Large Language Models (LLMs) are great baseline models for **zero-shot** classification, i.e. without any labeled examples. However, one often has a small labeled dataset and is interested in improving the performance over this baseline. In the **few-shot** setting, some labeled examples are provided in the prompt for the model to learn in context. To improve upon this setting, the next step is to **fine-tune** the model on the labeled dataset.
+
+There are different ways to fine-tune LLMs. For example: optimizing all network parameters, optimizing only the parameters of the final layer, or freezing all parameters but introduce a new smaller set of tunable parameters [1]. In this blog post I focus on the simple case of fine-tuning the last linear transformation, because I'm interested in interpreting the changes in individual logits and probabilities later on.
+
+# Binary Classification
+
+I also focus on binary classification specifically. This means that the model must only answer ``yes/no`` or ``0/1`` to the prompt. The reason is that this setting is easier to interpret with metrics like precision, recall or the $$F1$$ score. Furthermore, in the binary case we can interpret how the fine-tuning procedure affected the model by inspecting the answers that flipped between ``yes/no`` and vice-versa [2]. The multiclass classification case can be reduced to a set binary classification problems.
+
+In terms of computation, we will see that the problem structure of binary classification can be leveraged to compute a closed-form solution efficiently. Concretely, one can fine-tune the LLM by adding only one additional learned linear transformation $$W$$ before the softmax, as shown in figure 1. This transformation accepts a closed-form solution given by the Moore-Penrose Inverse. The fine-tuned model is mathematically equivalent to adding a linear layer before the logits and training it with gradient descent, but must perform a lot less computation.
 
 ### Formal Derivation
 In the original language model, the probability vector $$y$$ has the same size of the vocabulary, and is given by:
