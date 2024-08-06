@@ -8,7 +8,7 @@ katex: true
 
 # Summary
 
-In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes to the model are easier to interpret. The new linear transformation (green) $$W$$ is shown in figure 1.
+In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation $$W$$ is shown in figure 1 (green).
 
 <div style="text-align: center;">
   <img 
