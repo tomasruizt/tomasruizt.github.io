@@ -13,8 +13,9 @@ In this post I show how to linearly fine-tune a large language model (LLM) using
   <img 
     src="/diagrams/linear-adaptation/linear-adaptation.png" 
     alt="Learned Linear Transformation"
-    style="width: 70%;"
+    style="width: 75%;"
   >
+  <br/><br/>
   <p><strong>Figure 1:</strong><em> The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function.</em></p>
 </div>
 
