@@ -1,6 +1,7 @@
 ---
 layout: post
 title:  "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification"
+author: Tomas Ruiz
 date:   2024-08-02 15:26:31 +0200
 katex: true
 ---
