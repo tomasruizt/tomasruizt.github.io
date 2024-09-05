@@ -76,9 +76,9 @@ Or equivalently, by solving the following linear system of equations with $$V$$ 
 
 $$W = \text{linsolve}(\underbrace{Z_t^T Z_t}_{(d,d)}, \space \underbrace{Z_t^T (\log P_a - L_t)}_{(d,V)}) \qquad (2) $$
 
-Each linear system takes $$O(d^3)$$ to solve, so solving $$V$$ of these systems is prohibitively expensive ($$V=128k, d=4k$$ in LLama3 8B). (*But see <a href="#footnote-3">[5]</a> on repeated linear solves*). However, we can exploit the structure of the binary classification problem, by only evaluating the logits $$L_t$$ and probabilities $$P_a$$ for the ``yes/no`` tokens. This reduces the size of the probability matrix $$P_a$$ by *4 to 5 orders of magnitude*, from $$(N,V)$$ to $$(N,2)$$. Similarly, the  learned matrix $$W$$ shrinks from size $$(d,V)$$ to $$(d,2)$$.
+Each linear system takes $$O(d^3)$$ to solve, so solving $$V$$ of these systems is prohibitively expensive ($$V=128k, d=4k$$ in LLama3 8B). (*But see <a href="#footnote-3">[5]</a> on repeated linear solves*). However, we can exploit the structure of the binary classification problem, by only evaluating the logits $$L_t$$ and probabilities $$P_a$$ for the ``yes/no`` tokens. This reduces the size of the probability matrix $$P_a$$ by *4 to 5 orders of magnitude*, from $$(N,V)$$ to $$(N,2)$$. Similarly, the learned matrix $$W$$ shrinks from size $$(d,V)$$ to $$(d,2)$$.
 
-As a result, we need to solve only 2 linear systems, each with runtime constant in the vocabulary size $$V$$ and in the number of datapoints in our dataset $$N$$, but proportional to $$O(d^3)$$. As an added benefit of evaluating only the ``yes/no`` logits, the output of the fine-tuned model the compliant by design, as it cannot output any other logits other than for ``yes/no``.
+As a result, we need to solve only 2 linear systems, each with runtime constant in the vocabulary size $$V$$ and in the number of datapoints in our dataset $$N$$, but proportional to $$O(d^3)$$. As an added benefit of evaluating only the ``yes/no`` logits, the output of the fine-tuned model is compliant by design, as it cannot output any other logits other than for ``yes/no``.
 
 To solve for $$W$$ either using eq (1) or eq (2), we plug in our dataset $$D$$ for $$P_a$$, since both matrices have the same size.
 
