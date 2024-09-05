@@ -88,7 +88,7 @@ At inference time, the matrix $$W$$ stays constant, while the logits change for 
 $$
 \begin{aligned}
 p_a(y|x_{1:t}) 
-&= \text{softmax} \{ \text{logits}_t + W \} \\
+&= \text{softmax} \{ \text{logits}_t + z_t W \} \\
 &= \text{softmax} \{ z_t A + z_t W \}
 \end{aligned}
 $$
