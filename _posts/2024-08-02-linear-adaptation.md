@@ -64,7 +64,7 @@ $$
 \end{aligned}
 $$
 
-Solving for $$W$$ exactly is only possible for squared invertible matrices $$Z_t$$. However, $$W$$ is rectangular (size $$(d, V)$$), so this problem solved approximately by minimizing the is a squared distance:
+Solving for $$W$$ exactly is only possible for squared invertible matrices $$Z_t$$. However, $$W$$ is rectangular (size $$(d, V)$$), so this problem is solved approximately by minimizing the squared distance:
 
 $$W = \argmin_W || (\log P_a - L_t) - Z_t W ||^2_2 \qquad (1) $$ 
 
@@ -72,11 +72,11 @@ This is a least squares problem, whose solution is given by the **Moore-Penrose 
 
 $$W = (Z_t^T Z_t)^{-1} Z_t^T (\log P_a - L_t)$$
 
-Or equivalently, by solving the following linear system of equations with $$V$$ columns.
+Or equivalently, by solving the following linear system of equations with $$V$$ columns (*But see note on numerical stability <a href="#footnote-2">[4]</a>*).
 
 $$W = \text{linsolve}(\underbrace{Z_t^T Z_t}_{(d,d)}, \space \underbrace{Z_t^T (\log P_a - L_t)}_{(d,V)}) \qquad (2) $$
 
-Each linear system takes $$O(d^3)$$ to solve, so solving $$V$$ of these systems is prohibitively expensive ($$V=128k, d=4k$$ in LLama3 8B). However, we can exploit the structure of the binary classification problem, by only evaluating the logits $$L_t$$ and probabilities $$P_a$$ for the ``yes/no`` tokens. This reduces the size of the probability matrix $$P_a$$ by *3 to 4 orders of magnitude*, from $$(N,V)$$ to $$(N,2)$$. Similarly, the  learned matrix $$W$$ shrinks from size $$(d,V)$$ to $$(d,2)$$.
+Each linear system takes $$O(d^3)$$ to solve, so solving $$V$$ of these systems is prohibitively expensive ($$V=128k, d=4k$$ in LLama3 8B). (*But see <a href="#footnote-3">[5]</a> on repeated linear solves*). However, we can exploit the structure of the binary classification problem, by only evaluating the logits $$L_t$$ and probabilities $$P_a$$ for the ``yes/no`` tokens. This reduces the size of the probability matrix $$P_a$$ by *3 to 4 orders of magnitude*, from $$(N,V)$$ to $$(N,2)$$. Similarly, the  learned matrix $$W$$ shrinks from size $$(d,V)$$ to $$(d,2)$$.
 
 As a result, we need to solve only 2 linear systems, each with runtime constant in the vocabulary size $$V$$ and in the number of datapoints in our dataset $$N$$, but proportional to $$O(d^3)$$. As an added benefit of evaluating only the ``yes/no`` logits, the output of the fine-tuned model the compliant by design, as it cannot output any other logits other than for ``yes/no``.
 
@@ -102,4 +102,8 @@ In the next post, I will show an implementation of this method in PyTorch, and i
 <p id="link-flips">[2] Dutta, Abhinav, et al. "Accuracy is Not All You Need." arXiv preprint arXiv:2407.09141 (2024).</p>
 
 ## Notes
-<p id="footnote-1">[3]: Modern LLMs don't use bias terms in their linear layers: https://www.reddit.com/r/learnmachinelearning/comments/1ahcan4/why_do_modern_llms_remove_the_bias_term_in_their/</p>
+<p id="footnote-1">[3]: Modern LLMs don't use bias terms in their linear layers: <a href="https://www.reddit.com/r/learnmachinelearning/comments/1ahcan4/why_do_modern_llms_remove_the_bias_term_in_their">Source</a>.</p>
+
+<span id="footnote-2">[4]:</span> 2024-09: The matrix $$Z^T Z$$ is positive definite, so it is in theory efficiently invertible using the Cholesky decomposition. However, its condition number $$ \kappa(Z^T Z) $$ is squarely proportional to the condition number of $$ \kappa(Z) $$. This can lead to numerical instability when solving the linear system. In fact, I stumbled upon numerical instability while implementing this in linear system in PyTorch, which lead me to use an $$L_2$$ regularization term. See <a href="https://tobydriscoll.net/fnc-julia/leastsq/normaleqns.html#conditioning-and-stability">Source</a>.
+
+<span id="footnote-3">[5]:</span> 2024-09: It turns out that solving a linear system with $$V$$ columns on the right-hand side can be done cheaper than in $$V \cdot \frac{2}{3} d^3$$ flops. To solve $$A X = B$$ (with $$A \in \mathbb{R}^{d,d}$$ and $$X, B \in \mathbb{R}^{d,V}$$) the factorization of $$A$$ requires $$\frac{2}{3} d^3$$ flops, but it only has to be done once. After that, solving for each of the $$V$$ columns of $$B$$ costs $$2 d^2$$ flops each. So the total flop count is $$\frac{2}{3} d^3 + V \cdot 2 d^2$$. This is a significant improvement over the naive approach. See David S. Watkins book *"Fundamentals of matrix computations"*, 2nd Ed. p. 77-78.
