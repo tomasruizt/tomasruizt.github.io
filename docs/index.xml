@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss  xmlns:atom="http://www.w3.org/2005/Atom" 
+      xmlns:media="http://search.yahoo.com/mrss/" 
+      xmlns:content="http://purl.org/rss/1.0/modules/content/" 
+      xmlns:dc="http://purl.org/dc/elements/1.1/" 
+      version="2.0">
+<channel>
+<title>Tomas&#39; Site</title>
+<link>https://tomasruizt.github.io/</link>
+<atom:link href="https://tomasruizt.github.io/index.xml" rel="self" type="application/rss+xml"/>
+<description>Tomas Ruiz&#39;s blog</description>
+<generator>quarto-1.5.57</generator>
+<lastBuildDate>Wed, 11 Sep 2024 22:00:00 GMT</lastBuildDate>
+<item>
+  <title></title>
+  <dc:creator>Tomas Ruiz</dc:creator>
+  <link>https://tomasruizt.github.io/posts/viz-inequalities-inner-prod-wasm/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="grokking-an-inner-product-inequality-with-python-on-webassembly" class="level1">
+<h1>Grokking an Inner Product Inequality With Python on WebAssembly</h1>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>The purpose of this post is two-fold:</p>
+<ol type="1">
+<li>To showcase Python running directly in your browser <em>without</em> any server behind it, like JavaScript. I will even import libraries like <code>numpy</code> and <code>matplotlib</code>. The underlying technologies that power this are <a href="https://en.wikipedia.org/wiki/WebAssembly">WebAssembly</a> and <a href="https://pyodide.org/">Pyodide</a>, which I encourage you to check out.</li>
+<li>To get you excited about a simple inequality and its application to vectors, functions &amp; matrices. These are our objects of study, and we will inspect and visualize them interactively using Python.</li>
+</ol>
+<p>I created this document using <a href="https://r-wasm.github.io/quarto-live/">Quarto Live</a>. Big thanks to <a href="https://renatatopinkova.github.io/">Renata Topinkova</a> for showing me this tool!</p>
+</section>
+<section id="the-inequality" class="level2">
+<h2 class="anchored" data-anchor-id="the-inequality">The Inequality</h2>
+<p>Michael Steele presents in his book this simple inequality based only on the fact that <img src="https://latex.codecogs.com/png.latex?(x-y)%5E2"> is always positive<sup>1</sup>:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A0%20&amp;%5Cleq%20%20(x%20-%20y)%5E2%20%5C%5C%0A%5Cimplies%200%20&amp;%5Cleq%20x%5E2%20-2xy%20+y%5E2%20%5C%5C%0A%E2%9F%B9%20xy%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(x%5E2%20+%20y%5E2)%0A%5Cend%7Balign%7D%0A"></p>
+<p>The last inequality above is not intuitively obvious to me. I’m the kind of person that likes numerical proof to internalize these results, and this is where Python comes in handy. Change the variables <code>x</code> and <code>y</code> in the code below to see if the inequality holds.</p>
+<div>
+<div id="pyodide-1">
+
+</div>
+<script type="pyodide-1-contents">
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSJ9
+</script>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This Python code is running <em>in your browser</em>. There is no juypter notebook, nor any deployment or any client-server communication behind it! 🤯🚀</p>
+</div>
+</div>
+</section>
+<section id="generalizing-to-vectors" class="level2">
+<h2 class="anchored" data-anchor-id="generalizing-to-vectors">Generalizing to Vectors</h2>
+<p>What happens when we apply this inequality to more than just scalars? It also applies to sequences of numbers, e.g: <img src="https://latex.codecogs.com/png.latex?%0Ax_1%20y_1%20+%20x_2%20y_2%20%3C=%20%5Cfrac%7B1%7D%7B2%7D%20(x_1%5E2%20+%20x_2%5E2)%20+%20%5Cfrac%7B1%7D%7B2%7D%20(y_1%5E2%20+%20y_2%5E2)%0A"> You might recognize that this is equivalent to an inner product: <img src="https://latex.codecogs.com/png.latex?%20x%5ET%20y%20%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(x%5ET%20x%20+%20y%5ET%20y)"> where <img src="https://latex.codecogs.com/png.latex?x%20=%20%5Bx_1,%20%5Cdots,%20x_n%5D"> and <img src="https://latex.codecogs.com/png.latex?y%20=%20%5By_1,%20%5Cdots,%20y_n%5D">.</p>
+<p>The inequality is asserting that the vector product <img src="https://latex.codecogs.com/png.latex?x%5ETy"> of <em>any</em> two vectors <img src="https://latex.codecogs.com/png.latex?x"> and <img src="https://latex.codecogs.com/png.latex?y"> has an upper bound given by the average of <img src="https://latex.codecogs.com/png.latex?x%5ETx"> and <img src="https://latex.codecogs.com/png.latex?y%5ETy">.</p>
+<p>Once again, I’m not intuitively convinced until I see code running. Notice how we import <code>numpy</code>, which calls compiled C routines under the hood (<em>but our runtime is the browser now</em>).</p>
+<div>
+<div id="pyodide-2">
+
+</div>
+<script type="pyodide-2-contents">
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSJ9
+</script>
+</div>
+</section>
+<section id="generalizing-to-functions" class="level2">
+<h2 class="anchored" data-anchor-id="generalizing-to-functions">Generalizing to Functions</h2>
+<p>You might have heard that functions are infinite-dimensional vectors (🤯). In that case, the inequality also applies! But how does the inner product <img src="https://latex.codecogs.com/png.latex?x%5ETy"> for two functions look like?</p>
+<p>The convention is to use the bracket notation <img src="https://latex.codecogs.com/png.latex?%E2%9F%A8%20x,%20y%20%E2%9F%A9"> rather than <img src="https://latex.codecogs.com/png.latex?x%5ETy">. To sum over the infinite individual entries of the (function) vector, we use the integral:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%E2%9F%A8%20f,%20g%20%E2%9F%A9%20=%20%5Cint%20f(x)%20g(x)%20dx"> Using this definition, the inequality holds for functions as well: <img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A%E2%9F%A8%20f,%20g%20%E2%9F%A9%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(%E2%9F%A8%20f,%20f%20%E2%9F%A9%20+%20%E2%9F%A8%20g,%20g%20%E2%9F%A9)%20%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Cint%20f(x)%5E2%20dx%20+%20%5Cint%20g(x)%5E2%20dx%20%5Cright)%0A%5Cend%7Balign%7D%0A"></p>
+<p>Let’s take two concrete functions <img src="https://latex.codecogs.com/png.latex?f(x)%20=%20%5Ccos(x)"> and <img src="https://latex.codecogs.com/png.latex?g(x)%20=%20%5Csin(4x)">. I choose these arbitrarily because plotting them looks nice. Feel free to use different functions <code>f</code> and <code>g</code> in the code.</p>
+<script type="exercise-setup-ex_funcs-contents">
+eyJhdHRyIjp7ImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJzZXR1cCI6dHJ1ZSwiZXZhbCI6dHJ1ZX0sImNvZGUiOiJpbXBvcnQgbWF0cGxvdGxpYi5weXBsb3QgYXMgcGx0XG5cbmRlZiBwbG90KHgsIGYsIGcpOlxuICAgIHBsdC5wbG90KHgsIGYqZywgbGFiZWw9XCIkZiBcXFxcY2RvdCBnJFwiLCBjb2xvcj1cImdyZWVuXCIpXG4gICAgcGx0LnBsb3QoeCwgZipmLCBsYWJlbD1cIiRmXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgZypnLCBsYWJlbD1cIiRnXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgMC41ICogKGYqZiArIGcqZyksIGxhYmVsPVwiJDAuNSAoZl4yICsgZ14yKSRcIiwgY29sb3I9XCJyZWRcIilcbiAgICBwbHQudGl0bGUoXCJVcHBlciBib3VuZCBmb3IgJFxcXFxsYW5nbGUgZiwgZyBcXFxccmFuZ2xlJFwiKVxuICAgIHBsdC5sZWdlbmQoKVxuICAgIHBsdC5ncmlkKClcbiAgICBwbHQuc2hvdygpIn0=
+</script>
+<div>
+<div id="pyodide-4">
+
+</div>
+<script type="pyodide-4-contents">
+eyJhdHRyIjp7ImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJhdXRvcnVuIjp0cnVlLCJldmFsIjp0cnVlLCJlZGl0Ijp0cnVlLCJydW5idXR0b24iOmZhbHNlfSwiY29kZSI6ImltcG9ydCBudW1weSBhcyBucFxuXG54ID0gbnAubGluc3BhY2UoMCwgMiwgMTAwKVxuZiA9IG5wLmNvcyh4KVxuZyA9IG5wLnNpbig0KngpXG5wbG90KHgsIGYsIGcpIn0=
+</script>
+</div>
+<p>In the plot above, the individual functions <img src="https://latex.codecogs.com/png.latex?f%5E2"> and <img src="https://latex.codecogs.com/png.latex?g%5E2"> are plotted with light-blue lines. Their average is the red line, and the product <img src="https://latex.codecogs.com/png.latex?f%20%E2%8B%85%20g"> is the green line. The red line is an upper bound for the green one. We see that the green line crosses over the two blue lines at different points but never crosses over the red line.</p>
+<p><strong>About the integral:</strong> Perhaps you noticed that I formulated the inequality on inner-products, but I’m plotting the functions pointwise. The missing step is the integral, which is evaluated in Python using the numpy function <code>np.trapz()</code>. As we can confirm below, the inequality holds:</p>
+<div>
+<div id="pyodide-5">
+
+</div>
+<script type="pyodide-5-contents">
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikifQ==
+</script>
+</div>
+</section>
+<section id="generalizing-to-matrices" class="level2">
+<h2 class="anchored" data-anchor-id="generalizing-to-matrices">Generalizing to Matrices</h2>
+<p>Will the inequality also apply to matrices? The inner product of two matrices <img src="https://latex.codecogs.com/png.latex?A"> and <img src="https://latex.codecogs.com/png.latex?B"> (also called <a href="https://en.wikipedia.org/wiki/Frobenius_inner_product">Frobenius inner product</a>) is defined as: <img src="https://latex.codecogs.com/png.latex?%E2%9F%A8A,%20B%E2%9F%A9%20=%20%5Ctext%7Btr%7D(A%5ET%20B)"> where <img src="https://latex.codecogs.com/png.latex?%5Ctext%7Btr%7D"> is the trace operator.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Beware that this inner product is different from matrix multiplication <img src="https://latex.codecogs.com/png.latex?%E2%9F%A8A,%20B%E2%9F%A9%20=%20tr(A%5ET%20B)%20%E2%89%A0%20AB"></p>
+</div>
+</div>
+<p>The inequality for matrices then reads:</p>
+<p><img src="https://latex.codecogs.com/png.latex?tr(A%5ET%20B)%20%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(tr(A%5ET%20A)%20+%20tr(B%5ET%20B))"></p>
+<p>It’s easy to convince yourself that the inequality holds for matrices by writing down the trace as a sum of scalars. As we verified before, inequality holds for each scalar in the sum:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0Atr(A%5ET%20B)%0A&amp;=%20%5Csum_%7Bi,j%7D%20A_%7Bij%7D%20B_%7Bij%7D%20&amp;%20%5Ctext%7B(definition)%7D%5C%5C%0A&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Csum_%7Bi,j%7D%20A_%7Bij%7D%5E2%20+%20%5Csum_%7Bi,j%7D%20B_%7Bij%7D%5E2%20%5Cright)%20&amp;%5Ctext%7B(applied%20by%20scalar)%7D%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20(tr(A%5ET%20A)%20+%20tr(B%5ET%20B))%0A%5Cend%7Balign%7D%0A"></p>
+<p>Let’s check the inequality with random matrices. You can use the <code>"Start Over"</code> button to re-run the code with new matrices.</p>
+<div>
+<div id="pyodide-6">
+
+</div>
+<script type="pyodide-6-contents">
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIn0=
+</script>
+</div>
+<p>The inequality holds, but I have no geometric intuition about the trace of a matrix, or how this inequality could be visualized for matrices. If you have an idea, please let me know! 🙏</p>
+</section>
+<section id="further-sources" class="level2">
+<h2 class="anchored" data-anchor-id="further-sources">Further Sources</h2>
+<p>If you found the mathematics interesting, particularly the generalization of inner products, I recommend MIT’s course <a href="https://ocw.mit.edu/courses/18-s096-matrix-calculus-for-machine-learning-and-beyond-january-iap-2023/">Matrix Calculus for Machine Learning and Beyond</a>, which covers this topic in more detail, and goes <em>much</em> further 😄.</p>
+
+
+<script type="pyodide-data">
+eyJvcHRpb25zIjp7ImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjYuMS9mdWxsLyJ9LCJwYWNrYWdlcyI6eyJwa2dzIjpbInB5b2RpZGVfaHR0cCIsIm1pY3JvcGlwIiwiaXB5dGhvbiJdfX0=
+</script>
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTYiLCJpbmxpbmUiOmZhbHNlLCJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzYgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTYtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS02LWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfNiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNiwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTUiLCJpbmxpbmUiOmZhbHNlLCJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzUgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTUtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS01LWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfNSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNSwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJpbmxpbmUiOmZhbHNlLCJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzQgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTQtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICAvLyBEZWZhdWx0IGV4ZXJjaXNlIGNvbmZpZ3VyYXRpb25cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oXG4gICAge1xuICAgICAgaWQ6IFwicHlvZGlkZS00LWNvbnRlbnRzXCIsXG4gICAgICBlbnZpcjogYGV4ZXJjaXNlLWVudi0ke2Jsb2NrLmF0dHIuZXhlcmNpc2V9YCxcbiAgICAgIGVycm9yOiBmYWxzZSxcbiAgICAgIGF1dG9ydW46IGZhbHNlLFxuICAgICAgY2FwdGlvbjogJ0V4ZXJjaXNlJyxcbiAgICB9LFxuICAgIGJsb2NrLmF0dHJcbiAgKTtcblxuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsIGJsb2NrLmNvZGUsIG9wdGlvbnMpO1xuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbnZpZXdvZiBfcHlvZGlkZV92YWx1ZV80ID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl80LCB7fSk7XG5fcHlvZGlkZV9mZWVkYmFja180ID0ge1xuICBjb25zdCB7IFB5b2RpZGVHcmFkZXIgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG4gIGNvbnN0IGVtcHR5RmVlZGJhY2sgPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTtcblxuICBjb25zdCBncmFkZXIgPSBuZXcgUHlvZGlkZUdyYWRlcihfcHlvZGlkZV92YWx1ZV80LmV2YWx1YXRvcik7XG4gIGNvbnN0IGZlZWRiYWNrID0gYXdhaXQgZ3JhZGVyLmdyYWRlRXhlcmNpc2UoKTtcbiAgaWYgKCFmZWVkYmFjaykgcmV0dXJuIGVtcHR5RmVlZGJhY2s7XG4gIHJldHVybiBmZWVkYmFjaztcbn1cbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImNlbGxOYW1lIjoicHlvZGlkZS0yIiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8yID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0yLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzIgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzIsIHt9KTtcbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImNlbGxOYW1lIjoicHlvZGlkZS0xIiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8xID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0xLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzEgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzEsIHt9KTtcbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoicHlvZGlkZU9qcyA9IHtcbiAgY29uc3Qge1xuICAgIFB5b2RpZGVFdmFsdWF0b3IsXG4gICAgUHlvZGlkZUVudmlyb25tZW50TWFuYWdlcixcbiAgICBzZXR1cFB5dGhvbixcbiAgICBzdGFydFB5b2RpZGVXb3JrZXIsXG4gICAgYjY0RGVjb2RlLFxuICAgIGNvbGxhcHNlUGF0aCxcbiAgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc3RhdHVzQ29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJleGVyY2lzZS1sb2FkaW5nLXN0YXR1c1wiKTtcbiAgY29uc3QgaW5kaWNhdG9yQ29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJleGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaW5kaWNhdG9yQ29udGFpbmVyLmNsYXNzTGlzdC5yZW1vdmUoXCJkLW5vbmVcIik7XG5cbiAgbGV0IHN0YXR1c1RleHQgPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwiZGl2XCIpXG4gIHN0YXR1c1RleHQuY2xhc3NMaXN0ID0gXCJleGVyY2lzZS1sb2FkaW5nLWRldGFpbHNcIjtcbiAgc3RhdHVzVGV4dCA9IHN0YXR1c0NvbnRhaW5lci5hcHBlbmRDaGlsZChzdGF0dXNUZXh0KTtcbiAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBJbml0aWFsaXNlYDtcblxuICAvLyBIb2lzdCBpbmRpY2F0b3Igb3V0IGZyb20gZmluYWwgc2xpZGUgd2hlbiBydW5uaW5nIHVuZGVyIHJldmVhbFxuICBjb25zdCByZXZlYWxTdGF0dXMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCAuZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGlmIChyZXZlYWxTdGF0dXMpIHtcbiAgICByZXZlYWxTdGF0dXMucmVtb3ZlKCk7XG4gICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgPiAuc2xpZGVzXCIpLmFwcGVuZENoaWxkKHJldmVhbFN0YXR1cyk7XG4gIH1cblxuICAvLyBQeW9kaWRlIHN1cHBsZW1lbnRhbCBkYXRhIGFuZCBvcHRpb25zXG4gIGNvbnN0IGRhdGFDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtZGF0YVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGRhdGEgPSBKU09OLnBhcnNlKGI2NERlY29kZShkYXRhQ29udGVudCkpO1xuXG4gIC8vIEdyYWIgbGlzdCBvZiByZXNvdXJjZXMgdG8gYmUgZG93bmxvYWRlZFxuICBjb25zdCBmaWxlc0NvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwidmZzLWZpbGVcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBmaWxlcyA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGZpbGVzQ29udGVudCkpO1xuXG4gIGxldCBweW9kaWRlUHJvbWlzZSA9IChhc3luYyAoKSA9PiB7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBQeW9kaWRlYDtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgc3RhcnRQeW9kaWRlV29ya2VyKGRhdGEub3B0aW9ucyk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6IG1pY3JvcGlwYDtcbiAgICBhd2FpdCBweW9kaWRlLmxvYWRQYWNrYWdlKFwibWljcm9waXBcIik7XG4gICAgY29uc3QgbWljcm9waXAgPSBhd2FpdCBweW9kaWRlLnB5aW1wb3J0KFwibWljcm9waXBcIik7XG4gICAgYXdhaXQgZGF0YS5wYWNrYWdlcy5wa2dzLm1hcCgocGtnKSA9PiAoKSA9PiB7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6ICR7cGtnfWA7XG4gICAgICByZXR1cm4gbWljcm9waXAuaW5zdGFsbChwa2cpO1xuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuICAgIGF3YWl0IG1pY3JvcGlwLmRlc3Ryb3koKTtcblxuICAgIC8vIERvd25sb2FkIGFuZCBpbnN0YWxsIHJlc291cmNlc1xuICAgIGF3YWl0IGZpbGVzLm1hcCgoZmlsZSkgPT4gYXN5bmMgKCkgPT4ge1xuICAgICAgY29uc3QgbmFtZSA9IGZpbGUuc3Vic3RyaW5nKGZpbGUubGFzdEluZGV4T2YoJy8nKSArIDEpO1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyByZXNvdXJjZTogJHtuYW1lfWA7XG4gICAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGZldGNoKGZpbGUpO1xuICAgICAgaWYgKCFyZXNwb25zZS5vaykge1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYENhbid0IGRvd25sb2FkIFxcYCR7ZmlsZX1cXGAuIEVycm9yICR7cmVzcG9uc2Uuc3RhdHVzfTogXCIke3Jlc3BvbnNlLnN0YXR1c1RleHR9XCIuYCk7XG4gICAgICB9XG4gICAgICBjb25zdCBkYXRhID0gYXdhaXQgcmVzcG9uc2UuYXJyYXlCdWZmZXIoKTtcblxuICAgICAgLy8gU3RvcmUgVVJMcyBpbiB0aGUgY3dkIHdpdGhvdXQgYW55IHN1YmRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGlmIChmaWxlLmluY2x1ZGVzKFwiOi8vXCIpKSB7XG4gICAgICAgIGZpbGUgPSBuYW1lO1xuICAgICAgfVxuXG4gICAgICAvLyBDb2xsYXBzZSBoaWdoZXIgZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgZmlsZSA9IGNvbGxhcHNlUGF0aChmaWxlKTtcblxuICAgICAgLy8gQ3JlYXRlIGRpcmVjdG9yeSB0cmVlLCBpZ25vcmluZyBcImRpcmVjdG9yeSBleGlzdHNcIiBWRlMgZXJyb3JzXG4gICAgICBjb25zdCBwYXJ0cyA9IGZpbGUuc3BsaXQoJy8nKS5zbGljZSgwLCAtMSk7XG4gICAgICBsZXQgcGF0aCA9ICcnO1xuICAgICAgd2hpbGUgKHBhcnRzLmxlbmd0aCA+IDApIHtcbiAgICAgICAgcGF0aCArPSBwYXJ0cy5zaGlmdCgpICsgJy8nO1xuICAgICAgICB0cnkge1xuICAgICAgICAgIGF3YWl0IHB5b2RpZGUuRlMubWtkaXIocGF0aCk7XG4gICAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgICBpZiAoZS5lcnJubyAhPT0gMjApIHtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBXcml0ZSB0aGlzIGZpbGUgdG8gdGhlIFZGU1xuICAgICAgdHJ5IHtcbiAgICAgICAgcmV0dXJuIGF3YWl0IHB5b2RpZGUuRlMud3JpdGVGaWxlKGZpbGUsIG5ldyBVaW50OEFycmF5KGRhdGEpKTtcbiAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgUHlvZGlkZSBlbnZpcm9ubWVudCBzZXR1cGA7XG4gICAgYXdhaXQgc2V0dXBQeXRob24ocHlvZGlkZSk7XG5cbiAgICBzdGF0dXNUZXh0LnJlbW92ZSgpO1xuICAgIGlmIChzdGF0dXNDb250YWluZXIuY2hpbGRyZW4ubGVuZ3RoID09IDApIHtcbiAgICAgIHN0YXR1c0NvbnRhaW5lci5wYXJlbnROb2RlLnJlbW92ZSgpO1xuICAgIH1cbiAgICByZXR1cm4gcHlvZGlkZTtcbiAgfSkoKS5jYXRjaCgoZXJyKSA9PiB7XG4gICAgc3RhdHVzVGV4dC5zdHlsZS5jb2xvciA9IFwidmFyKC0tZXhlcmNpc2UtZWRpdG9yLWhsLWVyLCAjQUQwMDAwKVwiO1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBlcnIubWVzc2FnZTtcbiAgICAvL2luZGljYXRvckNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKFwiLnNwaW5uZXItZ3Jvd1wiKS5jbGFzc0xpc3QuYWRkKFwiZC1ub25lXCIpO1xuICAgIHRocm93IGVycjtcbiAgfSk7XG5cbiAgLy8gS2VlcCB0cmFjayBvZiBpbml0aWFsIE9KUyBibG9jayByZW5kZXJcbiAgY29uc3QgcmVuZGVyZWRPanMgPSB7fTtcblxuICBjb25zdCBwcm9jZXNzID0gYXN5bmMgKGNvbnRleHQsIGlucHV0cykgPT4ge1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBweW9kaWRlUHJvbWlzZTtcbiAgICBjb25zdCBldmFsdWF0b3IgPSBuZXcgUHlvZGlkZUV2YWx1YXRvcihweW9kaWRlLCBjb250ZXh0KTtcbiAgICBhd2FpdCBldmFsdWF0b3IucHJvY2VzcyhpbnB1dHMpO1xuICAgIHJldHVybiBldmFsdWF0b3IuY29udGFpbmVyO1xuICB9XG5cbiAgcmV0dXJuIHtcbiAgICBweW9kaWRlUHJvbWlzZSxcbiAgICByZW5kZXJlZE9qcyxcbiAgICBwcm9jZXNzLFxuICB9O1xufVxuIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0In1dfQ==
+</script>
+<div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
+<div id="exercise-loading-status" class="d-flex gap-2">
+
+</div>
+<div class="spinner-grow spinner-grow-sm">
+
+</div>
+</div>
+<script type="vfs-file">
+W10=
+</script>
+</section>
+</section>
+
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>“The Cauchy-Schwarz Master Class: An Introduction to the Art of Mathematical Inequalities” by J. Michael Steele.↩︎</p></li>
+</ol>
+</section></div> ]]></description>
+  <category>Mathematics</category>
+  <category>Python</category>
+  <guid>https://tomasruizt.github.io/posts/viz-inequalities-inner-prod-wasm/</guid>
+  <pubDate>Wed, 11 Sep 2024 22:00:00 GMT</pubDate>
+  <media:content url="https://tomasruizt.github.io/posts/viz-inequalities-inner-prod-wasm/upper-bound-img.png" medium="image" type="image/png" height="103" width="144"/>
+</item>
+<item>
+  <title>A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification</title>
+  <dc:creator>Tomas Ruiz</dc:creator>
+  <link>https://tomasruizt.github.io/posts/linear-adaptation/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="summary" class="level1">
+<h1>Summary</h1>
+<p>In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation <img src="https://latex.codecogs.com/png.latex?W"> is shown in figure 1 (green).</p>
+<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Learned Linear Transformation" data-text-align="center">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="linear-adaptation/linear-adaptation.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."><img src="https://tomasruizt.github.io/posts/linear-adaptation/linear-adaptation/linear-adaptation.png" class="img-fluid figure-img" style="width:75.0%" data-text-align="center" alt="Learned Linear Transformation"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="about-fine-tuning" class="level1">
+<h1>About Fine-Tuning</h1>
+<p>Large Language Models (LLMs) are great baseline models for <strong>zero-shot</strong> classification, i.e.&nbsp;without any labeled examples. However, one often has a small labeled dataset <img src="https://latex.codecogs.com/png.latex?D"> and is interested in improving the performance over this baseline. In the <strong>few-shot</strong> setting, some labeled examples are provided in the prompt for the model to learn in context. To improve upon this setting, the next step is to <strong>fine-tune</strong> the model on the labeled dataset.</p>
+<p>There are different ways to fine-tune LLMs. For example: optimizing all network parameters, optimizing only the parameters of the final layer, or freezing all parameters but introduce a new smaller set of tunable parameters <span class="citation" data-cites="hu2021lora">(Hu et al. 2021)</span>. In this post, I focus on the simple case of fine-tuning the last linear transformation, because I’m interested in interpreting the changes to individual logits and probabilities.</p>
+</section>
+<section id="binary-classification" class="level1">
+<h1>Binary Classification</h1>
+<p>I also focus on binary classification specifically. This means that the model must only answer <code>yes/no</code> or <code>0/1</code> to the prompt. This setting is easier to interpret with metrics like precision, recall or the <img src="https://latex.codecogs.com/png.latex?F1"> score. Furthermore, in the binary case we can interpret how the fine-tuning procedure affected the model by inspecting the answers that flipped between <code>yes/no</code> and vice-versa <span class="citation" data-cites="dutta2024accuracy">(Dutta et al. 2024)</span>.</p>
+<p>In terms of computation, we will see that the problem structure of binary classification can be leveraged to compute a closed-form solution efficiently. As shown in Figure&nbsp;1, I add an additional linear transformation <img src="https://latex.codecogs.com/png.latex?W"> before the softmax, and solve for it using the Moore-Penrose Inverse. This is mathematically equivalent to training <img src="https://latex.codecogs.com/png.latex?W"> with gradient descent, but without all the iteration.</p>
+</section>
+<section id="closed-form-solution" class="level1">
+<h1>Closed-Form Solution</h1>
+<p>In underbraces, I’ve written the dimension of the matrices and vectors. In the original language model, the probability vector <img src="https://latex.codecogs.com/png.latex?y"> has the same size of the vocabulary <img src="https://latex.codecogs.com/png.latex?V">, and is given by:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Baligned%7D%0A%5Cunderbrace%7Bp(y%20%7C%20x_%7B1:t%7D)%7D_%7B(1,V)%7D%0A&amp;=%20%5Ctext%7Bsoftmax%7D(%5Cunderbrace%7B%5Ctext%7Blogits%7D_t%7D_%7B(1,V)%7D)%20%5C%5C%0A&amp;=%20%5Ctext%7Bsoftmax%7D(%5Cunderbrace%7Bz_t%7D_%7B(1,d)%7D%20%5Cunderbrace%7BA%7D_%7B(d,V)%7D)%0A%5Cend%7Baligned%7D%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?z_t"> is the hidden state for the last token, and <img src="https://latex.codecogs.com/png.latex?A"> is the weights the last linear layer (no bias is included as in <span class="citation" data-cites="chowdhery2023palm">Chowdhery et al. (2023)</span>). The loss for this model is defined as the distance between these probabilites and our true labels, which is a set of binary labels <img src="https://latex.codecogs.com/png.latex?D%20=%20%5Cbegin%7Bbmatrix%7D%20d_1%20%5C%5C%20%5Cvdots%20%5C%5C%20d_N%20%5Cend%7Bbmatrix%7D%20%5Cin%20%5Cmathbb%7BR%7D%5E%7B(N,%202)%7D"></p>
+<p>With fine-tuning, we modify the probabilities that the LLM assigns to the tokens for <code>yes/no</code> from <img src="https://latex.codecogs.com/png.latex?p"> to <img src="https://latex.codecogs.com/png.latex?p_a"> (<em>adapted probabilities</em>). The role of <img src="https://latex.codecogs.com/png.latex?W"> is change the logits that are passed to the softmax function. We tweak <img src="https://latex.codecogs.com/png.latex?W"> to approximate the dataset <img src="https://latex.codecogs.com/png.latex?D"> with the adapted probabilities <img src="https://latex.codecogs.com/png.latex?p_a">:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Baligned%7D%0Ap_a(y%20%7C%20x_%7B1:t%7D)%20&amp;=%20%5Ctext%7Bsoftmax%7D(%5Ctext%7Blogits%7D_t%20+%20z_t%20W)%20%5C%5C%0A%5Cimplies%20%5Cunderbrace%7B%5Clog%20p_a%7D_%7B(1,%20V)%7D%0A&amp;=%20%5Cunderbrace%7B%5Ctext%7Blogits%7D_t%7D_%7B(1,V)%7D%20+%20%5Cunderbrace%7Bz_t%7D_%7B(1,d)%7D%20%5Cunderbrace%7BW%7D_%7B(d,V)%7D%0A%5Cend%7Baligned%7D%0A"></p>
+<p>In vectorized form (one row per datapoint <img src="https://latex.codecogs.com/png.latex?N">) this can be written as:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Baligned%7D%0A%5Cunderbrace%7B%5Clog%20P_a%7D_%7B(N,V)%7D%0A&amp;=%20%5Cunderbrace%7BL_t%7D_%7B(N,V)%7D%20+%20%5Cunderbrace%7BZ_t%7D_%7B(N,d)%7D%20%5Cunderbrace%7BW%7D_%7B(d,V)%7D%0A%5Cend%7Baligned%7D%0A"></p>
+<p>Solving for <img src="https://latex.codecogs.com/png.latex?W"> exactly is only possible for squared invertible matrices <img src="https://latex.codecogs.com/png.latex?Z_t">. However, <img src="https://latex.codecogs.com/png.latex?W"> is rectangular (size <img src="https://latex.codecogs.com/png.latex?(d,%20V)">), so this problem is solved approximately by minimizing the squared distance:</p>
+<p><img src="https://latex.codecogs.com/png.latex?W%20=%20%5Carg%20%5Cmin_W%20%7C%7C%20(%5Clog%20P_a%20-%20L_t)%20-%20Z_t%20W%20%7C%7C%5E2_2%20%5Cqquad%20(1)%20"></p>
+<p>This is a least squares problem, whose solution is given by the <strong>Moore-Penrose Inverse</strong>.</p>
+<p><img src="https://latex.codecogs.com/png.latex?W%20=%20(Z_t%5ET%20Z_t)%5E%7B-1%7D%20Z_t%5ET%20(%5Clog%20P_a%20-%20L_t)"></p>
+<p>Or equivalently, by solving the following linear system of equations with <img src="https://latex.codecogs.com/png.latex?V"> columns (<em>But see note on numerical stability <sup>1</sup></em>).</p>
+<p><img src="https://latex.codecogs.com/png.latex?W%20=%20%5Ctext%7Blinsolve%7D(%5Cunderbrace%7BZ_t%5ET%20Z_t%7D_%7B(d,d)%7D,%20%5Cspace%20%5Cunderbrace%7BZ_t%5ET%20(%5Clog%20P_a%20-%20L_t)%7D_%7B(d,V)%7D)%20%5Cqquad%20(2)%20"></p>
+</section>
+<section id="runtime" class="level1">
+<h1>Runtime</h1>
+<p>Each linear system takes <img src="https://latex.codecogs.com/png.latex?O(d%5E3)"> to solve, so solving <img src="https://latex.codecogs.com/png.latex?V"> of these systems is prohibitively expensive (<img src="https://latex.codecogs.com/png.latex?V=128k,%20d=4k"> in LLama3 8B). (<em>But see note on repeated linear solves<sup>2</sup></em>). However, we can exploit the structure of the binary classification problem, by only evaluating the logits <img src="https://latex.codecogs.com/png.latex?L_t"> and probabilities <img src="https://latex.codecogs.com/png.latex?P_a"> for the <code>yes/no</code> tokens. This reduces the size of the probability matrix <img src="https://latex.codecogs.com/png.latex?P_a"> by <em>4 to 5 orders of magnitude</em>, from <img src="https://latex.codecogs.com/png.latex?(N,V)"> to <img src="https://latex.codecogs.com/png.latex?(N,2)">. Similarly, the learned matrix <img src="https://latex.codecogs.com/png.latex?W"> shrinks from size <img src="https://latex.codecogs.com/png.latex?(d,V)"> to <img src="https://latex.codecogs.com/png.latex?(d,2)">.</p>
+<p>As a result, we need to solve only 2 linear systems, each with runtime constant in the vocabulary size <img src="https://latex.codecogs.com/png.latex?V"> and in the number of datapoints in our dataset <img src="https://latex.codecogs.com/png.latex?N">, but proportional to <img src="https://latex.codecogs.com/png.latex?O(d%5E3)">. As an added benefit of evaluating only the <code>yes/no</code> logits, the output of the fine-tuned model is compliant by design, as it cannot output any other logits other than for <code>yes/no</code>.</p>
+<p>To solve for <img src="https://latex.codecogs.com/png.latex?W"> either using eq (1) or eq (2), we plug in our dataset <img src="https://latex.codecogs.com/png.latex?D"> for <img src="https://latex.codecogs.com/png.latex?P_a">, since both matrices have the same size.</p>
+</section>
+<section id="inference" class="level1">
+<h1>Inference</h1>
+<p>At inference time, the matrix <img src="https://latex.codecogs.com/png.latex?W"> stays constant, while the logits change for each input.</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Baligned%7D%0Ap_a(y%7Cx_%7B1:t%7D)%0A&amp;=%20%5Ctext%7Bsoftmax%7D%20%5C%7B%20%5Ctext%7Blogits%7D_t%20+%20z_t%20W%20%5C%7D%20%5C%5C%0A&amp;=%20%5Ctext%7Bsoftmax%7D%20%5C%7B%20z_t%20A%20+%20z_t%20W%20%5C%7D%0A%5Cend%7Baligned%7D%0A"></p>
+</section>
+<section id="next-steps" class="level1">
+<h1>Next Steps</h1>
+<p>In the next post, I will show an implementation of this method in PyTorch, and interpret how linear fine-tuning changes the outputs of the original LLM. I am interested in the flips between <code>yes/no</code> outside of the small fine-tuning dataset <img src="https://latex.codecogs.com/png.latex?D">, and particularly on the boundaries of the dataset, and how this pertains to generalization. Stay tuned! :)</p>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-chowdhery2023palm" class="csl-entry">
+Chowdhery, Aakanksha, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, et al. 2023. <span>“Palm: Scaling Language Modeling with Pathways.”</span> <em>Journal of Machine Learning Research</em> 24 (240): 1–113.
+</div>
+<div id="ref-dutta2024accuracy" class="csl-entry">
+Dutta, Abhinav, Sanjeev Krishnan, Nipun Kwatra, and Ramachandran Ramjee. 2024. <span>“Accuracy Is Not All You Need.”</span> <em>arXiv Preprint arXiv:2407.09141</em>.
+</div>
+<div id="ref-hu2021lora" class="csl-entry">
+Hu, Edward J, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. 2021. <span>“Lora: Low-Rank Adaptation of Large Language Models.”</span> <em>arXiv Preprint arXiv:2106.09685</em>.
+</div>
+<div id="ref-watkins2004fundamentals" class="csl-entry">
+Watkins, David S. 2004. <em>Fundamentals of Matrix Computations</em>. John Wiley &amp; Sons.
+</div>
+</div>
+
+
+</section>
+</section>
+
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>2024-09: The matrix <img src="https://latex.codecogs.com/png.latex?Z%5ET%20Z"> is positive definite, so it is in theory efficiently invertible using the Cholesky decomposition. However, its condition number <img src="https://latex.codecogs.com/png.latex?%5Ckappa%20(Z%5ET%20Z)"> is squarely proportional to the condition number of <img src="https://latex.codecogs.com/png.latex?%5Ckappa(Z)">. This can lead to numerical instability when solving the linear system. In fact, I stumbled upon numerical instability while implementing this in linear system in PyTorch, which lead me to use an <img src="https://latex.codecogs.com/png.latex?L_2"> regularization term. See <a href="https://tobydriscoll.net/fnc-julia/leastsq/normaleqns.html#conditioning-and-stability">Source</a>.↩︎</p></li>
+<li id="fn2"><p>2024-09: It turns out that solving a linear system with <img src="https://latex.codecogs.com/png.latex?V"> columns on the right-hand side can be done cheaper than in <img src="https://latex.codecogs.com/png.latex?V%20%5Ccdot%20%5Cfrac%7B2%7D%7B3%7D%20d%5E3"> flops. To solve <img src="https://latex.codecogs.com/png.latex?A%20X%20=%20B"> (with <img src="https://latex.codecogs.com/png.latex?A%20%5Cin%20%5Cmathbb%7BR%7D%5E%7Bd,d%7D"> and <img src="https://latex.codecogs.com/png.latex?X,%20B%20%5Cin%20%5Cmathbb%7BR%7D%5E%7Bd,V%7D">) the factorization of <img src="https://latex.codecogs.com/png.latex?A"> requires <img src="https://latex.codecogs.com/png.latex?%5Cfrac%7B2%7D%7B3%7D%20d%5E3"> flops, but it only has to be done once. After that, solving for each of the <img src="https://latex.codecogs.com/png.latex?V"> columns of <img src="https://latex.codecogs.com/png.latex?B"> costs <img src="https://latex.codecogs.com/png.latex?2%20d%5E2"> flops each. So the total flop count is <img src="https://latex.codecogs.com/png.latex?%5Cfrac%7B2%7D%7B3%7D%20d%5E3%20+%20V%20%5Ccdot%202%20d%5E2">. This is a significant improvement over the naive approach. See <span class="citation" data-cites="watkins2004fundamentals">(Watkins 2004, 77–78)</span>.↩︎</p></li>
+</ol>
+</section></div> ]]></description>
+  <category>Machine Learning</category>
+  <guid>https://tomasruizt.github.io/posts/linear-adaptation/</guid>
+  <pubDate>Thu, 01 Aug 2024 22:00:00 GMT</pubDate>
+  <media:content url="https://tomasruizt.github.io/posts/linear-adaptation/linear-adaptation/linear-adaptation.png" medium="image" type="image/png" height="128" width="144"/>
+</item>
+</channel>
+</rss>
