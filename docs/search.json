@@ -7,27 +7,6 @@
     "text": "Grokking an Inner Product Inequality With Python on WebAssembly\n\n\n\n\n\n\nMathematics\n\n\nPython\n\n\n\n\n\n\n\n\n\nSep 12, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nA Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification\n\n\n\n\n\n\nMachine Learning\n\n\n\n\n\n\n\n\n\nAug 2, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\nNo matching items"
   },
   {
-    "objectID": "posts/linear-adaptation/index.html",
-    "href": "posts/linear-adaptation/index.html",
-    "title": "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification",
-    "section": "",
-    "text": "In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation \\(W\\) is shown in figure 1 (green).\n\n\n\n\n\n\nFigure 1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."
-  },
-  {
-    "objectID": "posts/linear-adaptation/index.html#references",
-    "href": "posts/linear-adaptation/index.html#references",
-    "title": "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification",
-    "section": "References",
-    "text": "References\n\n\nChowdhery, Aakanksha, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, et al. 2023. “Palm: Scaling Language Modeling with Pathways.” Journal of Machine Learning Research 24 (240): 1–113.\n\n\nDutta, Abhinav, Sanjeev Krishnan, Nipun Kwatra, and Ramachandran Ramjee. 2024. “Accuracy Is Not All You Need.” arXiv Preprint arXiv:2407.09141.\n\n\nHu, Edward J, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. 2021. “Lora: Low-Rank Adaptation of Large Language Models.” arXiv Preprint arXiv:2106.09685.\n\n\nWatkins, David S. 2004. Fundamentals of Matrix Computations. John Wiley & Sons."
-  },
-  {
-    "objectID": "posts/linear-adaptation/index.html#footnotes",
-    "href": "posts/linear-adaptation/index.html#footnotes",
-    "title": "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification",
-    "section": "Footnotes",
-    "text": "Footnotes\n\n\n2024-09: The matrix \\(Z^T Z\\) is positive definite, so it is in theory efficiently invertible using the Cholesky decomposition. However, its condition number \\(\\kappa (Z^T Z)\\) is squarely proportional to the condition number of \\(\\kappa(Z)\\). This can lead to numerical instability when solving the linear system. In fact, I stumbled upon numerical instability while implementing this in linear system in PyTorch, which lead me to use an \\(L_2\\) regularization term. See Source.↩︎\n2024-09: It turns out that solving a linear system with \\(V\\) columns on the right-hand side can be done cheaper than in \\(V \\cdot \\frac{2}{3} d^3\\) flops. To solve \\(A X = B\\) (with \\(A \\in \\mathbb{R}^{d,d}\\) and \\(X, B \\in \\mathbb{R}^{d,V}\\)) the factorization of \\(A\\) requires \\(\\frac{2}{3} d^3\\) flops, but it only has to be done once. After that, solving for each of the \\(V\\) columns of \\(B\\) costs \\(2 d^2\\) flops each. So the total flop count is \\(\\frac{2}{3} d^3 + V \\cdot 2 d^2\\). This is a significant improvement over the naive approach. See (Watkins 2004, 77–78).↩︎"
-  },
-  {
     "objectID": "posts/viz-inequalities-inner-prod-wasm/index.html",
     "href": "posts/viz-inequalities-inner-prod-wasm/index.html",
     "title": "Grokking an Inner Product Inequality With Python on WebAssembly",
@@ -82,6 +61,34 @@
     "title": "Grokking an Inner Product Inequality With Python on WebAssembly",
     "section": "Footnotes",
     "text": "Footnotes\n\n\n“The Cauchy-Schwarz Master Class: An Introduction to the Art of Mathematical Inequalities” by J. Michael Steele.↩︎"
+  },
+  {
+    "objectID": "posts/linear-adaptation/index.html",
+    "href": "posts/linear-adaptation/index.html",
+    "title": "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification",
+    "section": "",
+    "text": "In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation \\(W\\) is shown in figure 1 (green).\n\n\n\n\n\n\nFigure 1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."
+  },
+  {
+    "objectID": "posts/linear-adaptation/index.html#references",
+    "href": "posts/linear-adaptation/index.html#references",
+    "title": "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification",
+    "section": "References",
+    "text": "References\n\n\nChowdhery, Aakanksha, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, et al. 2023. “Palm: Scaling Language Modeling with Pathways.” Journal of Machine Learning Research 24 (240): 1–113.\n\n\nDutta, Abhinav, Sanjeev Krishnan, Nipun Kwatra, and Ramachandran Ramjee. 2024. “Accuracy Is Not All You Need.” arXiv Preprint arXiv:2407.09141.\n\n\nHu, Edward J, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. 2021. “Lora: Low-Rank Adaptation of Large Language Models.” arXiv Preprint arXiv:2106.09685.\n\n\nWatkins, David S. 2004. Fundamentals of Matrix Computations. John Wiley & Sons."
+  },
+  {
+    "objectID": "posts/linear-adaptation/index.html#footnotes",
+    "href": "posts/linear-adaptation/index.html#footnotes",
+    "title": "A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification",
+    "section": "Footnotes",
+    "text": "Footnotes\n\n\n2024-09: The matrix \\(Z^T Z\\) is positive definite, so it is in theory efficiently invertible using the Cholesky decomposition. However, its condition number \\(\\kappa (Z^T Z)\\) is squarely proportional to the condition number of \\(\\kappa(Z)\\). This can lead to numerical instability when solving the linear system. In fact, I stumbled upon numerical instability while implementing this in linear system in PyTorch, which lead me to use an \\(L_2\\) regularization term. See Source.↩︎\n2024-09: It turns out that solving a linear system with \\(V\\) columns on the right-hand side can be done cheaper than in \\(V \\cdot \\frac{2}{3} d^3\\) flops. To solve \\(A X = B\\) (with \\(A \\in \\mathbb{R}^{d,d}\\) and \\(X, B \\in \\mathbb{R}^{d,V}\\)) the factorization of \\(A\\) requires \\(\\frac{2}{3} d^3\\) flops, but it only has to be done once. After that, solving for each of the \\(V\\) columns of \\(B\\) costs \\(2 d^2\\) flops each. So the total flop count is \\(\\frac{2}{3} d^3 + V \\cdot 2 d^2\\). This is a significant improvement over the naive approach. See (Watkins 2004, 77–78).↩︎"
+  },
+  {
+    "objectID": "subscribe.html",
+    "href": "subscribe.html",
+    "title": "Subscribe",
+    "section": "",
+    "text": "To receive a notification when a new post is published, subscribe to the mailing list below.\n\n    \n\n\n  \n      \n          * indicates required\n          Email Address *\n      \n          \n          \n      \n  \n      /* real people should not fill this in and expect good things - do not remove this or risk form bot signups */"
   },
   {
     "objectID": "about.html",
