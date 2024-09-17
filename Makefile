@@ -1,4 +1,4 @@
 render:
-	quarto render tomas-blog --output-dir=docs
+	quarto render tomas-blog && mv tomas-blog/docs .
 run:
 	quarto preview tomas-blog
