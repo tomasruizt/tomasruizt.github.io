@@ -1,0 +1,103 @@
+---
+title: "How Does Tiling Speed Up Matrix Multiplication?"
+author:
+  - name: Tomas Ruiz
+    email: t.ruiz@lmu.de
+    affiliations: Ludwig-Maximilians-Universität München
+date: "2024-10-26"
+categories: [Mathematics, GPUs]
+format:
+  html:
+    toc: true
+    code-line-numbers: true
+editor:
+    render-on-save: true
+image: tiled-matrix-multiplication-squared.jpg
+engine: jupyter
+# draft: true
+---
+
+This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this speeds up the matrix multiplication operation, not only on CPUs, but also in GPUs.
+
+# Simple Matrix Multiplication
+Assume a matrix multiplication $AB = C$. For instructional purposes, we will assume that $A$ and $B$ are squared with size $n$. A simple formula for each element of $C$ is given by:
+
+$$C_{ij} = \sum_{k=1}^n A_{ik} B_{kj}$$
+
+Below is simple pseudocode for this operation. The total amount of floating-point operations (flops) is $2n^3$.
+
+```python {#lst-naive-matmul} 
+n, _ = A.shape
+for i in range(n):
+    for j in range(n):
+        for k in range(n):
+            C[i][j] += A[i][k] * B[k][j]
+```
+
+The code is correct, but it is inefficient in terms of its memory access pattern. Let's see why.
+
+# Memory Access Efficiency
+Besides the flops counts, the performance of an algorithms is also determined by the memory access pattern. Each operation requires fetching data from main memory into a fast cache, and then returning computed data to main memory. This roundtrip is time-consuming, often more so than the flops themselves. 
+
+::: {.callout-tip}
+# Remember
+To speed up our computations, **we need to minimize the number of memory transfers per flop**.
+:::
+
+## Naive Memory Access
+In the naive matrix multiplication above, to compute each element $C_{ij}$ we need to fetch $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). Therefore, we have $2n$ memory accesses. On this data we perform a multiplication and an addition $n$ times, which sums to $2n$ flops. This is what happens in line 5:
+
+```python
+C[i][j] += A[i][k] * B[k][j]
+```
+
+The ratio of flops ($2n$) to memory transfers from memory to cache ($2n$) is $\frac{2n}{2n} = 1$. essentially, we are doing one flop per unit of memory transfer. Can we do better?
+
+## Theoretically Optimal Memory Access
+If our cache was large enough, we would transfer all elements of $A$ and $B$ into cache at once ($2n^2$ transfers) and perform the full matrix multiplication ($2n^3$ flops). The ratio of flops to memory transfers would be $\frac{2n^3}{2n^2} = n$, suggesting that the larger the matrix, the more compute we do per unit of memory transfer.
+
+::: {.callout-note}
+# Example
+If our matrix size is $n=10000$, the naive approach would do one flop per memory transfer, while the optimal approach would do 10000 flops per memory transfer. This is a 10000x speedup!
+:::
+
+## A Middle Ground: Tiling
+In practice, we cannot fit the entire matrix into the fast memory cache. However, we can fit smaller squared submatrices of size $r$ into cache. This is the idea behind **tiling**. We divide the matrix into many small blocks, compute the block-wise matrix multiplication, and then sum the results.
+
+To gain some intuition about how block matrix multiplication works, lets break down $AB = C$ by splitting each matrix into 2x2 blocks each. Each of these matrices (e.g. $A_{11}$) has size $n/2$.
+
+$$
+\begin{bmatrix}
+A_{11} & A_{12} \\
+A_{21} & A_{22}
+\end{bmatrix}
+\begin{bmatrix}
+B_{11} & B_{12} \\
+B_{21} & B_{22}
+\end{bmatrix} = 
+\begin{bmatrix}
+C_{11} & C_{12} \\
+C_{21} & C_{22}
+\end{bmatrix}
+$$
+
+To compute an submatrix $C_{ij}$, we multiply the corresponding blocks of $A$ and $B$ and sum the results. For example:
+
+$$
+C_{11} = A_{11}B_{11} + A_{12}B_{21}
+$$
+
+In pseudocode this translates to the code below.
+
+```python
+n_blocks = n // r
+for i in range(n_blocks):
+    for j in range(n_blocks):
+        for k in range(n_blocks):
+            C[i, j] += A[i, k] @ B[k, j]
+```
+
+::: {.callout-warning}
+Note that the entry `C[i, j]` is now a block matrix rather than a scalar, and the `@` operator denotes block matrix multiplication, rathen than scalar multiplication.
+:::
+
