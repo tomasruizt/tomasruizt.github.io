@@ -1,0 +1,1 @@
+To publish, run the command `make render`. This will overwrite the `docs/` directory with the rendered content. The `docs/` directory is what is served by GitHub Pages. 
