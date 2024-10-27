@@ -1,0 +1,116 @@
+---
+title: Untitled
+format:
+  modern2-cv-pdf: default
+author: Tomas Ruiz
+cvfont: raleway #texlive fonts like raleway,fetamont,gillius,comfortaa
+cvcolor: 
+  main: 1E3E62
+  accent: 1E3E62
+jobtitle: "Research Assistant  \nWissenschaftlicher Mitarbeiter"
+sidebar:
+  image: portrait-smiling-square.jpeg
+  #image: one-px-img.jpeg
+  sections: 
+    - name: Contact
+      items:
+        - icon: map-marker
+          text: Munich, Germany
+        - icon: phone
+          text: +49 176 817 933 17
+        - icon: envelope
+          text: tomas.ruiz.te@gmail.de
+        - icon: home
+          text: Personal Links
+          href: https://tomasruizt.github.io/about.html
+        - icon: home
+          text: ToxicAInment Project
+          href: https://en.bidt.digital/research-project/using-ai-to-increase-resilience-against-toxicity-in-online-entertainment/
+    - name: Languages
+      items:
+        - German (Bilingual Proficiency)
+        - English (Bilingual Proficiency)
+        - Spanish (Native)
+    - name: Technical Skills
+      items:
+        - "Languages: Python, R, SQL, C-sharp"
+        - "Frameworks: PyTorch, HuggingFace transfomers"
+        - "Tools: Docker, CI/CD, AWS"
+    - name: Soft Skills
+      items:
+        - Open Communicator
+        - Continuous Learner
+        - Careful Listener
+        - Team Player
+execute: 
+  echo: false
+---
+
+```{r}
+#| label: cvevents
+cvevents <- function(tbl, when, what, where, descr) {
+
+    command_start <- "\\cvevent"
+    tbl[[where]] <- gsub("\n", " \\\\newline ", tbl[[where]])
+    res <- paste0(
+        command_start, "{", tbl[[when]], "}", 
+        "{", tbl[[what]], "}",
+        "{", tbl[[where]], "}",
+        "{", tbl[[descr]], "}"
+        )
+
+    cat(res, sep = "\n\n\n")
+}
+
+cvproj <- function(tbl,what,role,items){
+    command_start <- "\\cvproj"
+    res <- paste0(
+        command_start, "{", tbl[[what]], "}",
+        "{", tbl[[role]], "}",
+        "{", sapply(tbl[[items]], function(x)paste0(x,collapse = ", ")), "}"
+    )
+
+    cat(res, sep = "\n\n\n")
+}
+```
+
+### Summary
+
+Research assistant at the LMU Munich at the the intersection of Machine Learning and Social Media, particularly on multi-modal ML. In previous jobs, I worked as a software engineer in different companies and Startups.
+
+### Education
+
+```{r}
+#| label: education
+#| output: asis
+tibble::tribble(
+    ~role, ~institution, ~dates, ~details,
+    "Research Assistant", "Computational Social Sciences (Prof. Schwemmer)\nLudwig Maximilian University of Munich", "06/2024 - Present", "I apply large multi-modal models (VLMs) to understand and classify content from social media (videos, images, audio, \\& text). Our project 'ToxicAInment' is funded by the Bavarian Research Institute for Digital Transformation (bidt). ",
+  
+    "Master of Science - Computer Science", "Technical University of Munich", "04/2018 - 02/2021",
+    "My thesis was on the topic of Reinforcement Learning applied to robotics, and learning useful skills with weak supervision. I took courses such as Machine Learning, Deep Learning, Convex Optimization, and more.",
+
+    "Bachelor of Science - Engineering Science", "Technical University of Munich", "09/2013 - 08/2017",
+    "My thesis was with BMW Group, where I worked with a Hadoop cluster and evaluated its query throughput and latency on challenging database queries. I took courses in computer science such as Algorithms \\& Data Structures, Databases, etc. And also classic engineering courses such as Partial Differential Equations, Thermodynamics, etc.",
+) |>
+    cvevents(when = "dates", what = "role", where = "institution", descr = "details")
+```
+
+### Professional Experience
+
+```{r}
+#| label: experience
+#| output: asis
+tibble::tribble(
+    ~role, ~institution, ~dates, ~details,
+    "Software Engineer", "Allianz Global Investors - Munich, Germany", "03/2023 - 05/2024",
+    "[Python, C-sharp] Created C-sharp libraries to simulate the performance of trading strategies including options and derivatives. Wrote Python packages to orchestrate scenario simulations and interact with diverse data systems (REST, SQL databases).",
+    
+    "Software Engineer", "Preisenergie GmbH - Munich, Germany", "03/2021 - 02/2023",
+    "[R, Shiny]: Designed, implemented, and tested a price optimization algorithm using Quadratic Programming with 100.000 variables, resulting in a 20\\% improvement in the expected Customer Lifetime Value over the existing algorithm.",
+
+    "Internship - Machine Learning", "Amazon - Berlin, Germany", "09/2017 - 02/2018",
+    "[Java, AWS]: Developed a tool to benchmark advanced Multi-armed Bandit models for product recommendations. Released it on AWS, enabling internal Amazon and AWS teams to assess potential revenue increases based on their datasets.",
+) |>
+    cvevents(when = "dates", what = "role", where = "institution", descr = "details")
+```
