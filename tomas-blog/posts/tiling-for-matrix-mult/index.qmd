@@ -20,14 +20,14 @@ code-annotations: below
 citation: true
 ---
 
-**Summary:** This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this speeds up the matrix multiplication operation, not only on CPUs, but also in GPUs.
+**Summary:** This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this improves compute intensity and speeds up the matrix multiplication operation, not only on CPUs, but also in GPUs.
 
-# Matrix Multiplication
-Assume a matrix multiplication $AB = C$. For instructional purposes, we will assume that $A$ and $B$ are squared with size $n$. A simple formula for each element of $C$ is given by:
+# Matrix Multiplication Basics
+Matrix multiplication, where $AB = C$, computes each element of $C$ as:
 
 $$C_{ij} = \sum_{k=1}^n A_{ik} B_{kj}$$
 
-Below is simple pseudocode for this operation. The total amount of floating-point operations (flops) is approximately $n^3$ (triple triple nested loop).
+For simplicity, assume $A$ and $B$ are square matrices of size $n$. Below is a basic pseudocode for the operation, which involves approximately $n^3$ floating-point operations (flops), because of the triple nested loop:
 
 ```python
 for i in range(n):
@@ -39,24 +39,22 @@ for i in range(n):
 The code is correct, but it is inefficient in terms of its memory access pattern. Let's see why.
 
 # Compute Intensity
-Besides the flops counts, the performance of an algorithm is also determined by the memory access pattern. Each operation requires fetching data from main memory into a fast cache, and then returning computed data to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data to be fetched from memory. If so, the memory bandwidth becomes the bottleneck of the algorithm.
+Besides the flops counts, the performance of an algorithm is also determined by the memory access pattern. Each operation requires fetching data from main memory into a fast cache, and then returning computed data to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the memory bandwidth becomes the bottleneck of the algorithm.
 
-::: {.callout-tip}
-# Remember
-To speed up our computations, we need to minimize the number of memory transfers per flop. The ratio of flops to memory transfers is called the **compute intensity**.
+**Key Concept: Compute Intensity**. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model [@williams2009roofline].
+
+::: {.callout-tip} 
+To boost performance, maximize compute intensity by reducing memory transfers per flop. 
 :::
 
-The compute intensity can tell us if our algorithm is constrained by the memory bandwidth or the compute power, each requiring a different strategy to speed up the algorithm. This analysis goes back to the Roofline model [@williams2009roofline].
-
+# Memory Access Analysis
 ## Naive Memory Access
-In the naive matrix multiplication above, to compute each element $C_{ij}$ we fetch $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). That makes $2n$ memory accesses. Then we perform the dot product of the row and the column, ... On this data we perform a multiplication and an addition $n$ times, which sums to $2n$ flops. This is what happens in line 5:
+In the naive approach, computing $C_{ij}$ requires fetching $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). That makes $2n$ memory accesses. Then we perform the dot product of the row and the column to get the element $C_{ij}$, which makes $2n$ flops. Thus, the compute intensity is:
+$$
+\text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2n}{2n} = 1
+$$
 
-```{.python}
-for k in range(n):
-    C[i][j] += A[i][k] * B[k][j]
-```
-
-The ratio of flops ($2n$) to memory transfers from memory to cache ($2n$) is $\frac{2n}{2n} = 1$. essentially, we are doing one flop per unit of memory transfer. Can we do better? In this naive implementation, we are doing redundant memory transfers: For example, to compute $C_{11}$, and $C_{12}$, we fetch the same row of $A$ twice from main memory.
+Can we do better? In this naive implementation, we are doing redundant memory transfers: For example, to compute $C_{11}$, and $C_{12}$, we fetch the first row of $A$ twice from main memory.
 
 ## Theoretically Optimal Memory Access
 If our cache was large enough, we would transfer all elements of $A$ and $B$ into the cache at once ($2n^2$ transfers) and perform the full matrix multiplication ($2n^3$ flops). The ratio of flops to memory transfers would be $\frac{2n^3}{2n^2} = n$, suggesting that the larger the matrix, the more compute we do per unit of memory transfer.
