@@ -17,14 +17,14 @@ engine: jupyter
 # draft: true
 ---
 
-This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this speeds up the matrix multiplication operation, not only on CPUs, but also in GPUs.
+**Summary:** This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this speeds up the matrix multiplication operation, not only on CPUs, but also in GPUs.
 
-# Simple Matrix Multiplication
+# Matrix Multiplication
 Assume a matrix multiplication $AB = C$. For instructional purposes, we will assume that $A$ and $B$ are squared with size $n$. A simple formula for each element of $C$ is given by:
 
 $$C_{ij} = \sum_{k=1}^n A_{ik} B_{kj}$$
 
-Below is simple pseudocode for this operation. The total amount of floating-point operations (flops) is $2n^3$.
+Below is simple pseudocode for this operation. The total amount of floating-point operations (flops) is approximately $n^3$ (triple triple nested loop).
 
 ```python {#lst-naive-matmul} 
 n, _ = A.shape
@@ -37,7 +37,7 @@ for i in range(n):
 The code is correct, but it is inefficient in terms of its memory access pattern. Let's see why.
 
 # Memory Access Efficiency
-Besides the flops counts, the performance of an algorithms is also determined by the memory access pattern. Each operation requires fetching data from main memory into a fast cache, and then returning computed data to main memory. This roundtrip is time-consuming, often more so than the flops themselves. 
+Besides the flops counts, the performance of an algorithms is also determined by the memory access pattern. Each operation requires fetching data from main memory into a fast cache, and then returning computed data to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data to be fetched from memory. If so, the memory bandwidth becomes the bottleneck of the algorithms.
 
 ::: {.callout-tip}
 # Remember
@@ -45,16 +45,17 @@ To speed up our computations, **we need to minimize the number of memory transfe
 :::
 
 ## Naive Memory Access
-In the naive matrix multiplication above, to compute each element $C_{ij}$ we need to fetch $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). Therefore, we have $2n$ memory accesses. On this data we perform a multiplication and an addition $n$ times, which sums to $2n$ flops. This is what happens in line 5:
+In the naive matrix multiplication above, to compute each element $C_{ij}$ we fetch $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). That makes $2n$ memory accesses. Then we perform the dot product of the row and the column, ... On this data we perform a multiplication and an addition $n$ times, which sums to $2n$ flops. This is what happens in line 5:
 
-```python
-C[i][j] += A[i][k] * B[k][j]
+```{.python}
+for k in range(n):
+    C[i][j] += A[i][k] * B[k][j]
 ```
 
-The ratio of flops ($2n$) to memory transfers from memory to cache ($2n$) is $\frac{2n}{2n} = 1$. essentially, we are doing one flop per unit of memory transfer. Can we do better?
+The ratio of flops ($2n$) to memory transfers from memory to cache ($2n$) is $\frac{2n}{2n} = 1$. essentially, we are doing one flop per unit of memory transfer. Can we do better? In this naive implementation, we are doing redundant memory transfers: For example, to compute $C_{11}$, and $C_{12}$, we fetch the same row of $A$ twice from main memory.
 
 ## Theoretically Optimal Memory Access
-If our cache was large enough, we would transfer all elements of $A$ and $B$ into cache at once ($2n^2$ transfers) and perform the full matrix multiplication ($2n^3$ flops). The ratio of flops to memory transfers would be $\frac{2n^3}{2n^2} = n$, suggesting that the larger the matrix, the more compute we do per unit of memory transfer.
+If our cache was large enough, we would transfer all elements of $A$ and $B$ into the cache at once ($2n^2$ transfers) and perform the full matrix multiplication ($2n^3$ flops). The ratio of flops to memory transfers would be $\frac{2n^3}{2n^2} = n$, suggesting that the larger the matrix, the more compute we do per unit of memory transfer.
 
 ::: {.callout-note}
 # Example
@@ -62,9 +63,9 @@ If our matrix size is $n=10000$, the naive approach would do one flop per memory
 :::
 
 ## A Middle Ground: Tiling
-In practice, we cannot fit the entire matrix into the fast memory cache. However, we can fit smaller squared submatrices of size $r$ into cache. This is the idea behind **tiling**. We divide the matrix into many small blocks, compute the block-wise matrix multiplication, and then sum the results.
+In practice, we cannot fit the entire matrix into the cache. However, we can fit smaller squared submatrices of size $r$ into the cache. This is the idea behind **tiling**. We divide the matrices $A$ and $B$ into many small blocks, compute the block-wise matrix multiplication, and then sum the results.
 
-To gain some intuition about how block matrix multiplication works, lets break down $AB = C$ by splitting each matrix into 2x2 blocks each. Each of these matrices (e.g. $A_{11}$) has size $n/2$.
+To gain some intuition about how block matrix multiplication works, let's break down $AB = C$ by splitting each matrix into 2x2 blocks each. Each of these matrices (e.g. $A_{11}$) has size $n/2$.
 
 $$
 \begin{bmatrix}
@@ -94,10 +95,25 @@ n_blocks = n // r
 for i in range(n_blocks):
     for j in range(n_blocks):
         for k in range(n_blocks):
-            C[i, j] += A[i, k] @ B[k, j]
+            C[i][j] += A[i][k] @ B[k][j]
 ```
 
 ::: {.callout-warning}
-Note that the entry `C[i, j]` is now a block matrix rather than a scalar, and the `@` operator denotes block matrix multiplication, rathen than scalar multiplication.
+Note that the entry `C[i][j]` is now a block matrix rather than a scalar, and the `@` operator denotes block matrix multiplication, rather than scalar multiplication.
 :::
+
+Line 5 of the code above is loading blocks of size $r^2$ from $A$ and $B$ into the cache. This is a total of $2r^2$ memory transfers. Then, we perform the block matrix multiplication, which requires $2r^3$ flops. The ratio of flops to memory transfers is $\frac{2r^3}{2r^2} = r$. This is a significant improvement over the naive approach, with a ratio of 1 flop per memory transfer.
+
+::: {.callout-note}
+# Example
+If we use a block size of $r=100$, the naive approach would do one flop per memory transfer, while the tiling approach would do 100 flops per memory transfer. This is a 100x speedup!
+:::
+
+In the table below, we compare the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.
+
+| Method | Flops | Memory Transfers | Flops/Memory Transfer |
+|----------|-------|-----------------|------------------------|
+| Naive    | $2n^3$ | $2n \cdot n^2$ | $\frac{2n^3}{2n \cdot n^2} = 1$ |
+| Tiling   | $2r^3$ | $2r^2$          | $\frac{r^3}{r^2} = r$   |
+| Theoretical Optimal | $2n^3$ | $2n^2$          | $\frac{n^3}{n^2} = n$   |
 
