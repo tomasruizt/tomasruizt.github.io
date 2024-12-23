@@ -1,5 +1,5 @@
 ---
-title: "How Does Tiling Speed Up Matrix Multiplication?"
+title: "How Does Tiling Speed Up Matrix Multiplications on GPUs?"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -20,14 +20,14 @@ code-annotations: below
 citation: true
 ---
 
-**Summary:** This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this improves compute intensity and speeds up the matrix multiplication operation, not only on CPUs, but also in GPUs.
+**Summary:** This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this improves compute intensity and speeds up the matrix multiplication operation, not only on CPUs, but also on GPUs.
 
-# Matrix Multiplication Basics
+# Matrix Multiplication Recap
 Matrix multiplication, where $AB = C$, computes each element of $C$ as:
 
 $$C_{ij} = \sum_{k=1}^n A_{ik} B_{kj}$$
 
-For simplicity, assume $A$ and $B$ are square matrices of size $n$. Below is a basic pseudocode for the operation, which involves approximately $n^3$ floating-point operations (flops), because of the triple nested loop:
+For simplicity, assume $A$ and $B$ are square matrices of size $n$. Below is basic pseudocode for the operation, which involves $2n^3$ floating-point operations (flops), because of the triple nested loop:
 
 ```python
 for i in range(n):
@@ -39,9 +39,9 @@ for i in range(n):
 The code is correct, but it is inefficient in terms of its memory access pattern. Let's see why.
 
 # Compute Intensity
-Besides the flops counts, the performance of an algorithm is also determined by the memory access pattern. Each operation requires fetching data from main memory into a fast cache, and then returning computed data to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the memory bandwidth becomes the bottleneck of the algorithm.
+Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache, compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the **memory bandwidth** becomes the bottleneck of the algorithm.
 
-**Key Concept: Compute Intensity**. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model [@williams2009roofline].
+Key Concept: **Compute Intensity**. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model [@williams2009roofline].
 
 ::: {.callout-tip} 
 To boost performance, maximize compute intensity by reducing memory transfers per flop. 
@@ -49,25 +49,30 @@ To boost performance, maximize compute intensity by reducing memory transfers pe
 
 # Memory Access Analysis
 ## Naive Memory Access
-In the naive approach, computing $C_{ij}$ requires fetching $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). That makes $2n$ memory accesses. Then we perform the dot product of the row and the column to get the element $C_{ij}$, which makes $2n$ flops. Thus, the compute intensity is:
+In the naive approach, computing $C_{ij}$ requires fetching $n$ elements from $A$ (a row) and $n$ elements from $B$ (a column). That makes $2n$ memory accesses. $C_{ij}$ is computed as the dot product of the row and the column, which requires $2n$ flops (1 mult and 1 add, $n$ times). Thus, the compute intensity is:
 $$
 \text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2n}{2n} = 1
 $$
 
-Can we do better? In this naive implementation, we are doing redundant memory transfers: For example, to compute $C_{11}$, and $C_{12}$, we fetch the first row of $A$ twice from main memory.
+Can we do better? In this naive implementation, we are performing redundant memory transfers: For example, to compute $C_{11}$, and $C_{12}$, we fetch the first row of $A$ twice from main memory.
 
-## Theoretically Optimal Memory Access
-If our cache was large enough, we would transfer all elements of $A$ and $B$ into the cache at once ($2n^2$ transfers) and perform the full matrix multiplication ($2n^3$ flops). The ratio of flops to memory transfers would be $\frac{2n^3}{2n^2} = n$, suggesting that the larger the matrix, the more compute we do per unit of memory transfer.
+## Optimal Memory Access
+If our cache was (theoretically) large enough, we would transfer all elements of $A$ and $B$ into the cache at once ($2n^2$ transfers) and perform the full matrix multiplication ($2n^3$ flops). 
+
+$$
+\text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2n^3}{2n^2} = n
+$$
+The larger the matrices, the higher the compute intensity.
 
 ::: {.callout-note}
 # Example
-If our matrix size is $n=10000$, the naive approach would do one flop per memory transfer, while the optimal approach would do 10000 flops per memory transfer. This is a 10000x speedup!
+Assuming a matrix size of $n=10,000$, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This is a 10,000x speedup!
 :::
 
 ## A Middle Ground: Tiling
-In practice, we cannot fit the entire matrix into the cache. However, we can fit smaller squared submatrices of size $r$ into the cache. This is the idea behind **tiling**. We divide the matrices $A$ and $B$ into many small blocks, compute the block-wise matrix multiplication, and then sum the results.
+Since caching entire matrices is impractical, we divide matrices $A$ and $B$ into smaller square blocks of size $r$, called **tiles**, perform block-wise multiplications, and aggregate the results.
 
-To gain some intuition about how block matrix multiplication works, let's break down $AB = C$ by splitting each matrix into 2x2 blocks each. Each of these matrices (e.g. $A_{11}$) has size $n/2$.
+But how does block-wise matrix multiplication work? Let's go through an example to gain some intuition. We break the matrices $A$, $B$, and $C$ into 4 blocks each (2x2). Each of these blocks has size $n/2$.
 
 $$
 \begin{bmatrix}
@@ -100,72 +105,70 @@ for i in range(n_blocks):
             C[i][j] += A[i][k] @ B[k][j]
 ```
 
-::: {.callout-warning}
-Note that the entry `C[i][j]` is now a block matrix rather than a scalar, and the `@` operator denotes block matrix multiplication, rather than scalar multiplication.
-:::
+Note that the entry `C[i][j]` is now a block matrix rather than a scalar, and the `@` operator denotes matrix multiplication, rather than scalar multiplication. Line 5 of the code above is loading blocks of size $r^2$ from $A$ and $B$ into the cache, which takes $2r^2$ memory transfers. Then, it multiplies the two blocks, which requires $2r^3$ flops.
 
-Line 5 of the code above is loading blocks of size $r^2$ from $A$ and $B$ into the cache. This is a total of $2r^2$ memory transfers. Then, we perform the block matrix multiplication, which requires $2r^3$ flops. The ratio of flops to memory transfers is $\frac{2r^3}{2r^2} = r$. This is a significant improvement over the naive approach, with a ratio of 1 flop per memory transfer.
+$$
+\text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2r^3}{2r^2} = r
+$$
 
 ::: {.callout-note}
 # Example
-If we use a block size of $r=100$, the naive approach would do one flop per memory transfer, while the tiling approach would do 100 flops per memory transfer. This is a 100x speedup!
+Assuming a block size of $r=100$, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This is a 100x speedup!
 :::
 
-In the table below, we compare the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.
+It should be clear that $1 \leq r \leq n$. Setting $r=1$, we recover the naive approach, while setting $r=n$ we recover the optimal approach. The table below compares the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.
 
 | Method | Flops | Memory Transfers | Flops/Memory Transfer |
 |----------|-------|-----------------|------------------------|
 | Naive    | $2n^3$ | $2n \cdot n^2$ | $\frac{2n^3}{2n \cdot n^2} = 1$ |
 | Tiling   | $2r^3$ | $2r^2$          | $\frac{r^3}{r^2} = r$   |
-| Theoretical Optimal | $2n^3$ | $2n^2$          | $\frac{n^3}{n^2} = n$   |
+| Optimal (Theoretical) | $2n^3$ | $2n^2$          | $\frac{n^3}{n^2} = n$   |
 
-# Tiling on GPUs
+# Tiling on GPUs & CUDA
 
-GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the pressure on the memory bandwidth is higher on GPUs. To achieve maximum performance in matrix multiplication on GPUs, it's necessary to use the tiling technique to reduce the number of memory transfers.
+GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the memory bandwidth is likely to be a bottleneck in matrix multiplication on GPUs. To relieve the pressure on the memory bandwidth, it's necessary to reduce the number of memory transfers by using the tiling technique.
 
-The book by [@kirk2016programming] has a great explanation about implementing tiling on GPUs using CUDA C. What is important to know is that we manage the reads and writes to the cache explicitly, using the concept of **shared memory**. In CUDA C, to define a shared memory array, we use the `__shared__` keyword.
-
-The code block below shows a simplified version of tiled matrix multiplication using CUDA C. Have a look at the structure of the code, rather than the specific threading variables and indices. The variables `row` and `col` indicate what specific element of the matrix $C_{ij}$ the function is computing. Line 13 shows that we loop over blocks. Lines 15-16 load the data from main memory into the cache, and lines 22-24 perform the dot product needed, and accumulate the result. Finally in line 31, we write the result to global memory. The function `__syncthreads()` is a CUDA synchronization primitive to avoid a race condition between threads.
+How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA **shared memory**. The keyword ``__shared__`` defines an array used as cache. The variables `row` and `col` indicate what element of the matrix $C_{ij}$ the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product needed, and accumulate the result. Finally, line 31 writes the result to global memory. The function `__syncthreads()` is a CUDA synchronization primitive to avoid a race condition between threads.
 
 ```{.c code-line-numbers="6-8"}
 __global__ void matrixMul(float *A, float *B, float *C, int n) {
-    // CUDA thread variables
-    int row = threadIdx.x + blockIdx.x * BLOCK_SIZE;
-    int col = threadIdx.y + blockIdx.y * BLOCK_SIZE;
-
     // Define shared memory arrays (cache)
     __shared__ float A_block[BLOCK_SIZE][BLOCK_SIZE];
     __shared__ float B_block[BLOCK_SIZE][BLOCK_SIZE];
+    
+    // CUDA thread variables
+    int row = threadIdx.x + blockIdx.x * BLOCK_SIZE;  // i 
+    int col = threadIdx.y + blockIdx.y * BLOCK_SIZE;  // j
 
-    float C_value = 0.0;
+    float C_ij = 0.0f; // Initialize the result to 0
 
-    // Loop over blocks in the grid
+    // Loop over the blocks
     for (int block = 0; block < n / BLOCK_SIZE; block++) {
-        // Load data from main memory into the cache
+        // Transfer data from main memory into the cache
         A_block[threadIdx.x][threadIdx.y] = A[row * n + (block * BLOCK_SIZE + threadIdx.y)];
         B_block[threadIdx.x][threadIdx.y] = B[(block * BLOCK_SIZE + threadIdx.x) * n + col];
 
-        // Ensure loading is complete before proceeding
+        // Ensure data transfer is complete before proceeding
         __syncthreads();
 
-        // Perform the block matrix multiplication
+        // Matrix multiply both blocks
         for (int k = 0; k < BLOCK_SIZE; k++) {
-            C_value += A_block[threadIdx.x][k] * B_block[k][threadIdx.y];
+            C_ij += A_block[threadIdx.x][k] * B_block[k][threadIdx.y];
         }
 
-        // Synchronize threads before the next iteration
+        // Finish multiplying the blocks before overwriting the cache next iteration
         __syncthreads();
     }
 
-    // Write the result to global memory
-    C[row * n + col] = C_value;
+    // Transfer the result back to global memory
+    C[row * n + col] = C_ij;
 }
 ```
-The CUDA C code looks much more complicated than the pseudocode, but it is just making explicit what happened under the hood in the CPU pseudocode: That we needed a cache to store the data and avoid redundant memory transfers.
+The CUDA code is more complicated than the pseudocode, but it makes the cache usage explicit. If you want to see a more complete version, you can find it in the book by [@kirk2016programming]. They describe other techniques to optimize algorithms on GPUs, like memory coalescing, minimizing control divergence, and thread coarsening.
 
 # Conclusion
-In this post, we saw why memory access patterns are important for the performance of matrix multiplication, calculated the theoretically optimal memory access, and saw how tiling can be used to speed up matrix multiplication on both CPUs and GPUs. We also saw an example implementation of tiling using CUDA C.
+Tiling is a practical optimization technique for improving matrix multiplication performance by minimizing memory transfers and maximizing compute intensity. We saw how the memory access pattern affects the performance of matrix multiplication, and how tiling is implemented concretely in CUDA C.
 
-**Acknowledgement:** The author is funded by the Bavarian Research Institute for Digital Transformation (bidt), and employed by the Ludwig-Maximilians-Universität Munich, in the Computational Social Science group of Prof. Carsten Schwemmer.
+**Acknowledgement:** The author is funded by the Bavarian Research Institute for Digital Transformation (bidt) and the Ludwig Maximilian University of Munich.
 
 # References
