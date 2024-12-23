@@ -4,7 +4,7 @@ author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
     affiliations: Ludwig-Maximilians-Universität München
-date: "2024-10-26"
+date: "2024-12-23"
 categories: [Mathematics, GPUs]
 format:
   html:
@@ -14,13 +14,14 @@ editor:
     render-on-save: true
 image: tiled-matrix-multiplication-squared.jpg
 engine: jupyter
-# draft: true
 bibliography: refs.bib
 code-annotations: below
 citation: true
 ---
 
-**Summary:** This post is about the concept of **tiling**, which is a technique used to reduce the number of memory accesses performed during matrix multiplication. We will see why this improves compute intensity and speeds up the matrix multiplication operation, not only on CPUs, but also on GPUs.
+![Tiled MatMul according to ChatGPT](tiled-matrix-multiplication.webp){width="100%" text-align="center" fig-alt="Tiled Matrix Multiplication" .lightbox}
+
+**TL;DR:** Tiling is a technique used to reduce the number of memory accesses performed during matrix multiplication. We see how it improves compute intensity and how it speeds up the matrix multiplication operation, not only on CPUs, but also on GPUs. I also provide a simple implementation of tiling in CUDA C.
 
 # Matrix Multiplication Recap
 Matrix multiplication, where $AB = C$, computes each element of $C$ as:
@@ -131,40 +132,40 @@ GPUs have a large number of cores, which can quickly process the data arriving f
 How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA **shared memory**. The keyword ``__shared__`` defines an array used as cache. The variables `row` and `col` indicate what element of the matrix $C_{ij}$ the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product needed, and accumulate the result. Finally, line 31 writes the result to global memory. The function `__syncthreads()` is a CUDA synchronization primitive to avoid a race condition between threads.
 
 ```{.c code-line-numbers="6-8"}
-__global__ void matrixMul(float *A, float *B, float *C, int n) {
+__global__ void tiledMatMul(float *A, float *B, float *C, int n) {
     // Define shared memory arrays (cache)
-    __shared__ float A_block[BLOCK_SIZE][BLOCK_SIZE];
-    __shared__ float B_block[BLOCK_SIZE][BLOCK_SIZE];
+    __shared__ float A_block[TILE_SIZE][TILE_SIZE];
+    __shared__ float B_block[TILE_SIZE][TILE_SIZE];
     
     // CUDA thread variables
-    int row = threadIdx.x + blockIdx.x * BLOCK_SIZE;  // i 
-    int col = threadIdx.y + blockIdx.y * BLOCK_SIZE;  // j
-
-    float C_ij = 0.0f; // Initialize the result to 0
-
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    float C_ij = 0.0f;
+    
     // Loop over the blocks
-    for (int block = 0; block < n / BLOCK_SIZE; block++) {
+    for (int t = 0; t < n / TILE_SIZE; t++) {
         // Transfer data from main memory into the cache
-        A_block[threadIdx.x][threadIdx.y] = A[row * n + (block * BLOCK_SIZE + threadIdx.y)];
-        B_block[threadIdx.x][threadIdx.y] = B[(block * BLOCK_SIZE + threadIdx.x) * n + col];
-
+        A_block[threadIdx.y][threadIdx.x] = A[row * n + t * TILE_SIZE + threadIdx.x];
+        B_block[threadIdx.y][threadIdx.x] = B[(t * TILE_SIZE + threadIdx.y) * n + col];
+        
         // Ensure data transfer is complete before proceeding
         __syncthreads();
-
+        
         // Matrix multiply both blocks
-        for (int k = 0; k < BLOCK_SIZE; k++) {
-            C_ij += A_block[threadIdx.x][k] * B_block[k][threadIdx.y];
+        for (int k = 0; k < TILE_SIZE; k++) {
+            C_ij += A_block[threadIdx.y][k] * B_block[k][threadIdx.x];
         }
-
+        
         // Finish multiplying the blocks before overwriting the cache next iteration
         __syncthreads();
     }
-
+    
     // Transfer the result back to global memory
     C[row * n + col] = C_ij;
 }
 ```
-The CUDA code is more complicated than the pseudocode, but it makes the cache usage explicit. If you want to see a more complete version, you can find it in the book by [@kirk2016programming]. They describe other techniques to optimize algorithms on GPUs, like memory coalescing, minimizing control divergence, and thread coarsening.
+The CUDA code is more complicated than the pseudocode, but it makes the cache usage explicit. To run the code look at [my example on Github](https://github.com/tomasruizt/Code-Along/blob/main/cuda-pmpp/03_matrix_multiplication/main.cu), which has Makefile for compilation and execution. If you want to see a more complete version, you can find it in the book by [@kirk2016programming]. They describe other techniques to optimize algorithms on GPUs, like memory coalescing, minimizing control divergence, and thread coarsening.
 
 # Conclusion
 Tiling is a practical optimization technique for improving matrix multiplication performance by minimizing memory transfers and maximizing compute intensity. We saw how the memory access pattern affects the performance of matrix multiplication, and how tiling is implemented concretely in CUDA C.

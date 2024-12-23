@@ -10,7 +10,522 @@
 <atom:link href="https://tomasruizt.github.io/index.xml" rel="self" type="application/rss+xml"/>
 <description>Tomas Ruiz&#39;s blog</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Wed, 11 Sep 2024 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sun, 22 Dec 2024 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>How Does Tiling Speed Up Matrix Multiplications on GPUs?</title>
+  <dc:creator>Tomas Ruiz</dc:creator>
+  <link>https://tomasruizt.github.io/posts/tiling-for-matrix-mult/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="tiled-matrix-multiplication.webp" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Tiled MatMul according to ChatGPT"><img src="https://tomasruizt.github.io/posts/tiling-for-matrix-mult/tiled-matrix-multiplication.webp" class="img-fluid figure-img" style="width:100.0%" data-text-align="center" alt="Tiled Matrix Multiplication"></a></p>
+<figcaption>Tiled MatMul according to ChatGPT</figcaption>
+</figure>
+</div>
+<p><strong>TL;DR:</strong> Tiling is a technique used to reduce the number of memory accesses performed during matrix multiplication. We see how it improves compute intensity and how it speeds up the matrix multiplication operation, not only on CPUs, but also on GPUs. I also provide a simple implementation of tiling in CUDA C.</p>
+<section id="matrix-multiplication-recap" class="level1">
+<h1>Matrix Multiplication Recap</h1>
+<p>Matrix multiplication, where <img src="https://latex.codecogs.com/png.latex?AB%20=%20C">, computes each element of <img src="https://latex.codecogs.com/png.latex?C"> as:</p>
+<p><img src="https://latex.codecogs.com/png.latex?C_%7Bij%7D%20=%20%5Csum_%7Bk=1%7D%5En%20A_%7Bik%7D%20B_%7Bkj%7D"></p>
+<p>For simplicity, assume <img src="https://latex.codecogs.com/png.latex?A"> and <img src="https://latex.codecogs.com/png.latex?B"> are square matrices of size <img src="https://latex.codecogs.com/png.latex?n">. Below is basic pseudocode for the operation, which involves <img src="https://latex.codecogs.com/png.latex?2n%5E3"> floating-point operations (flops), because of the triple nested loop:</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n):</span>
+<span id="cb1-2">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n):</span>
+<span id="cb1-3">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> k <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n):</span>
+<span id="cb1-4">            C[i][j] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> A[i][k] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> B[k][j]</span></code></pre></div>
+<p>The code is correct, but it is inefficient in terms of its memory access pattern. Let’s see why.</p>
+</section>
+<section id="compute-intensity" class="level1">
+<h1>Compute Intensity</h1>
+<p>Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache, compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the <strong>memory bandwidth</strong> becomes the bottleneck of the algorithm.</p>
+<p>Key Concept: <strong>Compute Intensity</strong>. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model <span class="citation" data-cites="williams2009roofline">(Williams, Waterman, and Patterson 2009)</span>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>To boost performance, maximize compute intensity by reducing memory transfers per flop.</p>
+</div>
+</div>
+</section>
+<section id="memory-access-analysis" class="level1">
+<h1>Memory Access Analysis</h1>
+<section id="naive-memory-access" class="level2">
+<h2 class="anchored" data-anchor-id="naive-memory-access">Naive Memory Access</h2>
+<p>In the naive approach, computing <img src="https://latex.codecogs.com/png.latex?C_%7Bij%7D"> requires fetching <img src="https://latex.codecogs.com/png.latex?n"> elements from <img src="https://latex.codecogs.com/png.latex?A"> (a row) and <img src="https://latex.codecogs.com/png.latex?n"> elements from <img src="https://latex.codecogs.com/png.latex?B"> (a column). That makes <img src="https://latex.codecogs.com/png.latex?2n"> memory accesses. <img src="https://latex.codecogs.com/png.latex?C_%7Bij%7D"> is computed as the dot product of the row and the column, which requires <img src="https://latex.codecogs.com/png.latex?2n"> flops (1 mult and 1 add, <img src="https://latex.codecogs.com/png.latex?n"> times). Thus, the compute intensity is: <img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7BCompute%20Intensity%7D%20=%20%5Cfrac%7B%5Ctext%7Bflops%7D%7D%7B%5Ctext%7Bmemory%20transfers%7D%7D%20=%20%5Cfrac%7B2n%7D%7B2n%7D%20=%201%0A"></p>
+<p>Can we do better? In this naive implementation, we are performing redundant memory transfers: For example, to compute <img src="https://latex.codecogs.com/png.latex?C_%7B11%7D">, and <img src="https://latex.codecogs.com/png.latex?C_%7B12%7D">, we fetch the first row of <img src="https://latex.codecogs.com/png.latex?A"> twice from main memory.</p>
+</section>
+<section id="optimal-memory-access" class="level2">
+<h2 class="anchored" data-anchor-id="optimal-memory-access">Optimal Memory Access</h2>
+<p>If our cache was (theoretically) large enough, we would transfer all elements of <img src="https://latex.codecogs.com/png.latex?A"> and <img src="https://latex.codecogs.com/png.latex?B"> into the cache at once (<img src="https://latex.codecogs.com/png.latex?2n%5E2"> transfers) and perform the full matrix multiplication (<img src="https://latex.codecogs.com/png.latex?2n%5E3"> flops).</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7BCompute%20Intensity%7D%20=%20%5Cfrac%7B%5Ctext%7Bflops%7D%7D%7B%5Ctext%7Bmemory%20transfers%7D%7D%20=%20%5Cfrac%7B2n%5E3%7D%7B2n%5E2%7D%20=%20n%0A"> The larger the matrices, the higher the compute intensity.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Assuming a matrix size of <img src="https://latex.codecogs.com/png.latex?n=10,000">, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This is a 10,000x speedup!</p>
+</div>
+</div>
+</section>
+<section id="a-middle-ground-tiling" class="level2">
+<h2 class="anchored" data-anchor-id="a-middle-ground-tiling">A Middle Ground: Tiling</h2>
+<p>Since caching entire matrices is impractical, we divide matrices <img src="https://latex.codecogs.com/png.latex?A"> and <img src="https://latex.codecogs.com/png.latex?B"> into smaller square blocks of size <img src="https://latex.codecogs.com/png.latex?r">, called <strong>tiles</strong>, perform block-wise multiplications, and aggregate the results.</p>
+<p>But how does block-wise matrix multiplication work? Let’s go through an example to gain some intuition. We break the matrices <img src="https://latex.codecogs.com/png.latex?A">, <img src="https://latex.codecogs.com/png.latex?B">, and <img src="https://latex.codecogs.com/png.latex?C"> into 4 blocks each (2x2). Each of these blocks has size <img src="https://latex.codecogs.com/png.latex?n/2">.</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Bbmatrix%7D%0AA_%7B11%7D%20&amp;%20A_%7B12%7D%20%5C%5C%0AA_%7B21%7D%20&amp;%20A_%7B22%7D%0A%5Cend%7Bbmatrix%7D%0A%5Cbegin%7Bbmatrix%7D%0AB_%7B11%7D%20&amp;%20B_%7B12%7D%20%5C%5C%0AB_%7B21%7D%20&amp;%20B_%7B22%7D%0A%5Cend%7Bbmatrix%7D%20=%0A%5Cbegin%7Bbmatrix%7D%0AC_%7B11%7D%20&amp;%20C_%7B12%7D%20%5C%5C%0AC_%7B21%7D%20&amp;%20C_%7B22%7D%0A%5Cend%7Bbmatrix%7D%0A"></p>
+<p>To compute an submatrix <img src="https://latex.codecogs.com/png.latex?C_%7Bij%7D">, we multiply the corresponding blocks of <img src="https://latex.codecogs.com/png.latex?A"> and <img src="https://latex.codecogs.com/png.latex?B"> and sum the results. For example:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0AC_%7B11%7D%20=%20A_%7B11%7DB_%7B11%7D%20+%20A_%7B12%7DB_%7B21%7D%0A"></p>
+<p>In pseudocode this translates to the code below.</p>
+<div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb2-1">n_blocks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> n <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span> r</span>
+<span id="cb2-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n_blocks):</span>
+<span id="cb2-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n_blocks):</span>
+<span id="cb2-4">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> k <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n_blocks):</span>
+<span id="cb2-5">            C[i][j] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> A[i][k] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span> B[k][j]</span></code></pre></div>
+<p>Note that the entry <code>C[i][j]</code> is now a block matrix rather than a scalar, and the <code>@</code> operator denotes matrix multiplication, rather than scalar multiplication. Line 5 of the code above is loading blocks of size <img src="https://latex.codecogs.com/png.latex?r%5E2"> from <img src="https://latex.codecogs.com/png.latex?A"> and <img src="https://latex.codecogs.com/png.latex?B"> into the cache, which takes <img src="https://latex.codecogs.com/png.latex?2r%5E2"> memory transfers. Then, it multiplies the two blocks, which requires <img src="https://latex.codecogs.com/png.latex?2r%5E3"> flops.</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7BCompute%20Intensity%7D%20=%20%5Cfrac%7B%5Ctext%7Bflops%7D%7D%7B%5Ctext%7Bmemory%20transfers%7D%7D%20=%20%5Cfrac%7B2r%5E3%7D%7B2r%5E2%7D%20=%20r%0A"></p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Assuming a block size of <img src="https://latex.codecogs.com/png.latex?r=100">, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This is a 100x speedup!</p>
+</div>
+</div>
+<p>It should be clear that <img src="https://latex.codecogs.com/png.latex?1%20%5Cleq%20r%20%5Cleq%20n">. Setting <img src="https://latex.codecogs.com/png.latex?r=1">, we recover the naive approach, while setting <img src="https://latex.codecogs.com/png.latex?r=n"> we recover the optimal approach. The table below compares the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 12%">
+<col style="width: 29%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Flops</th>
+<th>Memory Transfers</th>
+<th>Flops/Memory Transfer</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Naive</td>
+<td><img src="https://latex.codecogs.com/png.latex?2n%5E3"></td>
+<td><img src="https://latex.codecogs.com/png.latex?2n%20%5Ccdot%20n%5E2"></td>
+<td><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7B2n%5E3%7D%7B2n%20%5Ccdot%20n%5E2%7D%20=%201"></td>
+</tr>
+<tr class="even">
+<td>Tiling</td>
+<td><img src="https://latex.codecogs.com/png.latex?2r%5E3"></td>
+<td><img src="https://latex.codecogs.com/png.latex?2r%5E2"></td>
+<td><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7Br%5E3%7D%7Br%5E2%7D%20=%20r"></td>
+</tr>
+<tr class="odd">
+<td>Optimal (Theoretical)</td>
+<td><img src="https://latex.codecogs.com/png.latex?2n%5E3"></td>
+<td><img src="https://latex.codecogs.com/png.latex?2n%5E2"></td>
+<td><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7Bn%5E3%7D%7Bn%5E2%7D%20=%20n"></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tiling-on-gpus-cuda" class="level1">
+<h1>Tiling on GPUs &amp; CUDA</h1>
+<p>GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the memory bandwidth is likely to be a bottleneck in matrix multiplication on GPUs. To relieve the pressure on the memory bandwidth, it’s necessary to reduce the number of memory transfers by using the tiling technique.</p>
+<p>How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA <strong>shared memory</strong>. The keyword <code>__shared__</code> defines an array used as cache. The variables <code>row</code> and <code>col</code> indicate what element of the matrix <img src="https://latex.codecogs.com/png.latex?C_%7Bij%7D"> the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product needed, and accumulate the result. Finally, line 31 writes the result to global memory. The function <code>__syncthreads()</code> is a CUDA synchronization primitive to avoid a race condition between threads.</p>
+<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1">__global__ <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">void</span> tiledMatMul<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">(</span><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">float</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>A<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">float</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>B<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">float</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>C<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">int</span> n<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">)</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span></span>
+<span id="cb3-2">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Define shared memory arrays (cache)</span></span>
+<span id="cb3-3">    __shared__ <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">float</span> A_block<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>TILE_SIZE<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">][</span>TILE_SIZE<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">];</span></span>
+<span id="cb3-4">    __shared__ <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">float</span> B_block<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>TILE_SIZE<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">][</span>TILE_SIZE<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">];</span></span>
+<span id="cb3-5">    </span>
+<span id="cb3-6">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// CUDA thread variables</span></span>
+<span id="cb3-7">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">int</span> row <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> blockIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> blockDim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb3-8">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">int</span> col <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> blockIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> blockDim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb3-9">    </span>
+<span id="cb3-10">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">float</span> C_ij <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">f</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb3-11">    </span>
+<span id="cb3-12">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Loop over the blocks</span></span>
+<span id="cb3-13">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">(</span><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">int</span> t <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span> t <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> n <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> TILE_SIZE<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span> t<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">++)</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span></span>
+<span id="cb3-14">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Transfer data from main memory into the cache</span></span>
+<span id="cb3-15">        A_block<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">][</span>threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">]</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> A<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>row <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> n <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> t <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> TILE_SIZE <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">];</span></span>
+<span id="cb3-16">        B_block<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">][</span>threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">]</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> B<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[(</span>t <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> TILE_SIZE <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">)</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> n <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> col<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">];</span></span>
+<span id="cb3-17">        </span>
+<span id="cb3-18">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Ensure data transfer is complete before proceeding</span></span>
+<span id="cb3-19">        __syncthreads<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">();</span></span>
+<span id="cb3-20">        </span>
+<span id="cb3-21">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Matrix multiply both blocks</span></span>
+<span id="cb3-22">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">(</span><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">int</span> k <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span> k <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> TILE_SIZE<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span> k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">++)</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span></span>
+<span id="cb3-23">            C_ij <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> A_block<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>y<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">][</span>k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">]</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> B_block<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">][</span>threadIdx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>x<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">];</span></span>
+<span id="cb3-24">        <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span></span>
+<span id="cb3-25">        </span>
+<span id="cb3-26">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Finish multiplying the blocks before overwriting the cache next iteration</span></span>
+<span id="cb3-27">        __syncthreads<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">();</span></span>
+<span id="cb3-28">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span></span>
+<span id="cb3-29">    </span>
+<span id="cb3-30">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Transfer the result back to global memory</span></span>
+<span id="cb3-31">    C<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">[</span>row <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> n <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> col<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">]</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> C_ij<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb3-32"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span></span></code></pre></div>
+<p>The CUDA code is more complicated than the pseudocode, but it makes the cache usage explicit. To run the code look at <a href="https://github.com/tomasruizt/Code-Along/blob/main/cuda-pmpp/03_matrix_multiplication/main.cu">my example on Github</a>, which has Makefile for compilation and execution. If you want to see a more complete version, you can find it in the book by <span class="citation" data-cites="kirk2016programming">(Kirk and Wen-Mei 2016)</span>. They describe other techniques to optimize algorithms on GPUs, like memory coalescing, minimizing control divergence, and thread coarsening.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>Tiling is a practical optimization technique for improving matrix multiplication performance by minimizing memory transfers and maximizing compute intensity. We saw how the memory access pattern affects the performance of matrix multiplication, and how tiling is implemented concretely in CUDA C.</p>
+<p><strong>Acknowledgement:</strong> The author is funded by the Bavarian Research Institute for Digital Transformation (bidt) and the Ludwig Maximilian University of Munich.</p>
+</section>
+<section id="references" class="level1">
+
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-kirk2016programming" class="csl-entry">
+Kirk, David B, and W Hwu Wen-Mei. 2016. <em>Programming Massively Parallel Processors: A Hands-on Approach</em>. Morgan kaufmann.
+</div>
+<div id="ref-williams2009roofline" class="csl-entry">
+Williams, Samuel, Andrew Waterman, and David Patterson. 2009. <span>“Roofline: An Insightful Visual Performance Model for Multicore Architectures.”</span> <em>Communications of the ACM</em> 52 (4): 65–76.
+</div>
+</div></section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2024,
+  author = {Ruiz, Tomas},
+  title = {How {Does} {Tiling} {Speed} {Up} {Matrix} {Multiplications}
+    on {GPUs?}},
+  date = {2024-12-23},
+  url = {https://tomasruizt.github.io/posts/tiling-for-matrix-mult/},
+  langid = {en}
+}
+</code></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2024" class="csl-entry quarto-appendix-citeas">
+Ruiz, Tomas. 2024. <span>“How Does Tiling Speed Up Matrix
+Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruizt.github.io/posts/tiling-for-matrix-mult/">https://tomasruizt.github.io/posts/tiling-for-matrix-mult/</a>.
+</div></div></section></div> ]]></description>
+  <category>Mathematics</category>
+  <category>GPUs</category>
+  <guid>https://tomasruizt.github.io/posts/tiling-for-matrix-mult/</guid>
+  <pubDate>Sun, 22 Dec 2024 23:00:00 GMT</pubDate>
+  <media:content url="https://tomasruizt.github.io/posts/tiling-for-matrix-mult/tiled-matrix-multiplication-squared.jpg" medium="image" type="image/jpeg"/>
+</item>
 <item>
   <title>Grokking an Inner Product Inequality With Python on WebAssembly</title>
   <dc:creator>Tomas Ruiz</dc:creator>
@@ -40,7 +555,7 @@
 
 </div>
 <script type="pyodide-1-contents">
-eyJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSIsImF0dHIiOnsiZWRpdCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZSwiZXZhbCI6dHJ1ZX19
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSJ9
 </script>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -67,7 +582,7 @@ Note
 
 </div>
 <script type="pyodide-2-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSIsImF0dHIiOnsiZWRpdCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZSwiZXZhbCI6dHJ1ZX19
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSJ9
 </script>
 </div>
 </section>
@@ -78,14 +593,14 @@ eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0g
 <p><img src="https://latex.codecogs.com/png.latex?%E2%9F%A8%20f,%20g%20%E2%9F%A9%20=%20%5Cint%20f(x)%20g(x)%20dx"> Using this definition, the inequality holds for functions as well: <img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A%E2%9F%A8%20f,%20g%20%E2%9F%A9%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(%E2%9F%A8%20f,%20f%20%E2%9F%A9%20+%20%E2%9F%A8%20g,%20g%20%E2%9F%A9)%20%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Cint%20f(x)%5E2%20dx%20+%20%5Cint%20g(x)%5E2%20dx%20%5Cright)%0A%5Cend%7Balign%7D%0A"></p>
 <p>Let’s take two concrete functions <img src="https://latex.codecogs.com/png.latex?f(x)%20=%20%5Ccos(x)"> and <img src="https://latex.codecogs.com/png.latex?g(x)%20=%20%5Csin(4x)">. I choose these arbitrarily because plotting them looks nice. Feel free to use different functions <code>f</code> and <code>g</code> in the code.</p>
 <script type="exercise-setup-ex_funcs-contents">
-eyJjb2RlIjoiaW1wb3J0IG1hdHBsb3RsaWIucHlwbG90IGFzIHBsdFxuXG5kZWYgcGxvdCh4LCBmLCBnKTpcbiAgICBwbHQucGxvdCh4LCBmKmcsIGxhYmVsPVwiJGYgXFxcXGNkb3QgZyRcIiwgY29sb3I9XCJncmVlblwiKVxuICAgIHBsdC5wbG90KHgsIGYqZiwgbGFiZWw9XCIkZl4yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIGcqZywgbGFiZWw9XCIkZ14yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIDAuNSAqIChmKmYgKyBnKmcpLCBsYWJlbD1cIiQwLjUgKGZeMiArIGdeMikkXCIsIGNvbG9yPVwicmVkXCIpXG4gICAgcGx0LnRpdGxlKFwiVXBwZXIgYm91bmQgZm9yICRcXFxcbGFuZ2xlIGYsIGcgXFxcXHJhbmdsZSRcIilcbiAgICBwbHQubGVnZW5kKClcbiAgICBwbHQuZ3JpZCgpXG4gICAgcGx0LnNob3coKSIsImF0dHIiOnsiZXhlcmNpc2UiOiJleF9mdW5jcyIsInNldHVwIjp0cnVlLCJldmFsIjp0cnVlfX0=
+eyJhdHRyIjp7ImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJzZXR1cCI6dHJ1ZSwiZXZhbCI6dHJ1ZX0sImNvZGUiOiJpbXBvcnQgbWF0cGxvdGxpYi5weXBsb3QgYXMgcGx0XG5cbmRlZiBwbG90KHgsIGYsIGcpOlxuICAgIHBsdC5wbG90KHgsIGYqZywgbGFiZWw9XCIkZiBcXFxcY2RvdCBnJFwiLCBjb2xvcj1cImdyZWVuXCIpXG4gICAgcGx0LnBsb3QoeCwgZipmLCBsYWJlbD1cIiRmXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgZypnLCBsYWJlbD1cIiRnXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgMC41ICogKGYqZiArIGcqZyksIGxhYmVsPVwiJDAuNSAoZl4yICsgZ14yKSRcIiwgY29sb3I9XCJyZWRcIilcbiAgICBwbHQudGl0bGUoXCJVcHBlciBib3VuZCBmb3IgJFxcXFxsYW5nbGUgZiwgZyBcXFxccmFuZ2xlJFwiKVxuICAgIHBsdC5sZWdlbmQoKVxuICAgIHBsdC5ncmlkKClcbiAgICBwbHQuc2hvdygpIn0=
 </script>
 <div>
 <div id="pyodide-4">
 
 </div>
 <script type="pyodide-4-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcbnBsb3QoeCwgZiwgZykiLCJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJydW5idXR0b24iOmZhbHNlLCJhdXRvcnVuIjp0cnVlfX0=
+eyJhdHRyIjp7ImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJlZGl0Ijp0cnVlLCJydW5idXR0b24iOmZhbHNlLCJhdXRvcnVuIjp0cnVlLCJldmFsIjp0cnVlfSwiY29kZSI6ImltcG9ydCBudW1weSBhcyBucFxuXG54ID0gbnAubGluc3BhY2UoMCwgMiwgMTAwKVxuZiA9IG5wLmNvcyh4KVxuZyA9IG5wLnNpbig0KngpXG5wbG90KHgsIGYsIGcpIn0=
 </script>
 </div>
 <p>In the plot above, the individual functions <img src="https://latex.codecogs.com/png.latex?f%5E2"> and <img src="https://latex.codecogs.com/png.latex?g%5E2"> are plotted with light-blue lines. Their average is the red line, and the product <img src="https://latex.codecogs.com/png.latex?f%20%E2%8B%85%20g"> is the green line. The red line is an upper bound for the green one. We see that the green line crosses over the two blue lines at different points but never crosses over the red line.</p>
@@ -95,7 +610,7 @@ eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5m
 
 </div>
 <script type="pyodide-5-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikiLCJhdHRyIjp7ImVkaXQiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2UsImV2YWwiOnRydWV9fQ==
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikifQ==
 </script>
 </div>
 </section>
@@ -125,7 +640,7 @@ Warning
 
 </div>
 <script type="pyodide-6-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIiwiYXR0ciI6eyJlZGl0Ijp0cnVlLCJydW5idXR0b24iOmZhbHNlLCJldmFsIjp0cnVlfX0=
+eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIn0=
 </script>
 </div>
 <p>The inequality holds, but I have no geometric intuition about the trace of a matrix, or how this inequality could be visualized for matrices. If you have an idea, please let me know! 🙏</p>
@@ -136,10 +651,10 @@ eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4o
 
 
 <script type="pyodide-data">
-eyJvcHRpb25zIjp7ImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjYuMS9mdWxsLyJ9LCJwYWNrYWdlcyI6eyJwa2dzIjpbInB5b2RpZGVfaHR0cCIsIm1pY3JvcGlwIiwiaXB5dGhvbiJdfX0=
+eyJwYWNrYWdlcyI6eyJwa2dzIjpbInB5b2RpZGVfaHR0cCIsIm1pY3JvcGlwIiwiaXB5dGhvbiJdfSwib3B0aW9ucyI6eyJpbmRleFVSTCI6Imh0dHBzOi8vY2RuLmpzZGVsaXZyLm5ldC9weW9kaWRlL3YwLjI2LjEvZnVsbC8ifX0=
 </script>
 <script type="ojs-module-contents">
-eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTYiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0IiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTUiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0IiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0IiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBhdXRvcnVuOiBmYWxzZSxcbiAgICAgIGNhcHRpb246ICdFeGVyY2lzZScsXG4gICAgfSxcbiAgICBibG9jay5hdHRyXG4gICk7XG5cbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLCBibG9jay5jb2RlLCBvcHRpb25zKTtcbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG52aWV3b2YgX3B5b2RpZGVfdmFsdWVfNCA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNCwge30pO1xuX3B5b2RpZGVfZmVlZGJhY2tfNCA9IHtcbiAgY29uc3QgeyBQeW9kaWRlR3JhZGVyIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuICBjb25zdCBlbXB0eUZlZWRiYWNrID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7XG5cbiAgY29uc3QgZ3JhZGVyID0gbmV3IFB5b2RpZGVHcmFkZXIoX3B5b2RpZGVfdmFsdWVfNC5ldmFsdWF0b3IpO1xuICBjb25zdCBmZWVkYmFjayA9IGF3YWl0IGdyYWRlci5ncmFkZUV4ZXJjaXNlKCk7XG4gIGlmICghZmVlZGJhY2spIHJldHVybiBlbXB0eUZlZWRiYWNrO1xuICByZXR1cm4gZmVlZGJhY2s7XG59XG4ifSx7ImNlbGxOYW1lIjoicHlvZGlkZS0yIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMiA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMi1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTItY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8yID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8yLCB7fSk7XG4ifSx7ImNlbGxOYW1lIjoicHlvZGlkZS0xIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMSA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMS1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTEtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8xLCB7fSk7XG4ifSx7ImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0IiwiaW5saW5lIjpmYWxzZSwic291cmNlIjoicHlvZGlkZU9qcyA9IHtcbiAgY29uc3Qge1xuICAgIFB5b2RpZGVFdmFsdWF0b3IsXG4gICAgUHlvZGlkZUVudmlyb25tZW50TWFuYWdlcixcbiAgICBzZXR1cFB5dGhvbixcbiAgICBzdGFydFB5b2RpZGVXb3JrZXIsXG4gICAgYjY0RGVjb2RlLFxuICAgIGNvbGxhcHNlUGF0aCxcbiAgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc3RhdHVzQ29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJleGVyY2lzZS1sb2FkaW5nLXN0YXR1c1wiKTtcbiAgY29uc3QgaW5kaWNhdG9yQ29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJleGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaW5kaWNhdG9yQ29udGFpbmVyLmNsYXNzTGlzdC5yZW1vdmUoXCJkLW5vbmVcIik7XG5cbiAgbGV0IHN0YXR1c1RleHQgPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwiZGl2XCIpXG4gIHN0YXR1c1RleHQuY2xhc3NMaXN0ID0gXCJleGVyY2lzZS1sb2FkaW5nLWRldGFpbHNcIjtcbiAgc3RhdHVzVGV4dCA9IHN0YXR1c0NvbnRhaW5lci5hcHBlbmRDaGlsZChzdGF0dXNUZXh0KTtcbiAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBJbml0aWFsaXNlYDtcblxuICAvLyBIb2lzdCBpbmRpY2F0b3Igb3V0IGZyb20gZmluYWwgc2xpZGUgd2hlbiBydW5uaW5nIHVuZGVyIHJldmVhbFxuICBjb25zdCByZXZlYWxTdGF0dXMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCAuZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGlmIChyZXZlYWxTdGF0dXMpIHtcbiAgICByZXZlYWxTdGF0dXMucmVtb3ZlKCk7XG4gICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgPiAuc2xpZGVzXCIpLmFwcGVuZENoaWxkKHJldmVhbFN0YXR1cyk7XG4gIH1cblxuICAvLyBQeW9kaWRlIHN1cHBsZW1lbnRhbCBkYXRhIGFuZCBvcHRpb25zXG4gIGNvbnN0IGRhdGFDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtZGF0YVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGRhdGEgPSBKU09OLnBhcnNlKGI2NERlY29kZShkYXRhQ29udGVudCkpO1xuXG4gIC8vIEdyYWIgbGlzdCBvZiByZXNvdXJjZXMgdG8gYmUgZG93bmxvYWRlZFxuICBjb25zdCBmaWxlc0NvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwidmZzLWZpbGVcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBmaWxlcyA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGZpbGVzQ29udGVudCkpO1xuXG4gIGxldCBweW9kaWRlUHJvbWlzZSA9IChhc3luYyAoKSA9PiB7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBQeW9kaWRlYDtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgc3RhcnRQeW9kaWRlV29ya2VyKGRhdGEub3B0aW9ucyk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6IG1pY3JvcGlwYDtcbiAgICBhd2FpdCBweW9kaWRlLmxvYWRQYWNrYWdlKFwibWljcm9waXBcIik7XG4gICAgY29uc3QgbWljcm9waXAgPSBhd2FpdCBweW9kaWRlLnB5aW1wb3J0KFwibWljcm9waXBcIik7XG4gICAgYXdhaXQgZGF0YS5wYWNrYWdlcy5wa2dzLm1hcCgocGtnKSA9PiAoKSA9PiB7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6ICR7cGtnfWA7XG4gICAgICByZXR1cm4gbWljcm9waXAuaW5zdGFsbChwa2cpO1xuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuICAgIGF3YWl0IG1pY3JvcGlwLmRlc3Ryb3koKTtcblxuICAgIC8vIERvd25sb2FkIGFuZCBpbnN0YWxsIHJlc291cmNlc1xuICAgIGF3YWl0IGZpbGVzLm1hcCgoZmlsZSkgPT4gYXN5bmMgKCkgPT4ge1xuICAgICAgY29uc3QgbmFtZSA9IGZpbGUuc3Vic3RyaW5nKGZpbGUubGFzdEluZGV4T2YoJy8nKSArIDEpO1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyByZXNvdXJjZTogJHtuYW1lfWA7XG4gICAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGZldGNoKGZpbGUpO1xuICAgICAgaWYgKCFyZXNwb25zZS5vaykge1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYENhbid0IGRvd25sb2FkIFxcYCR7ZmlsZX1cXGAuIEVycm9yICR7cmVzcG9uc2Uuc3RhdHVzfTogXCIke3Jlc3BvbnNlLnN0YXR1c1RleHR9XCIuYCk7XG4gICAgICB9XG4gICAgICBjb25zdCBkYXRhID0gYXdhaXQgcmVzcG9uc2UuYXJyYXlCdWZmZXIoKTtcblxuICAgICAgLy8gU3RvcmUgVVJMcyBpbiB0aGUgY3dkIHdpdGhvdXQgYW55IHN1YmRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGlmIChmaWxlLmluY2x1ZGVzKFwiOi8vXCIpKSB7XG4gICAgICAgIGZpbGUgPSBuYW1lO1xuICAgICAgfVxuXG4gICAgICAvLyBDb2xsYXBzZSBoaWdoZXIgZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgZmlsZSA9IGNvbGxhcHNlUGF0aChmaWxlKTtcblxuICAgICAgLy8gQ3JlYXRlIGRpcmVjdG9yeSB0cmVlLCBpZ25vcmluZyBcImRpcmVjdG9yeSBleGlzdHNcIiBWRlMgZXJyb3JzXG4gICAgICBjb25zdCBwYXJ0cyA9IGZpbGUuc3BsaXQoJy8nKS5zbGljZSgwLCAtMSk7XG4gICAgICBsZXQgcGF0aCA9ICcnO1xuICAgICAgd2hpbGUgKHBhcnRzLmxlbmd0aCA+IDApIHtcbiAgICAgICAgcGF0aCArPSBwYXJ0cy5zaGlmdCgpICsgJy8nO1xuICAgICAgICB0cnkge1xuICAgICAgICAgIGF3YWl0IHB5b2RpZGUuRlMubWtkaXIocGF0aCk7XG4gICAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgICBpZiAoZS5lcnJubyAhPT0gMjApIHtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBXcml0ZSB0aGlzIGZpbGUgdG8gdGhlIFZGU1xuICAgICAgdHJ5IHtcbiAgICAgICAgcmV0dXJuIGF3YWl0IHB5b2RpZGUuRlMud3JpdGVGaWxlKGZpbGUsIG5ldyBVaW50OEFycmF5KGRhdGEpKTtcbiAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgUHlvZGlkZSBlbnZpcm9ubWVudCBzZXR1cGA7XG4gICAgYXdhaXQgc2V0dXBQeXRob24ocHlvZGlkZSk7XG5cbiAgICBzdGF0dXNUZXh0LnJlbW92ZSgpO1xuICAgIGlmIChzdGF0dXNDb250YWluZXIuY2hpbGRyZW4ubGVuZ3RoID09IDApIHtcbiAgICAgIHN0YXR1c0NvbnRhaW5lci5wYXJlbnROb2RlLnJlbW92ZSgpO1xuICAgIH1cbiAgICByZXR1cm4gcHlvZGlkZTtcbiAgfSkoKS5jYXRjaCgoZXJyKSA9PiB7XG4gICAgc3RhdHVzVGV4dC5zdHlsZS5jb2xvciA9IFwidmFyKC0tZXhlcmNpc2UtZWRpdG9yLWhsLWVyLCAjQUQwMDAwKVwiO1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBlcnIubWVzc2FnZTtcbiAgICAvL2luZGljYXRvckNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKFwiLnNwaW5uZXItZ3Jvd1wiKS5jbGFzc0xpc3QuYWRkKFwiZC1ub25lXCIpO1xuICAgIHRocm93IGVycjtcbiAgfSk7XG5cbiAgLy8gS2VlcCB0cmFjayBvZiBpbml0aWFsIE9KUyBibG9jayByZW5kZXJcbiAgY29uc3QgcmVuZGVyZWRPanMgPSB7fTtcblxuICBjb25zdCBwcm9jZXNzID0gYXN5bmMgKGNvbnRleHQsIGlucHV0cykgPT4ge1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBweW9kaWRlUHJvbWlzZTtcbiAgICBjb25zdCBldmFsdWF0b3IgPSBuZXcgUHlvZGlkZUV2YWx1YXRvcihweW9kaWRlLCBjb250ZXh0KTtcbiAgICBhd2FpdCBldmFsdWF0b3IucHJvY2VzcyhpbnB1dHMpO1xuICAgIHJldHVybiBldmFsdWF0b3IuY29udGFpbmVyO1xuICB9XG5cbiAgcmV0dXJuIHtcbiAgICBweW9kaWRlUHJvbWlzZSxcbiAgICByZW5kZXJlZE9qcyxcbiAgICBwcm9jZXNzLFxuICB9O1xufVxuIn1dfQ==
+eyJjb250ZW50cyI6W3siaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiIsImNlbGxOYW1lIjoicHlvZGlkZS02IiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiIsImNlbGxOYW1lIjoicHlvZGlkZS01IiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBhdXRvcnVuOiBmYWxzZSxcbiAgICAgIGNhcHRpb246ICdFeGVyY2lzZScsXG4gICAgfSxcbiAgICBibG9jay5hdHRyXG4gICk7XG5cbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLCBibG9jay5jb2RlLCBvcHRpb25zKTtcbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG52aWV3b2YgX3B5b2RpZGVfdmFsdWVfNCA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNCwge30pO1xuX3B5b2RpZGVfZmVlZGJhY2tfNCA9IHtcbiAgY29uc3QgeyBQeW9kaWRlR3JhZGVyIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuICBjb25zdCBlbXB0eUZlZWRiYWNrID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7XG5cbiAgY29uc3QgZ3JhZGVyID0gbmV3IFB5b2RpZGVHcmFkZXIoX3B5b2RpZGVfdmFsdWVfNC5ldmFsdWF0b3IpO1xuICBjb25zdCBmZWVkYmFjayA9IGF3YWl0IGdyYWRlci5ncmFkZUV4ZXJjaXNlKCk7XG4gIGlmICghZmVlZGJhY2spIHJldHVybiBlbXB0eUZlZWRiYWNrO1xuICByZXR1cm4gZmVlZGJhY2s7XG59XG4iLCJjZWxsTmFtZSI6InB5b2RpZGUtNCIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMiA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMi1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTItY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8yID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8yLCB7fSk7XG4iLCJjZWxsTmFtZSI6InB5b2RpZGUtMiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMSA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMS1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTEtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8xLCB7fSk7XG4iLCJjZWxsTmFtZSI6InB5b2RpZGUtMSIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InB5b2RpZGVPanMgPSB7XG4gIGNvbnN0IHtcbiAgICBQeW9kaWRlRXZhbHVhdG9yLFxuICAgIFB5b2RpZGVFbnZpcm9ubWVudE1hbmFnZXIsXG4gICAgc2V0dXBQeXRob24sXG4gICAgc3RhcnRQeW9kaWRlV29ya2VyLFxuICAgIGI2NERlY29kZSxcbiAgICBjb2xsYXBzZVBhdGgsXG4gIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHN0YXR1c0NvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1zdGF0dXNcIik7XG4gIGNvbnN0IGluZGljYXRvckNvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGluZGljYXRvckNvbnRhaW5lci5jbGFzc0xpc3QucmVtb3ZlKFwiZC1ub25lXCIpO1xuXG4gIGxldCBzdGF0dXNUZXh0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKVxuICBzdGF0dXNUZXh0LmNsYXNzTGlzdCA9IFwiZXhlcmNpc2UtbG9hZGluZy1kZXRhaWxzXCI7XG4gIHN0YXR1c1RleHQgPSBzdGF0dXNDb250YWluZXIuYXBwZW5kQ2hpbGQoc3RhdHVzVGV4dCk7XG4gIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgSW5pdGlhbGlzZWA7XG5cbiAgLy8gSG9pc3QgaW5kaWNhdG9yIG91dCBmcm9tIGZpbmFsIHNsaWRlIHdoZW4gcnVubmluZyB1bmRlciByZXZlYWxcbiAgY29uc3QgcmV2ZWFsU3RhdHVzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgLmV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpZiAocmV2ZWFsU3RhdHVzKSB7XG4gICAgcmV2ZWFsU3RhdHVzLnJlbW92ZSgpO1xuICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsID4gLnNsaWRlc1wiKS5hcHBlbmRDaGlsZChyZXZlYWxTdGF0dXMpO1xuICB9XG5cbiAgLy8gUHlvZGlkZSBzdXBwbGVtZW50YWwgZGF0YSBhbmQgb3B0aW9uc1xuICBjb25zdCBkYXRhQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLWRhdGFcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBkYXRhID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZGF0YUNvbnRlbnQpKTtcblxuICAvLyBHcmFiIGxpc3Qgb2YgcmVzb3VyY2VzIHRvIGJlIGRvd25sb2FkZWRcbiAgY29uc3QgZmlsZXNDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInZmcy1maWxlXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZmlsZXMgPSBKU09OLnBhcnNlKGI2NERlY29kZShmaWxlc0NvbnRlbnQpKTtcblxuICBsZXQgcHlvZGlkZVByb21pc2UgPSAoYXN5bmMgKCkgPT4ge1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgUHlvZGlkZWA7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHN0YXJ0UHlvZGlkZVdvcmtlcihkYXRhLm9wdGlvbnMpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiBtaWNyb3BpcGA7XG4gICAgYXdhaXQgcHlvZGlkZS5sb2FkUGFja2FnZShcIm1pY3JvcGlwXCIpO1xuICAgIGNvbnN0IG1pY3JvcGlwID0gYXdhaXQgcHlvZGlkZS5weWltcG9ydChcIm1pY3JvcGlwXCIpO1xuICAgIGF3YWl0IGRhdGEucGFja2FnZXMucGtncy5tYXAoKHBrZykgPT4gKCkgPT4ge1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiAke3BrZ31gO1xuICAgICAgcmV0dXJuIG1pY3JvcGlwLmluc3RhbGwocGtnKTtcbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcbiAgICBhd2FpdCBtaWNyb3BpcC5kZXN0cm95KCk7XG5cbiAgICAvLyBEb3dubG9hZCBhbmQgaW5zdGFsbCByZXNvdXJjZXNcbiAgICBhd2FpdCBmaWxlcy5tYXAoKGZpbGUpID0+IGFzeW5jICgpID0+IHtcbiAgICAgIGNvbnN0IG5hbWUgPSBmaWxlLnN1YnN0cmluZyhmaWxlLmxhc3RJbmRleE9mKCcvJykgKyAxKTtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcmVzb3VyY2U6ICR7bmFtZX1gO1xuICAgICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChmaWxlKTtcbiAgICAgIGlmICghcmVzcG9uc2Uub2spIHtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBDYW4ndCBkb3dubG9hZCBcXGAke2ZpbGV9XFxgLiBFcnJvciAke3Jlc3BvbnNlLnN0YXR1c306IFwiJHtyZXNwb25zZS5zdGF0dXNUZXh0fVwiLmApO1xuICAgICAgfVxuICAgICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmFycmF5QnVmZmVyKCk7XG5cbiAgICAgIC8vIFN0b3JlIFVSTHMgaW4gdGhlIGN3ZCB3aXRob3V0IGFueSBzdWJkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBpZiAoZmlsZS5pbmNsdWRlcyhcIjovL1wiKSkge1xuICAgICAgICBmaWxlID0gbmFtZTtcbiAgICAgIH1cblxuICAgICAgLy8gQ29sbGFwc2UgaGlnaGVyIGRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGZpbGUgPSBjb2xsYXBzZVBhdGgoZmlsZSk7XG5cbiAgICAgIC8vIENyZWF0ZSBkaXJlY3RvcnkgdHJlZSwgaWdub3JpbmcgXCJkaXJlY3RvcnkgZXhpc3RzXCIgVkZTIGVycm9yc1xuICAgICAgY29uc3QgcGFydHMgPSBmaWxlLnNwbGl0KCcvJykuc2xpY2UoMCwgLTEpO1xuICAgICAgbGV0IHBhdGggPSAnJztcbiAgICAgIHdoaWxlIChwYXJ0cy5sZW5ndGggPiAwKSB7XG4gICAgICAgIHBhdGggKz0gcGFydHMuc2hpZnQoKSArICcvJztcbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICBhd2FpdCBweW9kaWRlLkZTLm1rZGlyKHBhdGgpO1xuICAgICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgICAgaWYgKGUuZXJybm8gIT09IDIwKSB7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgLy8gV3JpdGUgdGhpcyBmaWxlIHRvIHRoZSBWRlNcbiAgICAgIHRyeSB7XG4gICAgICAgIHJldHVybiBhd2FpdCBweW9kaWRlLkZTLndyaXRlRmlsZShmaWxlLCBuZXcgVWludDhBcnJheShkYXRhKSk7XG4gICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICB9XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYFB5b2RpZGUgZW52aXJvbm1lbnQgc2V0dXBgO1xuICAgIGF3YWl0IHNldHVwUHl0aG9uKHB5b2RpZGUpO1xuXG4gICAgc3RhdHVzVGV4dC5yZW1vdmUoKTtcbiAgICBpZiAoc3RhdHVzQ29udGFpbmVyLmNoaWxkcmVuLmxlbmd0aCA9PSAwKSB7XG4gICAgICBzdGF0dXNDb250YWluZXIucGFyZW50Tm9kZS5yZW1vdmUoKTtcbiAgICB9XG4gICAgcmV0dXJuIHB5b2RpZGU7XG4gIH0pKCkuY2F0Y2goKGVycikgPT4ge1xuICAgIHN0YXR1c1RleHQuc3R5bGUuY29sb3IgPSBcInZhcigtLWV4ZXJjaXNlLWVkaXRvci1obC1lciwgI0FEMDAwMClcIjtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gZXJyLm1lc3NhZ2U7XG4gICAgLy9pbmRpY2F0b3JDb250YWluZXIucXVlcnlTZWxlY3RvcihcIi5zcGlubmVyLWdyb3dcIikuY2xhc3NMaXN0LmFkZChcImQtbm9uZVwiKTtcbiAgICB0aHJvdyBlcnI7XG4gIH0pO1xuXG4gIC8vIEtlZXAgdHJhY2sgb2YgaW5pdGlhbCBPSlMgYmxvY2sgcmVuZGVyXG4gIGNvbnN0IHJlbmRlcmVkT2pzID0ge307XG5cbiAgY29uc3QgcHJvY2VzcyA9IGFzeW5jIChjb250ZXh0LCBpbnB1dHMpID0+IHtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgcHlvZGlkZVByb21pc2U7XG4gICAgY29uc3QgZXZhbHVhdG9yID0gbmV3IFB5b2RpZGVFdmFsdWF0b3IocHlvZGlkZSwgY29udGV4dCk7XG4gICAgYXdhaXQgZXZhbHVhdG9yLnByb2Nlc3MoaW5wdXRzKTtcbiAgICByZXR1cm4gZXZhbHVhdG9yLmNvbnRhaW5lcjtcbiAgfVxuXG4gIHJldHVybiB7XG4gICAgcHlvZGlkZVByb21pc2UsXG4gICAgcmVuZGVyZWRPanMsXG4gICAgcHJvY2VzcyxcbiAgfTtcbn1cbiIsImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0In1dfQ==
 </script>
 <div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
 <div id="exercise-loading-status" class="d-flex gap-2">
