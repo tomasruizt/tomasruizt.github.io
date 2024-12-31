@@ -295,7 +295,7 @@ window.Quarto = {
 </section>
 <section id="compute-intensity" class="level1">
 <h1>Compute Intensity</h1>
-<p>Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache, compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the <strong>memory bandwidth</strong> becomes the bottleneck of the algorithm.</p>
+<p>Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache (L1 or L2), compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the <strong>memory bandwidth</strong> becomes the bottleneck of the algorithm.</p>
 <p>Key Concept: <strong>Compute Intensity</strong>. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model <span class="citation" data-cites="williams2009roofline">(<a href="#ref-williams2009roofline" role="doc-biblioref">Williams, Waterman, and Patterson 2009</a>)</span>.</p>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -336,7 +336,7 @@ Example
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Assuming a matrix size of <span class="math inline">\(n=10,000\)</span>, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This is a 10,000x speedup!</p>
+<p>Assuming a matrix size of <span class="math inline">\(n=10,000\)</span>, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This would result in a 10,000x speedup, assuming memory bandwidth remained the bottleneck.</p>
 </div>
 </div>
 </section>
@@ -382,7 +382,7 @@ Example
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Assuming a block size of <span class="math inline">\(r=100\)</span>, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This is a 100x speedup!</p>
+<p>Assuming a block size of <span class="math inline">\(r=100\)</span>, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This would result in a 100x speedup, assuming memory bandwidth remained the bottleneck.</p>
 </div>
 </div>
 <p>It should be clear that <span class="math inline">\(1 \leq r \leq n\)</span>. Setting <span class="math inline">\(r=1\)</span>, we recover the naive approach, while setting <span class="math inline">\(r=n\)</span> we recover the optimal approach. The table below compares the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.</p>
@@ -427,7 +427,7 @@ Example
 <section id="tiling-on-gpus-cuda" class="level1">
 <h1>Tiling on GPUs &amp; CUDA</h1>
 <p>GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the memory bandwidth is likely to be a bottleneck in matrix multiplication on GPUs. To relieve the pressure on the memory bandwidth, it’s necessary to reduce the number of memory transfers by using the tiling technique.</p>
-<p>How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA <strong>shared memory</strong>. The keyword <code>__shared__</code> defines an array used as cache. The variables <code>row</code> and <code>col</code> indicate what element of the matrix <span class="math inline">\(C_{ij}\)</span> the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product needed, and accumulate the result. Finally, line 31 writes the result to global memory. The function <code>__syncthreads()</code> is a CUDA synchronization primitive to avoid a race condition between threads.</p>
+<p>How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA <strong>shared memory</strong>. This is the equivalent to a user-managed L1 cache. The keyword <code>__shared__</code> defines an array used as cache. The variables <code>row</code> and <code>col</code> indicate what element of the matrix <span class="math inline">\(C_{ij}\)</span> the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product and accumulate the result. Finally, line 31 writes the result back to global memory. The function <code>__syncthreads()</code> is a CUDA synchronization primitive to avoid a race condition between threads.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a href="#cb3-1"></a>__global__ <span class="dt">void</span> tiledMatMul<span class="op">(</span><span class="dt">float</span> <span class="op">*</span>A<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>B<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>C<span class="op">,</span> <span class="dt">int</span> n<span class="op">)</span> <span class="op">{</span></span>
 <span id="cb3-2"><a href="#cb3-2"></a>    <span class="co">// Define shared memory arrays (cache)</span></span>
 <span id="cb3-3"><a href="#cb3-3"></a>    __shared__ <span class="dt">float</span> A_block<span class="op">[</span>TILE_SIZE<span class="op">][</span>TILE_SIZE<span class="op">];</span></span>
@@ -914,7 +914,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","closeEffect":"zoom","selector":".lightbox","descPosition":"bottom","loop":false});
+<script>var lightboxQuarto = GLightbox({"selector":".lightbox","openEffect":"zoom","closeEffect":"zoom","loop":false,"descPosition":"bottom"});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {

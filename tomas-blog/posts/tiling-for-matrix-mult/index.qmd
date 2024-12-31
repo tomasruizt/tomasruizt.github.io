@@ -40,7 +40,7 @@ for i in range(n):
 The code is correct, but it is inefficient in terms of its memory access pattern. Let's see why.
 
 # Compute Intensity
-Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache, compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the **memory bandwidth** becomes the bottleneck of the algorithm.
+Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache (L1 or L2), compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the **memory bandwidth** becomes the bottleneck of the algorithm.
 
 Key Concept: **Compute Intensity**. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model [@williams2009roofline].
 
@@ -67,7 +67,7 @@ The larger the matrices, the higher the compute intensity.
 
 ::: {.callout-note}
 # Example
-Assuming a matrix size of $n=10,000$, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This is a 10,000x speedup!
+Assuming a matrix size of $n=10,000$, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This would result in a 10,000x speedup, assuming memory bandwidth remained the bottleneck.
 :::
 
 ## A Middle Ground: Tiling
@@ -114,7 +114,7 @@ $$
 
 ::: {.callout-note}
 # Example
-Assuming a block size of $r=100$, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This is a 100x speedup!
+Assuming a block size of $r=100$, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This would result in a 100x speedup, assuming memory bandwidth remained the bottleneck.
 :::
 
 It should be clear that $1 \leq r \leq n$. Setting $r=1$, we recover the naive approach, while setting $r=n$ we recover the optimal approach. The table below compares the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.
@@ -129,7 +129,7 @@ It should be clear that $1 \leq r \leq n$. Setting $r=1$, we recover the naive a
 
 GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the memory bandwidth is likely to be a bottleneck in matrix multiplication on GPUs. To relieve the pressure on the memory bandwidth, it's necessary to reduce the number of memory transfers by using the tiling technique.
 
-How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA **shared memory**. The keyword ``__shared__`` defines an array used as cache. The variables `row` and `col` indicate what element of the matrix $C_{ij}$ the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product needed, and accumulate the result. Finally, line 31 writes the result to global memory. The function `__syncthreads()` is a CUDA synchronization primitive to avoid a race condition between threads.
+How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA **shared memory**. This is the equivalent to a user-managed L1 cache. The keyword ``__shared__`` defines an array used as cache. The variables `row` and `col` indicate what element of the matrix $C_{ij}$ the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product and accumulate the result. Finally, line 31 writes the result back to global memory. The function `__syncthreads()` is a CUDA synchronization primitive to avoid a race condition between threads.
 
 ```{.c code-line-numbers="6-8"}
 __global__ void tiledMatMul(float *A, float *B, float *C, int n) {
