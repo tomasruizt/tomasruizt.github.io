@@ -1,0 +1,50 @@
+---
+title: "Visualizing Multimodal Attention"
+author:
+  - name: Tomas Ruiz
+    email: t.ruiz@lmu.de
+    affiliations: Ludwig-Maximilians-Universität München
+date: "2025-01-29"
+categories: [Transformers, Attention]
+format:
+  html:
+    toc: true
+    code-line-numbers: true
+editor:
+    render-on-save: true
+engine: jupyter
+bibliography: refs.bib
+code-annotations: below
+citation: true
+---
+
+![Visualizing Multimodal Attention](multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
+
+This post explains how to inspect the attention patterns of vision-language models (VLMs) like `LLaVa`, or `PaliGemma2` using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis).
+
+## Mechanistic Interpretability
+Large language models (LLMs) are notoriously difficult to interpret (black-box). One approach to shed light on LLMs is mechanistic interpretability, which aims to understand the inner workings of the model by breaking down its components. The [distill.pub journal](https://distill.pub/) hosted early works on this topic, the team at [Anthropic](https://transformer-circuits.pub/) continued the tradition, and today researchers actively contribute to the field.
+
+## Attention Patterns
+The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g. "induction heads" for in-context-learning [@olsson2022incontextlearninginductionheads]. To find such attention patterns, an essential tool is to visualize them, and the `circuitsviz` librarydo so. The examples below show that each token in the input sequence attends to other tokens with different "intensities", as determined by the attention mechanism.
+
+::: {layout-ncol=2}
+
+![Example 1: Induction Head Pattern](attn-pattern-induction-head.png){width="80%"}
+
+![Example 2: Multiple Attention Heads](many-txt-attention-heads.png){width="120%"}
+
+Text-Only Attention Patterns
+:::
+
+## Multimodal Tokens
+But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on two exemplary VLMs: LLaVA [@liu2023visualinstructiontuning] and PaliGemma [@beyer2024paligemmaversatile3bvlm]. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) [@dosovitskiy2021imageworth16x16words] that has been pre-trained with (image, text) pairs, like CLIP [@radford2021learningtransferablevisualmodels] or SigLIP [@zhai2023sigmoid]. The VLM converts the image into a sequence of image tokens in two steps: 
+
+![1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named `[CLS]` to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from [@dosovitskiy2021imageworth16x16words]](vision-transformer.png){width="60%"}
+
+![2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from [@liu2023visualinstructiontuning]](llava-architecture.png){width="60%"}
+
+
+# References
+
+
