@@ -18,7 +18,7 @@ code-annotations: below
 citation: true
 ---
 
-![Visualizing Multimodal Attention](multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
+![Visualizing Multimodal Attention](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
 
 This post explains how to inspect the attention patterns of vision-language models (VLMs) like `LLaVa`, or `PaliGemma2` using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis).
 
@@ -30,9 +30,9 @@ The central component of the Transformer architecture is the attention mechanism
 
 ::: {layout-ncol=2}
 
-![Example 1: Induction Head Pattern](attn-pattern-induction-head.png){width="80%"}
+![Example 1: Induction Head Pattern](images/attn-pattern-induction-head.png){width="80%"}
 
-![Example 2: Multiple Attention Heads](many-txt-attention-heads.png){width="120%"}
+![Example 2: Multiple Attention Heads](images/many-txt-attention-heads.png){width="120%"}
 
 Text-Only Attention Patterns
 :::
@@ -40,9 +40,9 @@ Text-Only Attention Patterns
 ## Multimodal Tokens
 But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on two exemplary VLMs: LLaVA [@liu2023visualinstructiontuning] and PaliGemma [@beyer2024paligemmaversatile3bvlm]. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) [@dosovitskiy2021imageworth16x16words] that has been pre-trained with (image, text) pairs, like CLIP [@radford2021learningtransferablevisualmodels] or SigLIP [@zhai2023sigmoid]. The VLM converts the image into a sequence of image tokens in two steps: 
 
-![1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named `[CLS]` to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from [@dosovitskiy2021imageworth16x16words]](vision-transformer.png){width="60%"}
+![1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named `[CLS]` to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from [@dosovitskiy2021imageworth16x16words]](images/vision-transformer.png){width="60%"}
 
-![2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from [@liu2023visualinstructiontuning]](llava-architecture.png){width="60%"}
+![2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from [@liu2023visualinstructiontuning]](images/llava-architecture.png){width="60%"}
 
 
 # References
