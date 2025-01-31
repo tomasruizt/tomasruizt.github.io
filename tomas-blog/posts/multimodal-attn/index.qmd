@@ -75,5 +75,11 @@ So what is the `<bos>` token attending to? Mostly to image tokens. To highlight 
 
 ![The last text token attends to patches of image tokens](images/paligemma-layer-15-dest-token-last-maxatt-low.png)
 
+This suggest a hypothesis: Namely that the visual information flows from the image tokens into the `<bos>` token, and then from the `<bos>` token to the rest of the text tokens. This is interesting, because it suggests that **PaliGemma2 has trained the `<bos>` token to be a "broker" token for visual information.**
+
+We can partition input into 3 region: The image tokens, the `<bos>` token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.
+
+![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens.](images/blockwise-attn-sums.png)
+
 
 # References
