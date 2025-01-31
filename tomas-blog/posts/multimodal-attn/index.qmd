@@ -53,7 +53,7 @@ This is where the new visualization shines: It overlays the attention pattern ov
 
 ## Case Study: PaliGemma2
 
-I use the PaliGemma2 VLM by Google (`paligemma2-3b-pt-224`) as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt.
+I use the PaliGemma2 VLM [@steiner2024paligemma2familyversatile] by Google as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt.
 
 ![PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens fully attend to each other. Only the output tokens have a causal mask. Image from [@beyer2024paligemmaversatile3bvlm]](images/prefix-attn.png){width="50%"}
 
@@ -77,4 +77,3 @@ So what is the `<bos>` token attending to? Mostly to image tokens. To highlight 
 
 
 # References
-
