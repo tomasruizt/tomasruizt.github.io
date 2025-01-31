@@ -1,5 +1,5 @@
 ---
-title: "Visualizing Multimodal Attention"
+title: "Understanding Multimodal Attention in Prefix-Attention Models"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -20,12 +20,12 @@ citation: true
 
 ![Visualizing Multimodal Attention Patterns](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
 
-This post explains how to inspect the attention patterns of vision-language models (VLMs) like `LLaVa`, or `PaliGemma2` using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis).
+This post explains how to inspect the attention patterns of vision-language models (VLMs) like `LLaVa`, or `PaliGemma2` using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis). My preliminary hypothesis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its `<bos>` token to be a "broker" token for visual information.
 
-## Mechanistic Interpretability
+# Mechanistic Interpretability
 Large language models (LLMs) are notoriously difficult to interpret (black-box). One approach to shed light on LLMs is mechanistic interpretability, which aims to understand the inner workings of the model by breaking down its components. The [distill.pub journal](https://distill.pub/) hosted early works on this topic, the team at [Anthropic](https://transformer-circuits.pub/) continued the tradition, and today researchers actively contribute to the field.
 
-## Attention Patterns
+# Attention Patterns
 The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g. "induction heads" for in-context-learning [@olsson2022incontextlearninginductionheads]. To find such attention patterns, an essential tool is to visualize them, and the `circuitsviz` librarydo so. The examples below show that each token in the input sequence attends to other tokens with different "intensities", as determined by the attention mechanism.
 
 ::: {layout-ncol=2}
@@ -37,7 +37,7 @@ The central component of the Transformer architecture is the attention mechanism
 Text-Only Attention Patterns
 :::
 
-## Multimodal Tokens
+# Multimodal Tokens
 But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on two exemplary VLMs: LLaVA [@liu2023visualinstructiontuning] and PaliGemma [@beyer2024paligemmaversatile3bvlm]. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) [@dosovitskiy2021imageworth16x16words] that has been pre-trained with (image, text) pairs, like CLIP [@radford2021learningtransferablevisualmodels] or SigLIP [@zhai2023sigmoid]. The VLM converts the image into a sequence of image tokens in two steps: 
 
 ![1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named `[CLS]` to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from [@dosovitskiy2021imageworth16x16words]](images/vision-transformer.png){width="60%"}
@@ -46,12 +46,14 @@ But how are images turned into tokens? In contrast to text-only LLMs, VLMs can a
 
 In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in figure @fig-induction-head. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.
 
-## Visualizing Multimodal Attention
-This is where the new visualization shines: It overlays the attention pattern over the image, so we can appreciate the spatial structure of the attention over the image. The main visualization is split in two parts: on the left is the attention pattern over the image, and on the right the pattern over the text. The left part is actually just a single row of the entire attention pattern. One can click on any token in the left or right part to "switch" to the attention pattern with the selected token as a "destination" token. See the video below as an example. The right part is the self-attention only of the text tokens.
+# Visualizing Multimodal Attention
+This is where the new visualization shines: It overlays the attention pattern over the image, so we can appreciate the spatial structure of the attention over the image. The main visualization is split in two attention grids: The left grid shows **only a single row** of the image self-attention pattern, rearranged spatially on top of the image. The right grid is the classic self-attention of the text tokens. 
 
-{{< video https://www.youtube.com/embed/rTY9GBGfASs >}}
+By clicking on any token on either grid, the token is selected as the "destination" token, and the left grid switches to that row of the attention pattern. It is possible to tune the contrast of the attention with a slider, to see patterns with lower attention values. See the video below as an example.
 
-## Case Study: PaliGemma2
+{{< video https://www.youtube.com/embed/oIhhqn1tDhk >}}
+
+# Case Study: PaliGemma2
 
 I use the PaliGemma2 VLM [@steiner2024paligemma2familyversatile] by Google as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt.
 
@@ -81,5 +83,7 @@ We can partition input into 3 region: The image tokens, the `<bos>` token, and t
 
 ![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens.](images/blockwise-attn-sums.png)
 
+# Conclusion
+I showed how to visualize multimodal attention patterns using the new module for `circuitsviz`, which is useful for exploratory work in interpretability. I used PaliGemma2 as an interesting case study, because of its prefix-attention mask. After inspecting the attention patterns, I hypothesize that the `<bos>` token is trained to be a "broker" token for visual information. After this qualitative analysis, the next step is to quantitatively test the hypothesis, e.g. by performing causal intervention on the activations of the `<bos>` token, and by using other (image, text) pairs to see if the relation holds. Understanding the mechanisms of how VLMs process visual information helps us build better models, control them more easily, and ultimately improve their trustworthyness and safety.
 
 # References
