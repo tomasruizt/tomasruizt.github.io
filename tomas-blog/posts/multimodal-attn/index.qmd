@@ -18,7 +18,7 @@ code-annotations: below
 citation: true
 ---
 
-![Visualizing Multimodal Attention](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
+![Visualizing Multimodal Attention Patterns](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
 
 This post explains how to inspect the attention patterns of vision-language models (VLMs) like `LLaVa`, or `PaliGemma2` using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis).
 
@@ -30,7 +30,7 @@ The central component of the Transformer architecture is the attention mechanism
 
 ::: {layout-ncol=2}
 
-![Example 1: Induction Head Pattern](images/attn-pattern-induction-head.png){width="80%"}
+![Example 1: Induction Head Pattern](images/attn-pattern-induction-head.png){#fig-induction-head width="80%"}
 
 ![Example 2: Multiple Attention Heads](images/many-txt-attention-heads.png){width="120%"}
 
@@ -44,7 +44,37 @@ But how are images turned into tokens? In contrast to text-only LLMs, VLMs can a
 
 ![2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from [@liu2023visualinstructiontuning]](images/llava-architecture.png){width="60%"}
 
+In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in figure @fig-induction-head. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.
+
+## Visualizing Multimodal Attention
+This is where the new visualization shines: It overlays the attention pattern over the image, so we can appreciate the spatial structure of the attention over the image. The main visualization is split in two parts: on the left is the attention pattern over the image, and on the right the pattern over the text. The left part is actually just a single row of the entire attention pattern. One can click on any token in the left or right part to "switch" to the attention pattern with the selected token as a "destination" token. See the video below as an example. The right part is the self-attention only of the text tokens.
+
+{{< video https://www.youtube.com/embed/rTY9GBGfASs >}}
+
+## Case Study: PaliGemma2
+
+I use the PaliGemma2 VLM by Google (`paligemma2-3b-pt-224`) as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt.
+
+![PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens fully attend to each other. Only the output tokens have a causal mask. Image from [@beyer2024paligemmaversatile3bvlm]](images/prefix-attn.png){width="50%"}
+
+PaliGemma2 uses a special syntax for prompt. We must prefix the text question with "Answer en <question>" for the model to answer a question in the english (en) language. In the example below, the model correctly answers the question "Answer en what is the color of the frisbee?" with "purple". 
+
+It was surprising to find that the tokens in the text prompt attend most intensely to each other, rather than to the image tokens. This effect persists across layers. In the example below, to highlight the top attention tokens only, I set `max-attention = 1.0`. In the middle layers (layer 15), vertical bars are visible in almost every head. This indicates that most text tokens are attending to the `<bos>` token, which is the first token after the image tokens. Interestingly, the `<bos>` does not attend back to the other text tokens. We can tell because the first row of the colored pattern is completely white (close to 0 attention) in middle and late layers.
+
+![Layer 0](images/paligemma-layer-00-heads.png)
+
+![Layer 15: Dark vertical bars, but first row (`<bos>` token) is white](images/paligemma-layer-15-heads.png){#fig-paligemma-layer-15}
+
+![Layer 25](images/paligemma-layer-25-heads.png)
+
+So what is the `<bos>` token attending to? Mostly to image tokens. To highlight this, I set `max-attention = 0.01` and compare the attentions with different destination text tokens. The `<bos>` token is attending uniformly to all the image tokens. The images below are all from intermediate layers (layer 15).
+
+![The `<bos>` token attends uniformly to all image tokens](images/paligemma-layer-15-dest-token-bos-maxatt-low.png)
+
+![The first text token mostly does not attend to image tokens](images/paligemma-layer-15-dest-token-first-maxatt-low.png)
+
+![The last text token attends to patches of image tokens](images/paligemma-layer-15-dest-token-last-maxatt-low.png)
+
 
 # References
-
 
