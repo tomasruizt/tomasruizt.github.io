@@ -20,7 +20,7 @@ citation: true
 
 ![Visualizing Multimodal Attention Patterns](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
 
-This post explains how to inspect the attention patterns of vision-language models (VLMs) like `LLaVa`, or `PaliGemma2` using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis). My preliminary hypothesis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its `<bos>` token to be a "broker" token for visual information.
+This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis). My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its `<bos>` token to be a "broker" token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable.
 
 # Mechanistic Interpretability
 Large language models (LLMs) are notoriously difficult to interpret (black-box). One approach to shed light on LLMs is mechanistic interpretability, which aims to understand the inner workings of the model by breaking down its components. The [distill.pub journal](https://distill.pub/) hosted early works on this topic, the team at [Anthropic](https://transformer-circuits.pub/) continued the tradition, and today researchers actively contribute to the field.
@@ -38,7 +38,7 @@ Text-Only Attention Patterns
 :::
 
 # Multimodal Tokens
-But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on two exemplary VLMs: LLaVA [@liu2023visualinstructiontuning] and PaliGemma [@beyer2024paligemmaversatile3bvlm]. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) [@dosovitskiy2021imageworth16x16words] that has been pre-trained with (image, text) pairs, like CLIP [@radford2021learningtransferablevisualmodels] or SigLIP [@zhai2023sigmoid]. The VLM converts the image into a sequence of image tokens in two steps: 
+But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on an exemplary VLMs: PaliGemma2 [@beyer2024paligemmaversatile3bvlm]. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) [@dosovitskiy2021imageworth16x16words] that has been pre-trained with (image, text) pairs, like CLIP [@radford2021learningtransferablevisualmodels] or SigLIP [@zhai2023sigmoid]. The VLM converts the image into a sequence of image tokens in two steps: 
 
 ![1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named `[CLS]` to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from [@dosovitskiy2021imageworth16x16words]](images/vision-transformer.png){width="60%"}
 
@@ -55,7 +55,7 @@ By clicking on any token on either grid, the token is selected as the "destinati
 
 # Case Study: PaliGemma2
 
-I use the PaliGemma2 VLM [@steiner2024paligemma2familyversatile] by Google as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt.
+I use the PaliGemma2 VLM [@steiner2024paligemma2familyversatile] by Google as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt. In contrast to other VLMs, the PaliGemma2 model does not use the `[CLS]` token of the ViT.
 
 ![PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens fully attend to each other. Only the output tokens have a causal mask. Image from [@beyer2024paligemmaversatile3bvlm]](images/prefix-attn.png){width="50%"}
 
@@ -79,11 +79,24 @@ So what is the `<bos>` token attending to? Mostly to image tokens. To highlight 
 
 This suggest a hypothesis: Namely that the visual information flows from the image tokens into the `<bos>` token, and then from the `<bos>` token to the rest of the text tokens. To quantify this, I partition the input into 3 region: The image tokens, the `<bos>` token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.
 
-![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens, despite their ratio being 1:256.](images/blockwise-attn-sums.png)
+![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens, despite their ratio being 1:256.](images/blockwise-attn-sums.png){#fig-blockwise-attn-sums-frisbee}
 
 These numbers suggest that **PaliGemma2 has trained the `<bos>` token to be a "broker" token for visual information:** The `<bos>` token "collects" and aggregates visual information from the image tokens into a single place, and then "serves" it back to text and image tokens. It plays a similar role as the `[CLS]` token in the ViT.
 
-# Conclusion
-I showed how to visualize multimodal attention patterns using the new module for `circuitsviz`, which is useful for exploratory work in interpretability. I used PaliGemma2 as an interesting case study, because of its prefix-attention mask. After inspecting the attention patterns, I hypothesize that the `<bos>` token is trained to be a "broker" token for visual information. After this qualitative analysis, the next step is to quantitatively test the hypothesis, e.g. by performing causal intervention on the activations of the `<bos>` token, and by using other (image, text) pairs to see if the relation holds. Understanding the mechanisms of how VLMs process visual information helps us build better models, control them more easily, and ultimately improve their trustworthyness and safety.
+## Do the Numbers Generalize?
+To test if the hypothesis holds in general for (image, text) pairs other than the example of the dog with the frisbee, I ran the analysis on the first 1000 distinct images from the VQA dataset (train) and their corresponding questions. The dataset has multiple questions per image, but I used only the first question so as to have the most visual variation within the 1000 samples.
+
+![VQA images, questions, and model answers. The images are diverse real-life images, and the questions are short open- and closed-ended questions. Note that the questions are formatted in the PaliGemma2 QA format ("Answer en <question>").](images/vqa-grid-of-img-question-answer.png)
+
+I computed the self-attention matrix over regions for each (image, question) pair and computed the average and the standard deviation over the 1000 pairs. We observe that the standard deviations are very small, indicating that **the "broker" role of the `<bos>` token is robust and independent of the image and question.**
+
+![Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in @fig-blockwise-attn-sums-frisbee are mostly within the 1-$\sigma$ confidence interval here, suggesting it is a typical example.](images/blockwise-attn-sums-vqa1000.png)
+
+# Summary and Outlook
+I showed how to visualize multimodal attention patterns using the new module for `circuitsviz`, which is useful for exploratory work in interpretability. I used PaliGemma2 as an interesting case study, because of its prefix-attention mask. After inspecting the attention patterns, I hypothesized that the `<bos>` token is trained to be a "broker" token for visual information, and I showed that this phenomenon is independent of the input image and question on VQA.
+
+**Yet, more analysis remains to be done:** If the token is truly a "broker" token, then visual information flow should be disrupted if this token is causally intervened on. It is also possible that the "broker" role is not tied to the `<bos>` token specifically, but to the first text token in the input (whatever it is). Finding key tokens in VLMs has been useful to improve their efficiency because the less important tokens can be pruned away and don't have to be computed [@chen2024imageworth12tokens] [@wang2024clstokentellsneeded]. We saw in our example that the image tokens outnumber the text tokens (around 256 to 15). This problem is worsened by the quadratic growth of the attention pattern, so pruning image tokens greatly reduces the compute and memory footprint of the model.
+
+Finally, by understanding the mechanisms by which VLMs process visual information, as well as their information bottlenecks, we can monitor them better and make their usage more reliable and safe. We can also control them more easily, for example by intervening on the activations of key tokens when necessary, ultimately improving their safety once deployed.
 
 # References
