@@ -4,7 +4,7 @@ author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
     affiliations: Ludwig-Maximilians-Universität München
-date: "2025-01-29"
+date: "2025-02-01"
 categories: [Transformers, Attention]
 format:
   html:
@@ -20,6 +20,7 @@ citation: true
 
 ![Visualizing Multimodal Attention Patterns](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
 
+# Summary
 This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis). My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its `<bos>` token to be a "broker" token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable.
 
 # Mechanistic Interpretability
@@ -92,11 +93,14 @@ I computed the self-attention matrix over regions for each (image, question) pai
 
 ![Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in @fig-blockwise-attn-sums-frisbee are mostly within the 1-$\sigma$ confidence interval here, suggesting it is a typical example.](images/blockwise-attn-sums-vqa1000.png)
 
-# Summary and Outlook
+# Conclusion and Outlook
 I showed how to visualize multimodal attention patterns using the new module for `circuitsviz`, which is useful for exploratory work in interpretability. I used PaliGemma2 as an interesting case study, because of its prefix-attention mask. After inspecting the attention patterns, I hypothesized that the `<bos>` token is trained to be a "broker" token for visual information, and I showed that this phenomenon is independent of the input image and question on VQA.
 
-**Yet, more analysis remains to be done:** If the token is truly a "broker" token, then visual information flow should be disrupted if this token is causally intervened on. It is also possible that the "broker" role is not tied to the `<bos>` token specifically, but to the first text token in the input (whatever it is). Finding key tokens in VLMs has been useful to improve their efficiency because the less important tokens can be pruned away and don't have to be computed [@chen2024imageworth12tokens] [@wang2024clstokentellsneeded]. We saw in our example that the image tokens outnumber the text tokens (around 256 to 15). This problem is worsened by the quadratic growth of the attention pattern, so pruning image tokens greatly reduces the compute and memory footprint of the model.
+**Yet, more analysis remains to be done:** If the token is truly a "broker" token, then visual information flow should be disrupted if this token is causally intervened on (patching). It is also possible that the "broker" role is not tied to the `<bos>` token specifically, but to the first text token in the input (whatever it is). Finding key tokens in VLMs has been useful to improve their efficiency because the less important tokens can be pruned away and don't have to be computed [@chen2024imageworth12tokens] [@wang2024clstokentellsneeded]. We saw in our example that the image tokens outnumber the text tokens (around 256 to 15). This problem is worsened by the quadratic growth of the attention pattern, so pruning image tokens greatly reduces the compute and memory footprint of the model.
 
 Finally, by understanding the mechanisms by which VLMs process visual information, as well as their information bottlenecks, we can monitor them better and make their usage more reliable and safe. We can also control them more easily, for example by intervening on the activations of key tokens when necessary, ultimately improving their safety once deployed.
+
+## Acknowledgement
+This is the final project for the course "Artificial Intelligence Safety Fundamentals" [(AISF)](https://aisafetyfundamentals.com/) by BlueDot Impact. The author is funded by the Bavarian Research Institute for Digital Transformation (bidt) and the Ludwig Maximilian University of Munich.
 
 # References
