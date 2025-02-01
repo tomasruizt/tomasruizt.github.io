@@ -7,9 +7,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Tomas Ruiz">
-<meta name="dcterms.date" content="2024-12-23">
+<meta name="dcterms.date" content="2025-02-01">
 
-<title>How Does Tiling Speed Up Matrix Multiplications on GPUs? – All Posts</title>
+<title>Drilling Down into Multimodal Attention – All Posts</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -21,40 +21,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 /* CSS for citations */
 div.csl-bib-body { }
@@ -210,10 +176,10 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">How Does Tiling Speed Up Matrix Multiplications on GPUs?</h1>
+      <h1 class="title">Drilling Down into Multimodal Attention</h1>
                                 <div class="quarto-categories">
-                <div class="quarto-category">Mathematics</div>
-                <div class="quarto-category">GPUs</div>
+                <div class="quarto-category">Transformers</div>
+                <div class="quarto-category">Attention</div>
               </div>
                   </div>
   </div>
@@ -238,7 +204,7 @@ window.Quarto = {
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">December 23, 2024</p>
+        <p class="date">February 1, 2025</p>
       </div>
     </div>
     
@@ -254,16 +220,19 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#matrix-multiplication-recap" id="toc-matrix-multiplication-recap" class="nav-link active" data-scroll-target="#matrix-multiplication-recap">Matrix Multiplication Recap</a></li>
-  <li><a href="#compute-intensity" id="toc-compute-intensity" class="nav-link" data-scroll-target="#compute-intensity">Compute Intensity</a></li>
-  <li><a href="#memory-access-analysis" id="toc-memory-access-analysis" class="nav-link" data-scroll-target="#memory-access-analysis">Memory Access Analysis</a>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#mechanistic-interpretability" id="toc-mechanistic-interpretability" class="nav-link" data-scroll-target="#mechanistic-interpretability">Mechanistic Interpretability</a></li>
+  <li><a href="#attention-patterns" id="toc-attention-patterns" class="nav-link" data-scroll-target="#attention-patterns">Attention Patterns</a></li>
+  <li><a href="#multimodal-tokens" id="toc-multimodal-tokens" class="nav-link" data-scroll-target="#multimodal-tokens">Multimodal Tokens</a></li>
+  <li><a href="#visualizing-multimodal-attention" id="toc-visualizing-multimodal-attention" class="nav-link" data-scroll-target="#visualizing-multimodal-attention">Visualizing Multimodal Attention</a></li>
+  <li><a href="#case-study-paligemma2" id="toc-case-study-paligemma2" class="nav-link" data-scroll-target="#case-study-paligemma2">Case Study: PaliGemma2</a>
   <ul class="collapse">
-  <li><a href="#naive-memory-access" id="toc-naive-memory-access" class="nav-link" data-scroll-target="#naive-memory-access">Naive Memory Access</a></li>
-  <li><a href="#optimal-memory-access" id="toc-optimal-memory-access" class="nav-link" data-scroll-target="#optimal-memory-access">Optimal Memory Access</a></li>
-  <li><a href="#a-middle-ground-tiling" id="toc-a-middle-ground-tiling" class="nav-link" data-scroll-target="#a-middle-ground-tiling">A Middle Ground: Tiling</a></li>
+  <li><a href="#do-the-numbers-generalize" id="toc-do-the-numbers-generalize" class="nav-link" data-scroll-target="#do-the-numbers-generalize">Do the Numbers Generalize?</a></li>
   </ul></li>
-  <li><a href="#tiling-on-gpus-cuda" id="toc-tiling-on-gpus-cuda" class="nav-link" data-scroll-target="#tiling-on-gpus-cuda">Tiling on GPUs &amp; CUDA</a></li>
-  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#conclusion-and-outlook" id="toc-conclusion-and-outlook" class="nav-link" data-scroll-target="#conclusion-and-outlook">Conclusion and Outlook</a>
+  <ul class="collapse">
+  <li><a href="#acknowledgement" id="toc-acknowledgement" class="nav-link" data-scroll-target="#acknowledgement">Acknowledgement</a></li>
+  </ul></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
 </nav>
@@ -277,195 +246,168 @@ window.Quarto = {
 
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><a href="tiled-matrix-multiplication.webp" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Tiled MatMul according to ChatGPT"><img src="tiled-matrix-multiplication.webp" class="img-fluid figure-img" style="width:100.0%" data-text-align="center" alt="Tiled Matrix Multiplication"></a></p>
-<figcaption>Tiled MatMul according to ChatGPT</figcaption>
+<p><a href="images/multimodal-attn.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Visualizing Multimodal Attention Patterns"><img src="images/multimodal-attn.png" class="img-fluid figure-img" style="width:70.0%" data-text-align="left" alt="Visualizing Multimodal Attention"></a></p>
+<figcaption>Visualizing Multimodal Attention Patterns</figcaption>
 </figure>
 </div>
-<p><strong>TL;DR:</strong> Tiling is a technique used to reduce the number of memory accesses performed during matrix multiplication. We see how it improves compute intensity and how it speeds up the matrix multiplication operation, not only on CPUs, but also on GPUs. I also provide a simple implementation of tiling in CUDA C.</p>
-<section id="matrix-multiplication-recap" class="level1">
-<h1>Matrix Multiplication Recap</h1>
-<p>Matrix multiplication, where <span class="math inline">\(AB = C\)</span>, computes each element of <span class="math inline">\(C\)</span> as:</p>
-<p><span class="math display">\[C_{ij} = \sum_{k=1}^n A_{ik} B_{kj}\]</span></p>
-<p>For simplicity, assume <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> are square matrices of size <span class="math inline">\(n\)</span>. Below is basic pseudocode for the operation, which involves <span class="math inline">\(2n^3\)</span> floating-point operations (flops), because of the triple nested loop:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n):</span>
-<span id="cb1-2"><a href="#cb1-2"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(n):</span>
-<span id="cb1-3"><a href="#cb1-3"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(n):</span>
-<span id="cb1-4"><a href="#cb1-4"></a>            C[i][j] <span class="op">+=</span> A[i][k] <span class="op">*</span> B[k][j]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>The code is correct, but it is inefficient in terms of its memory access pattern. Let’s see why.</p>
+<section id="summary" class="level1">
+<h1>Summary</h1>
+<p>This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created for the <code>circuitsviz</code> library <a href="https://github.com/tomasruizt/CircuitsVis">link here</a>. My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its <code>&lt;bos&gt;</code> token to be a “broker” token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable.</p>
 </section>
-<section id="compute-intensity" class="level1">
-<h1>Compute Intensity</h1>
-<p>Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache (L1 or L2), compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the <strong>memory bandwidth</strong> becomes the bottleneck of the algorithm.</p>
-<p>Key Concept: <strong>Compute Intensity</strong>. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model <span class="citation" data-cites="williams2009roofline">(<a href="#ref-williams2009roofline" role="doc-biblioref">Williams, Waterman, and Patterson 2009</a>)</span>.</p>
-<div class="callout callout-style-default callout-tip callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Tip
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>To boost performance, maximize compute intensity by reducing memory transfers per flop.</p>
-</div>
-</div>
+<section id="mechanistic-interpretability" class="level1">
+<h1>Mechanistic Interpretability</h1>
+<p>Large language models (LLMs) are notoriously difficult to interpret (black-box). One approach to shed light on LLMs is mechanistic interpretability, which aims to understand the inner workings of the model by breaking down its components. The <a href="https://distill.pub/">distill.pub journal</a> hosted early works on this topic, the team at <a href="https://transformer-circuits.pub/">Anthropic</a> continued the tradition, and today researchers actively contribute to the field.</p>
 </section>
-<section id="memory-access-analysis" class="level1">
-<h1>Memory Access Analysis</h1>
-<section id="naive-memory-access" class="level2">
-<h2 class="anchored" data-anchor-id="naive-memory-access">Naive Memory Access</h2>
-<p>In the naive approach, computing <span class="math inline">\(C_{ij}\)</span> requires fetching <span class="math inline">\(n\)</span> elements from <span class="math inline">\(A\)</span> (a row) and <span class="math inline">\(n\)</span> elements from <span class="math inline">\(B\)</span> (a column). That makes <span class="math inline">\(2n\)</span> memory accesses. <span class="math inline">\(C_{ij}\)</span> is computed as the dot product of the row and the column, which requires <span class="math inline">\(2n\)</span> flops (1 mult and 1 add, <span class="math inline">\(n\)</span> times). Thus, the compute intensity is: <span class="math display">\[
-\text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2n}{2n} = 1
-\]</span></p>
-<p>Can we do better? In this naive implementation, we are performing redundant memory transfers: For example, to compute <span class="math inline">\(C_{11}\)</span>, and <span class="math inline">\(C_{12}\)</span>, we fetch the first row of <span class="math inline">\(A\)</span> twice from main memory.</p>
-</section>
-<section id="optimal-memory-access" class="level2">
-<h2 class="anchored" data-anchor-id="optimal-memory-access">Optimal Memory Access</h2>
-<p>If our cache was (theoretically) large enough, we would transfer all elements of <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> into the cache at once (<span class="math inline">\(2n^2\)</span> transfers) and perform the full matrix multiplication (<span class="math inline">\(2n^3\)</span> flops).</p>
-<p><span class="math display">\[
-\text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2n^3}{2n^2} = n
-\]</span> The larger the matrices, the higher the compute intensity.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
+<section id="attention-patterns" class="level1">
+<h1>Attention Patterns</h1>
+<p>The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g.&nbsp;“induction heads” for in-context-learning <span class="citation" data-cites="olsson2022incontextlearninginductionheads">(<a href="#ref-olsson2022incontextlearninginductionheads" role="doc-biblioref">Olsson et al. 2022</a>)</span>. To find such attention patterns, an essential tool is to visualize them, and the <code>circuitsviz</code> librarydo so. The examples below show that each token in the input sequence attends to other tokens with different “intensities”, as determined by the attention mechanism.</p>
+<div>
+
 </div>
-<div class="callout-title-container flex-fill">
-Example
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-induction-head" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-induction-head-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/attn-pattern-induction-head.png" class="img-fluid figure-img" style="width:80.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-induction-head-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Example 1: Induction Head Pattern
+</figcaption>
+</figure>
 </div>
 </div>
-<div class="callout-body-container callout-body">
-<p>Assuming a matrix size of <span class="math inline">\(n=10,000\)</span>, the naive approach does 1 flop per memory transfer, while the optimal approach does 10,000 flops per memory transfer. This would result in a 10,000x speedup, assuming memory bandwidth remained the bottleneck.</p>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/many-txt-attention-heads.png" class="img-fluid figure-img" style="width:120.0%"></p>
+<figcaption>Example 2: Multiple Attention Heads</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<p>Text-Only Attention Patterns</p>
+</div>
 </div>
 </div>
 </section>
-<section id="a-middle-ground-tiling" class="level2">
-<h2 class="anchored" data-anchor-id="a-middle-ground-tiling">A Middle Ground: Tiling</h2>
-<p>Since caching entire matrices is impractical, we divide matrices <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> into smaller square blocks of size <span class="math inline">\(r\)</span>, called <strong>tiles</strong>, perform block-wise multiplications, and aggregate the results.</p>
-<p>But how does block-wise matrix multiplication work? Let’s go through an example to gain some intuition. We break the matrices <span class="math inline">\(A\)</span>, <span class="math inline">\(B\)</span>, and <span class="math inline">\(C\)</span> into 4 blocks each (2x2). Each of these blocks has size <span class="math inline">\(n/2\)</span>.</p>
-<p><span class="math display">\[
-\begin{bmatrix}
-A_{11} &amp; A_{12} \\
-A_{21} &amp; A_{22}
-\end{bmatrix}
-\begin{bmatrix}
-B_{11} &amp; B_{12} \\
-B_{21} &amp; B_{22}
-\end{bmatrix} =
-\begin{bmatrix}
-C_{11} &amp; C_{12} \\
-C_{21} &amp; C_{22}
-\end{bmatrix}
-\]</span></p>
-<p>To compute an submatrix <span class="math inline">\(C_{ij}\)</span>, we multiply the corresponding blocks of <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> and sum the results. For example:</p>
-<p><span class="math display">\[
-C_{11} = A_{11}B_{11} + A_{12}B_{21}
-\]</span></p>
-<p>In pseudocode this translates to the code below.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1"></a>n_blocks <span class="op">=</span> n <span class="op">//</span> r</span>
-<span id="cb2-2"><a href="#cb2-2"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_blocks):</span>
-<span id="cb2-3"><a href="#cb2-3"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(n_blocks):</span>
-<span id="cb2-4"><a href="#cb2-4"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(n_blocks):</span>
-<span id="cb2-5"><a href="#cb2-5"></a>            C[i][j] <span class="op">+=</span> A[i][k] <span class="op">@</span> B[k][j]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Note that the entry <code>C[i][j]</code> is now a block matrix rather than a scalar, and the <code>@</code> operator denotes matrix multiplication, rather than scalar multiplication. Line 5 of the code above is loading blocks of size <span class="math inline">\(r^2\)</span> from <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> into the cache, which takes <span class="math inline">\(2r^2\)</span> memory transfers. Then, it multiplies the two blocks, which requires <span class="math inline">\(2r^3\)</span> flops.</p>
-<p><span class="math display">\[
-\text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2r^3}{2r^2} = r
-\]</span></p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
+<section id="multimodal-tokens" class="level1">
+<h1>Multimodal Tokens</h1>
+<p>But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on an exemplary VLMs: PaliGemma2 <span class="citation" data-cites="beyer2024paligemmaversatile3bvlm">(<a href="#ref-beyer2024paligemmaversatile3bvlm" role="doc-biblioref">Beyer et al. 2024</a>)</span>. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) <span class="citation" data-cites="dosovitskiy2021imageworth16x16words">(<a href="#ref-dosovitskiy2021imageworth16x16words" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span> that has been pre-trained with (image, text) pairs, like CLIP <span class="citation" data-cites="radford2021learningtransferablevisualmodels">(<a href="#ref-radford2021learningtransferablevisualmodels" role="doc-biblioref">Radford et al. 2021</a>)</span> or SigLIP <span class="citation" data-cites="zhai2023sigmoid">(<a href="#ref-zhai2023sigmoid" role="doc-biblioref">Zhai et al. 2023</a>)</span>. The VLM converts the image into a sequence of image tokens in two steps:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/vision-transformer.png" class="img-fluid figure-img" style="width:60.0%"></p>
+<figcaption>1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named <code>[CLS]</code> to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from <span class="citation" data-cites="dosovitskiy2021imageworth16x16words">(<a href="#ref-dosovitskiy2021imageworth16x16words" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span></figcaption>
+</figure>
 </div>
-<div class="callout-title-container flex-fill">
-Example
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/llava-architecture.png" class="img-fluid figure-img" style="width:60.0%"></p>
+<figcaption>2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from <span class="citation" data-cites="liu2023visualinstructiontuning">(<a href="#ref-liu2023visualinstructiontuning" role="doc-biblioref">Liu et al. 2023</a>)</span></figcaption>
+</figure>
 </div>
+<p>In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in figure <a href="#fig-induction-head" class="quarto-xref">Figure&nbsp;1</a>. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.</p>
+</section>
+<section id="visualizing-multimodal-attention" class="level1">
+<h1>Visualizing Multimodal Attention</h1>
+<p>This is where the new visualization shines: It overlays the attention pattern over the image, so we can appreciate the spatial structure of the attention over the image. The main visualization is split in two attention grids: The left grid shows <strong>only a single row</strong> of the image self-attention pattern, rearranged spatially on top of the image. The right grid is the classic self-attention of the text tokens.</p>
+<p>By clicking on any token on either grid, the token is selected as the “destination” token, and the left grid switches to that row of the attention pattern. It is possible to tune the contrast of the attention with a slider, to see patterns with lower attention values. See the video below as an example.</p>
+<div class="quarto-video ratio ratio-16x9"><iframe data-external="1" src="https://www.youtube.com/embed/oIhhqn1tDhk" title="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe></div>
+</section>
+<section id="case-study-paligemma2" class="level1">
+<h1>Case Study: PaliGemma2</h1>
+<p>I use the PaliGemma2 VLM <span class="citation" data-cites="steiner2024paligemma2familyversatile">(<a href="#ref-steiner2024paligemma2familyversatile" role="doc-biblioref">Steiner et al. 2024</a>)</span> by Google as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt. In contrast to other VLMs, the PaliGemma2 model does not use the <code>[CLS]</code> token of the ViT.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/prefix-attn.png" class="img-fluid figure-img" style="width:50.0%"></p>
+<figcaption>PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens fully attend to each other. Only the output tokens have a causal mask. Image from <span class="citation" data-cites="beyer2024paligemmaversatile3bvlm">(<a href="#ref-beyer2024paligemmaversatile3bvlm" role="doc-biblioref">Beyer et al. 2024</a>)</span></figcaption>
+</figure>
 </div>
-<div class="callout-body-container callout-body">
-<p>Assuming a block size of <span class="math inline">\(r=100\)</span>, the naive approach does 1 flop per memory transfer, while the tiling approach does 100 flops per memory transfer. This would result in a 100x speedup, assuming memory bandwidth remained the bottleneck.</p>
+<p>PaliGemma2 uses a special syntax for prompt. We must prefix the text question with “Answer en <question>” for the model to answer a question in the english (en) language. In the example below, the model correctly answers the question “Answer en what is the color of the frisbee?” with “purple”.</question></p>
+<p>It was surprising to find that the tokens in the text prompt attend most intensely to each other, rather than to the image tokens. This effect persists across layers. In the example below, to highlight the top attention tokens only, I set <code>max-attention = 1.0</code>. In the middle layers (layer 15), vertical bars are visible in almost every head. This indicates that most text tokens are attending to the <code>&lt;bos&gt;</code> token, which is the first token after the image tokens. Interestingly, the <code>&lt;bos&gt;</code> does not attend back to the other text tokens. We can tell because the first row of the colored pattern is completely white (close to 0 attention) in middle and late layers.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/paligemma-layer-00-heads.png" class="img-fluid figure-img"></p>
+<figcaption>Layer 0</figcaption>
+</figure>
 </div>
+<div id="fig-paligemma-layer-15" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-paligemma-layer-15-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/paligemma-layer-15-heads.png" class="img-fluid figure-img">
 </div>
-<p>It should be clear that <span class="math inline">\(1 \leq r \leq n\)</span>. Setting <span class="math inline">\(r=1\)</span>, we recover the naive approach, while setting <span class="math inline">\(r=n\)</span> we recover the optimal approach. The table below compares the performance of the different methods. Note that for the tiled method, the flops and memory transfers are measured per block, rather than per matrix.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 17%">
-<col style="width: 12%">
-<col style="width: 29%">
-<col style="width: 41%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Method</th>
-<th>Flops</th>
-<th>Memory Transfers</th>
-<th>Flops/Memory Transfer</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Naive</td>
-<td><span class="math inline">\(2n^3\)</span></td>
-<td><span class="math inline">\(2n \cdot n^2\)</span></td>
-<td><span class="math inline">\(\frac{2n^3}{2n \cdot n^2} = 1\)</span></td>
-</tr>
-<tr class="even">
-<td>Tiling</td>
-<td><span class="math inline">\(2r^3\)</span></td>
-<td><span class="math inline">\(2r^2\)</span></td>
-<td><span class="math inline">\(\frac{r^3}{r^2} = r\)</span></td>
-</tr>
-<tr class="odd">
-<td>Optimal (Theoretical)</td>
-<td><span class="math inline">\(2n^3\)</span></td>
-<td><span class="math inline">\(2n^2\)</span></td>
-<td><span class="math inline">\(\frac{n^3}{n^2} = n\)</span></td>
-</tr>
-</tbody>
-</table>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-paligemma-layer-15-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Layer 15: Dark vertical bars, but first row (<code>&lt;bos&gt;</code> token) is white
+</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/paligemma-layer-25-heads.png" class="img-fluid figure-img"></p>
+<figcaption>Layer 25</figcaption>
+</figure>
+</div>
+<p>So what is the <code>&lt;bos&gt;</code> token attending to? Mostly to image tokens. To highlight this, I set <code>max-attention = 0.01</code> and compare the attentions with different destination text tokens. The <code>&lt;bos&gt;</code> token is attending uniformly to all the image tokens. The images below are all from intermediate layers (layer 15).</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/paligemma-layer-15-dest-token-bos-maxatt-low.png" class="img-fluid figure-img"></p>
+<figcaption>The <code>&lt;bos&gt;</code> token attends uniformly to all image tokens</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/paligemma-layer-15-dest-token-first-maxatt-low.png" class="img-fluid figure-img"></p>
+<figcaption>The first text token mostly does not attend to image tokens</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/paligemma-layer-15-dest-token-last-maxatt-low.png" class="img-fluid figure-img"></p>
+<figcaption>The last text token attends to patches of image tokens</figcaption>
+</figure>
+</div>
+<p>This suggest a hypothesis: Namely that the visual information flows from the image tokens into the <code>&lt;bos&gt;</code> token, and then from the <code>&lt;bos&gt;</code> token to the rest of the text tokens. To quantify this, I partition the input into 3 region: The image tokens, the <code>&lt;bos&gt;</code> token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.</p>
+<div id="fig-blockwise-attn-sums-frisbee" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-blockwise-attn-sums-frisbee-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/blockwise-attn-sums.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blockwise-attn-sums-frisbee-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the <code>&lt;bos&gt;</code> token, (an example of information flowing back from text to image). The <code>&lt;bos&gt;</code> token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the <code>&lt;bos&gt;</code>token as to the image tokens, despite their ratio being 1:256.
+</figcaption>
+</figure>
+</div>
+<p>These numbers suggest that <strong>PaliGemma2 has trained the <code>&lt;bos&gt;</code> token to be a “broker” token for visual information:</strong> The <code>&lt;bos&gt;</code> token “collects” and aggregates visual information from the image tokens into a single place, and then “serves” it back to text and image tokens. It plays a similar role as the <code>[CLS]</code> token in the ViT.</p>
+<section id="do-the-numbers-generalize" class="level2">
+<h2 class="anchored" data-anchor-id="do-the-numbers-generalize">Do the Numbers Generalize?</h2>
+<p>To test if the hypothesis holds in general for (image, text) pairs other than the example of the dog with the frisbee, I ran the analysis on the first 1000 distinct images from the VQA dataset (train) and their corresponding questions. The dataset has multiple questions per image, but I used only the first question so as to have the most visual variation within the 1000 samples.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/vqa-grid-of-img-question-answer.png" class="img-fluid figure-img"></p>
+<figcaption>VQA images, questions, and model answers. The images are diverse real-life images, and the questions are short open- and closed-ended questions. Note that the questions are formatted in the PaliGemma2 QA format (“Answer en <question>”).</question></figcaption>
+</figure>
+</div>
+<p>I computed the self-attention matrix over regions for each (image, question) pair and computed the average and the standard deviation over the 1000 pairs. We observe that the standard deviations are very small, indicating that <strong>the “broker” role of the <code>&lt;bos&gt;</code> token is robust and independent of the image and question.</strong></p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/blockwise-attn-sums-vqa1000.png" class="img-fluid figure-img"></p>
+<figcaption>Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in <a href="#fig-blockwise-attn-sums-frisbee" class="quarto-xref">Figure&nbsp;3</a> are mostly within the 1-<span class="math inline">\(\sigma\)</span> confidence interval here, suggesting it is a typical example.</figcaption>
+</figure>
+</div>
 </section>
 </section>
-<section id="tiling-on-gpus-cuda" class="level1">
-<h1>Tiling on GPUs &amp; CUDA</h1>
-<p>GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the memory bandwidth is likely to be a bottleneck in matrix multiplication on GPUs. To relieve the pressure on the memory bandwidth, it’s necessary to reduce the number of memory transfers by using the tiling technique.</p>
-<p>How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA <strong>shared memory</strong>. This is the equivalent to a user-managed L1 cache. The keyword <code>__shared__</code> defines an array used as cache. The variables <code>row</code> and <code>col</code> indicate what element of the matrix <span class="math inline">\(C_{ij}\)</span> the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product and accumulate the result. Finally, line 31 writes the result back to global memory. The function <code>__syncthreads()</code> is a CUDA synchronization primitive to avoid a race condition between threads.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a href="#cb3-1"></a>__global__ <span class="dt">void</span> tiledMatMul<span class="op">(</span><span class="dt">float</span> <span class="op">*</span>A<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>B<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>C<span class="op">,</span> <span class="dt">int</span> n<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb3-2"><a href="#cb3-2"></a>    <span class="co">// Define shared memory arrays (cache)</span></span>
-<span id="cb3-3"><a href="#cb3-3"></a>    __shared__ <span class="dt">float</span> A_block<span class="op">[</span>TILE_SIZE<span class="op">][</span>TILE_SIZE<span class="op">];</span></span>
-<span id="cb3-4"><a href="#cb3-4"></a>    __shared__ <span class="dt">float</span> B_block<span class="op">[</span>TILE_SIZE<span class="op">][</span>TILE_SIZE<span class="op">];</span></span>
-<span id="cb3-5"><a href="#cb3-5"></a>    </span>
-<span id="cb3-6"><a href="#cb3-6"></a>    <span class="co">// CUDA thread variables</span></span>
-<span id="cb3-7"><a href="#cb3-7"></a>    <span class="dt">int</span> row <span class="op">=</span> blockIdx<span class="op">.</span>y <span class="op">*</span> blockDim<span class="op">.</span>y <span class="op">+</span> threadIdx<span class="op">.</span>y<span class="op">;</span></span>
-<span id="cb3-8"><a href="#cb3-8"></a>    <span class="dt">int</span> col <span class="op">=</span> blockIdx<span class="op">.</span>x <span class="op">*</span> blockDim<span class="op">.</span>x <span class="op">+</span> threadIdx<span class="op">.</span>x<span class="op">;</span></span>
-<span id="cb3-9"><a href="#cb3-9"></a>    </span>
-<span id="cb3-10"><a href="#cb3-10"></a>    <span class="dt">float</span> C_ij <span class="op">=</span> <span class="fl">0.0</span><span class="bu">f</span><span class="op">;</span></span>
-<span id="cb3-11"><a href="#cb3-11"></a>    </span>
-<span id="cb3-12"><a href="#cb3-12"></a>    <span class="co">// Loop over the blocks</span></span>
-<span id="cb3-13"><a href="#cb3-13"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> t <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> t <span class="op">&lt;</span> n <span class="op">/</span> TILE_SIZE<span class="op">;</span> t<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb3-14"><a href="#cb3-14"></a>        <span class="co">// Transfer data from main memory into the cache</span></span>
-<span id="cb3-15"><a href="#cb3-15"></a>        A_block<span class="op">[</span>threadIdx<span class="op">.</span>y<span class="op">][</span>threadIdx<span class="op">.</span>x<span class="op">]</span> <span class="op">=</span> A<span class="op">[</span>row <span class="op">*</span> n <span class="op">+</span> t <span class="op">*</span> TILE_SIZE <span class="op">+</span> threadIdx<span class="op">.</span>x<span class="op">];</span></span>
-<span id="cb3-16"><a href="#cb3-16"></a>        B_block<span class="op">[</span>threadIdx<span class="op">.</span>y<span class="op">][</span>threadIdx<span class="op">.</span>x<span class="op">]</span> <span class="op">=</span> B<span class="op">[(</span>t <span class="op">*</span> TILE_SIZE <span class="op">+</span> threadIdx<span class="op">.</span>y<span class="op">)</span> <span class="op">*</span> n <span class="op">+</span> col<span class="op">];</span></span>
-<span id="cb3-17"><a href="#cb3-17"></a>        </span>
-<span id="cb3-18"><a href="#cb3-18"></a>        <span class="co">// Ensure data transfer is complete before proceeding</span></span>
-<span id="cb3-19"><a href="#cb3-19"></a>        __syncthreads<span class="op">();</span></span>
-<span id="cb3-20"><a href="#cb3-20"></a>        </span>
-<span id="cb3-21"><a href="#cb3-21"></a>        <span class="co">// Matrix multiply both blocks</span></span>
-<span id="cb3-22"><a href="#cb3-22"></a>        <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> k <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> k <span class="op">&lt;</span> TILE_SIZE<span class="op">;</span> k<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb3-23"><a href="#cb3-23"></a>            C_ij <span class="op">+=</span> A_block<span class="op">[</span>threadIdx<span class="op">.</span>y<span class="op">][</span>k<span class="op">]</span> <span class="op">*</span> B_block<span class="op">[</span>k<span class="op">][</span>threadIdx<span class="op">.</span>x<span class="op">];</span></span>
-<span id="cb3-24"><a href="#cb3-24"></a>        <span class="op">}</span></span>
-<span id="cb3-25"><a href="#cb3-25"></a>        </span>
-<span id="cb3-26"><a href="#cb3-26"></a>        <span class="co">// Finish multiplying the blocks before overwriting the cache next iteration</span></span>
-<span id="cb3-27"><a href="#cb3-27"></a>        __syncthreads<span class="op">();</span></span>
-<span id="cb3-28"><a href="#cb3-28"></a>    <span class="op">}</span></span>
-<span id="cb3-29"><a href="#cb3-29"></a>    </span>
-<span id="cb3-30"><a href="#cb3-30"></a>    <span class="co">// Transfer the result back to global memory</span></span>
-<span id="cb3-31"><a href="#cb3-31"></a>    C<span class="op">[</span>row <span class="op">*</span> n <span class="op">+</span> col<span class="op">]</span> <span class="op">=</span> C_ij<span class="op">;</span></span>
-<span id="cb3-32"><a href="#cb3-32"></a><span class="op">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>The CUDA code is more complicated than the pseudocode, but it makes the cache usage explicit. To run the code look at <a href="https://github.com/tomasruizt/Code-Along/blob/main/cuda-pmpp/03_matrix_multiplication/main.cu">my example on Github</a>, which has Makefile for compilation and execution. If you want to see a more complete version, you can find it in the book by <span class="citation" data-cites="kirk2016programming">(<a href="#ref-kirk2016programming" role="doc-biblioref">Kirk and Wen-Mei 2016</a>)</span>. They describe other techniques to optimize algorithms on GPUs, like memory coalescing, minimizing control divergence, and thread coarsening.</p>
+<section id="conclusion-and-outlook" class="level1">
+<h1>Conclusion and Outlook</h1>
+<p>I showed how to visualize multimodal attention patterns using the new module for <code>circuitsviz</code>, which is useful for exploratory work in interpretability. I used PaliGemma2 as an interesting case study, because of its prefix-attention mask. After inspecting the attention patterns, I hypothesized that the <code>&lt;bos&gt;</code> token is trained to be a “broker” token for visual information, and I showed that this phenomenon is independent of the input image and question on VQA.</p>
+<p><strong>Yet, more analysis remains to be done:</strong> If the token is truly a “broker” token, then visual information flow should be disrupted if this token is causally intervened on (patching). It is also possible that the “broker” role is not tied to the <code>&lt;bos&gt;</code> token specifically, but to the first text token in the input (whatever it is). Finding key tokens in VLMs has been useful to improve their efficiency because the less important tokens can be pruned away and don’t have to be computed <span class="citation" data-cites="chen2024imageworth12tokens">(<a href="#ref-chen2024imageworth12tokens" role="doc-biblioref">Chen et al. 2024</a>)</span> <span class="citation" data-cites="wang2024clstokentellsneeded">(<a href="#ref-wang2024clstokentellsneeded" role="doc-biblioref">Wang et al. 2024</a>)</span>. We saw in our example that the image tokens outnumber the text tokens (around 256 to 15). This problem is worsened by the quadratic growth of the attention pattern, so pruning image tokens greatly reduces the compute and memory footprint of the model.</p>
+<p>Finally, by understanding the mechanisms by which VLMs process visual information, as well as their information bottlenecks, we can monitor them better and make their usage more reliable and safe. We can also control them more easily, for example by intervening on the activations of key tokens when necessary, ultimately improving their safety once deployed.</p>
+<section id="acknowledgement" class="level2">
+<h2 class="anchored" data-anchor-id="acknowledgement">Acknowledgement</h2>
+<p>This is the final project for the course “Artificial Intelligence Safety Fundamentals” <a href="https://aisafetyfundamentals.com/">(AISF)</a> by BlueDot Impact. The author is funded by the Bavarian Research Institute for Digital Transformation (bidt) and the Ludwig Maximilian University of Munich.</p>
 </section>
-<section id="conclusion" class="level1">
-<h1>Conclusion</h1>
-<p>Tiling is a practical optimization technique for improving matrix multiplication performance by minimizing memory transfers and maximizing compute intensity. We saw how the memory access pattern affects the performance of matrix multiplication, and how tiling is implemented concretely in CUDA C.</p>
-<p><strong>Acknowledgement:</strong> The author is funded by the Bavarian Research Institute for Digital Transformation (bidt) and the Ludwig Maximilian University of Munich.</p>
 </section>
 <section id="references" class="level1">
 
@@ -475,23 +417,43 @@ Example
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
-<div id="ref-kirk2016programming" class="csl-entry" role="listitem">
-Kirk, David B, and W Hwu Wen-Mei. 2016. <em>Programming Massively Parallel Processors: A Hands-on Approach</em>. Morgan kaufmann.
+<div id="ref-beyer2024paligemmaversatile3bvlm" class="csl-entry" role="listitem">
+Beyer, Lucas, Andreas Steiner, André Susano Pinto, Alexander Kolesnikov, Xiao Wang, Daniel Salz, Maxim Neumann, et al. 2024. <span>“PaliGemma: A Versatile 3B VLM for Transfer.”</span> <a href="https://arxiv.org/abs/2407.07726">https://arxiv.org/abs/2407.07726</a>.
 </div>
-<div id="ref-williams2009roofline" class="csl-entry" role="listitem">
-Williams, Samuel, Andrew Waterman, and David Patterson. 2009. <span>“Roofline: An Insightful Visual Performance Model for Multicore Architectures.”</span> <em>Communications of the ACM</em> 52 (4): 65–76.
+<div id="ref-chen2024imageworth12tokens" class="csl-entry" role="listitem">
+Chen, Liang, Haozhe Zhao, Tianyu Liu, Shuai Bai, Junyang Lin, Chang Zhou, and Baobao Chang. 2024. <span>“An Image Is Worth 1/2 Tokens After Layer 2: Plug-and-Play Inference Acceleration for Large Vision-Language Models.”</span> <a href="https://arxiv.org/abs/2403.06764">https://arxiv.org/abs/2403.06764</a>.
 </div>
-</div></section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2024,
+<div id="ref-dosovitskiy2021imageworth16x16words" class="csl-entry" role="listitem">
+Dosovitskiy, Alexey, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, et al. 2021. <span>“An Image Is Worth 16x16 Words: Transformers for Image Recognition at Scale.”</span> <a href="https://arxiv.org/abs/2010.11929">https://arxiv.org/abs/2010.11929</a>.
+</div>
+<div id="ref-liu2023visualinstructiontuning" class="csl-entry" role="listitem">
+Liu, Haotian, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. 2023. <span>“Visual Instruction Tuning.”</span> <a href="https://arxiv.org/abs/2304.08485">https://arxiv.org/abs/2304.08485</a>.
+</div>
+<div id="ref-olsson2022incontextlearninginductionheads" class="csl-entry" role="listitem">
+Olsson, Catherine, Nelson Elhage, Neel Nanda, Nicholas Joseph, Nova DasSarma, Tom Henighan, Ben Mann, et al. 2022. <span>“In-Context Learning and Induction Heads.”</span> <a href="https://arxiv.org/abs/2209.11895">https://arxiv.org/abs/2209.11895</a>.
+</div>
+<div id="ref-radford2021learningtransferablevisualmodels" class="csl-entry" role="listitem">
+Radford, Alec, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, et al. 2021. <span>“Learning Transferable Visual Models from Natural Language Supervision.”</span> <a href="https://arxiv.org/abs/2103.00020">https://arxiv.org/abs/2103.00020</a>.
+</div>
+<div id="ref-steiner2024paligemma2familyversatile" class="csl-entry" role="listitem">
+Steiner, Andreas, André Susano Pinto, Michael Tschannen, Daniel Keysers, Xiao Wang, Yonatan Bitton, Alexey Gritsenko, et al. 2024. <span>“PaliGemma 2: A Family of Versatile VLMs for Transfer.”</span> <a href="https://arxiv.org/abs/2412.03555">https://arxiv.org/abs/2412.03555</a>.
+</div>
+<div id="ref-wang2024clstokentellsneeded" class="csl-entry" role="listitem">
+Wang, Ao, Fengyuan Sun, Hui Chen, Zijia Lin, Jungong Han, and Guiguang Ding. 2024. <span>“[CLS] Token Tells Everything Needed for Training-Free Efficient MLLMs.”</span> <a href="https://arxiv.org/abs/2412.05819">https://arxiv.org/abs/2412.05819</a>.
+</div>
+<div id="ref-zhai2023sigmoid" class="csl-entry" role="listitem">
+Zhai, Xiaohua, Basil Mustafa, Alexander Kolesnikov, and Lucas Beyer. 2023. <span>“Sigmoid Loss for Language Image Pre-Training.”</span> In <em>Proceedings of the IEEE/CVF International Conference on Computer Vision</em>, 11975–86.
+</div>
+</div></section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2025,
   author = {Ruiz, Tomas},
-  title = {How {Does} {Tiling} {Speed} {Up} {Matrix} {Multiplications}
-    on {GPUs?}},
-  date = {2024-12-23},
-  url = {https://tomasruizt.github.io/posts/tiling-for-matrix-mult/},
+  title = {Drilling {Down} into {Multimodal} {Attention}},
+  date = {2025-02-01},
+  url = {https://tomasruizt.github.io/posts/multimodal-attn/},
   langid = {en}
 }
-</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2024" class="csl-entry quarto-appendix-citeas" role="listitem">
-Ruiz, Tomas. 2024. <span>“How Does Tiling Speed Up Matrix
-Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruizt.github.io/posts/tiling-for-matrix-mult/">https://tomasruizt.github.io/posts/tiling-for-matrix-mult/</a>.
+</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2025" class="csl-entry quarto-appendix-citeas" role="listitem">
+Ruiz, Tomas. 2025. <span>“Drilling Down into Multimodal
+Attention.”</span> February 1, 2025. <a href="https://tomasruizt.github.io/posts/multimodal-attn/">https://tomasruizt.github.io/posts/multimodal-attn/</a>.
 </div></div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
@@ -914,7 +876,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","loop":false,"closeEffect":"zoom","selector":".lightbox","openEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","selector":".lightbox","loop":false,"openEffect":"zoom","closeEffect":"zoom"});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
