@@ -1,5 +1,5 @@
 ---
-title: "Understanding Multimodal Attention in Prefix-Attention Models"
+title: "Drilling Down into Multimodal Attention"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -77,11 +77,11 @@ So what is the `<bos>` token attending to? Mostly to image tokens. To highlight 
 
 ![The last text token attends to patches of image tokens](images/paligemma-layer-15-dest-token-last-maxatt-low.png)
 
-This suggest a hypothesis: Namely that the visual information flows from the image tokens into the `<bos>` token, and then from the `<bos>` token to the rest of the text tokens. This is interesting, because it suggests that **PaliGemma2 has trained the `<bos>` token to be a "broker" token for visual information.**
+This suggest a hypothesis: Namely that the visual information flows from the image tokens into the `<bos>` token, and then from the `<bos>` token to the rest of the text tokens. To quantify this, I partition the input into 3 region: The image tokens, the `<bos>` token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.
 
-We can partition input into 3 region: The image tokens, the `<bos>` token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.
+![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens, despite their ratio being 1:256.](images/blockwise-attn-sums.png)
 
-![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens.](images/blockwise-attn-sums.png)
+These numbers suggest that **PaliGemma2 has trained the `<bos>` token to be a "broker" token for visual information:** The `<bos>` token "collects" and aggregates visual information from the image tokens into a single place, and then "serves" it back to text and image tokens. It plays a similar role as the `[CLS]` token in the ViT.
 
 # Conclusion
 I showed how to visualize multimodal attention patterns using the new module for `circuitsviz`, which is useful for exploratory work in interpretability. I used PaliGemma2 as an interesting case study, because of its prefix-attention mask. After inspecting the attention patterns, I hypothesize that the `<bos>` token is trained to be a "broker" token for visual information. After this qualitative analysis, the next step is to quantitatively test the hypothesis, e.g. by performing causal intervention on the activations of the `<bos>` token, and by using other (image, text) pairs to see if the relation holds. Understanding the mechanisms of how VLMs process visual information helps us build better models, control them more easily, and ultimately improve their trustworthyness and safety.
