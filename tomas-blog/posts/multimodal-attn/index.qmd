@@ -16,6 +16,7 @@ engine: jupyter
 bibliography: refs.bib
 code-annotations: below
 citation: true
+lightbox: true
 ---
 
 ![Visualizing Multimodal Attention Patterns](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
@@ -27,15 +28,14 @@ This post explains how to inspect the attention patterns of a vision-language mo
 Large language models (LLMs) are notoriously difficult to interpret (black-box). One approach to shed light on LLMs is mechanistic interpretability, which aims to understand the inner workings of the model by breaking down its components. The [distill.pub journal](https://distill.pub/) hosted early works on this topic, the team at [Anthropic](https://transformer-circuits.pub/) continued the tradition, and today researchers actively contribute to the field.
 
 # Attention Patterns
-The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g. "induction heads" for in-context-learning [@olsson2022incontextlearninginductionheads]. To find such attention patterns, an essential tool is to visualize them, and the `circuitsviz` librarydo so. The examples below show that each token in the input sequence attends to other tokens with different "intensities", as determined by the attention mechanism.
+The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g. "induction heads". These are heads that learn to copy part of the input sequence into the output, and form an important mechanism for in-context learning [@olsson2022incontextlearninginductionheads]. 
+
+To find such attention patterns, it is essential to have effective visualization tools like the `circuitsviz` library. The examples below show two different modules in the library to visualize attention over tokens. Each token in the input sequence attends to the all other tokens (therefore the squared shape of the pattern). The attention mechanism determines the color intensity: dark fields mean high attention, white fields means low attention, and gray fields are inactive. Click on any image in this post to see a larger version.
 
 ::: {layout-ncol=2}
+![(Example 1) Induction Head Pattern. The top-right triangle is inactive due to the "causal attention mask" of the Transformer, which prevents tokens from attending to future tokens. We observe a diagonal pattern in blue, which shows the induction head "copying" the sequence, because the tokens are repeating the sequence.](images/attn-pattern-induction-head.png){#fig-induction-head width="80%"}
 
-![Example 1: Induction Head Pattern](images/attn-pattern-induction-head.png){#fig-induction-head width="80%"}
-
-![Example 2: Multiple Attention Heads](images/many-txt-attention-heads.png){width="120%"}
-
-Text-Only Attention Patterns
+![(Example 2) Multiple Attention Heads. Each head in the multi-head-attention block of the Transformer learn to attend to different elements in the inputs, and therefore has different attention patterns.](images/many-txt-attention-heads.png){width="120%"}
 :::
 
 # Multimodal Tokens
@@ -45,7 +45,7 @@ But how are images turned into tokens? In contrast to text-only LLMs, VLMs can a
 
 ![2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from [@liu2023visualinstructiontuning]](images/llava-architecture.png){width="60%"}
 
-In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in figure @fig-induction-head. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.
+In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in  @fig-induction-head. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.
 
 # Visualizing Multimodal Attention
 This is where the new visualization shines: It overlays the attention pattern over the image, so we can appreciate the spatial structure of the attention over the image. The main visualization is split in two attention grids: The left grid shows **only a single row** of the image self-attention pattern, rearranged spatially on top of the image. The right grid is the classic self-attention of the text tokens. 
@@ -78,7 +78,7 @@ So what is the `<bos>` token attending to? Mostly to image tokens. To highlight 
 
 ![The last text token attends to patches of image tokens](images/paligemma-layer-15-dest-token-last-maxatt-low.png)
 
-This suggest a hypothesis: Namely that the visual information flows from the image tokens into the `<bos>` token, and then from the `<bos>` token to the rest of the text tokens. To quantify this, I partition the input into 3 region: The image tokens, the `<bos>` token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.
+This suggests a hypothesis: Namely that the visual information flows from the image tokens into the `<bos>` token, and then from the `<bos>` token to the rest of the text tokens. To quantify this, I partition the input into 3 regions: The image tokens, the `<bos>` token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.
 
 ![Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the `<bos>` token, (an example of information flowing back from text to image). The `<bos>` token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the `<bos>`token as to the image tokens, despite their ratio being 1:256.](images/blockwise-attn-sums.png){#fig-blockwise-attn-sums-frisbee}
 
