@@ -227,6 +227,7 @@ window.Quarto = {
   <li><a href="#visualizing-multimodal-attention" id="toc-visualizing-multimodal-attention" class="nav-link" data-scroll-target="#visualizing-multimodal-attention">Visualizing Multimodal Attention</a></li>
   <li><a href="#case-study-paligemma2" id="toc-case-study-paligemma2" class="nav-link" data-scroll-target="#case-study-paligemma2">Case Study: PaliGemma2</a>
   <ul class="collapse">
+  <li><a href="#paligemma2s-attention-patterns" id="toc-paligemma2s-attention-patterns" class="nav-link" data-scroll-target="#paligemma2s-attention-patterns">PaliGemma2’s Attention Patterns</a></li>
   <li><a href="#do-the-numbers-generalize" id="toc-do-the-numbers-generalize" class="nav-link" data-scroll-target="#do-the-numbers-generalize">Do the Numbers Generalize?</a></li>
   </ul></li>
   <li><a href="#conclusion-and-outlook" id="toc-conclusion-and-outlook" class="nav-link" data-scroll-target="#conclusion-and-outlook">Conclusion and Outlook</a>
@@ -260,7 +261,8 @@ window.Quarto = {
 </section>
 <section id="attention-patterns" class="level1">
 <h1>Attention Patterns</h1>
-<p>The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g.&nbsp;“induction heads” for in-context-learning <span class="citation" data-cites="olsson2022incontextlearninginductionheads">(<a href="#ref-olsson2022incontextlearninginductionheads" role="doc-biblioref">Olsson et al. 2022</a>)</span>. To find such attention patterns, an essential tool is to visualize them, and the <code>circuitsviz</code> librarydo so. The examples below show that each token in the input sequence attends to other tokens with different “intensities”, as determined by the attention mechanism.</p>
+<p>The central component of the Transformer architecture is the attention mechanism, which allows the LLM to focus on different parts of the input sequence. Most interpretability research on attention has focused on text-only models, finding e.g.&nbsp;“induction heads”. These are heads that learn to copy part of the input sequence into the output, and form an important mechanism for in-context learning <span class="citation" data-cites="olsson2022incontextlearninginductionheads">(<a href="#ref-olsson2022incontextlearninginductionheads" role="doc-biblioref">Olsson et al. 2022</a>)</span>.</p>
+<p>To find such attention patterns, it is essential to have effective visualization tools like the <code>circuitsviz</code> library. The examples below show two different modules in the library to visualize attention over tokens. Each token in the input sequence attends to the all other tokens (therefore the squared shape of the pattern). The attention mechanism determines the color intensity: dark fields mean high attention, white fields means low attention, and gray fields are inactive. Click on any image in this post to see a larger version.</p>
 <div>
 
 </div>
@@ -270,10 +272,10 @@ window.Quarto = {
 <div id="fig-induction-head" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-induction-head-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/attn-pattern-induction-head.png" class="img-fluid figure-img" style="width:80.0%">
+<a href="images/attn-pattern-induction-head.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: (Example 1) Induction Head Pattern. The top-right triangle is inactive due to the “causal attention mask” of the Transformer, which prevents tokens from attending to future tokens. We observe a diagonal pattern in blue, which shows the induction head “copying” the sequence, because the tokens are repeating the sequence."><img src="images/attn-pattern-induction-head.png" class="img-fluid figure-img" style="width:80.0%"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-induction-head-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Example 1: Induction Head Pattern
+Figure&nbsp;1: (Example 1) Induction Head Pattern. The top-right triangle is inactive due to the “causal attention mask” of the Transformer, which prevents tokens from attending to future tokens. We observe a diagonal pattern in blue, which shows the induction head “copying” the sequence, because the tokens are repeating the sequence.
 </figcaption>
 </figure>
 </div>
@@ -281,35 +283,30 @@ Figure&nbsp;1: Example 1: Induction Head Pattern
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/many-txt-attention-heads.png" class="img-fluid figure-img" style="width:120.0%"></p>
-<figcaption>Example 2: Multiple Attention Heads</figcaption>
+<p><a href="images/many-txt-attention-heads.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="(Example 2) Multiple Attention Heads. Each head in the multi-head-attention block of the Transformer learn to attend to different elements in the inputs, and therefore has different attention patterns."><img src="images/many-txt-attention-heads.png" class="img-fluid figure-img" style="width:120.0%" alt="(Example 2) Multiple Attention Heads. Each head in the multi-head-attention block of the Transformer learn to attend to different elements in the inputs, and therefore has different attention patterns."></a></p>
+<figcaption>(Example 2) Multiple Attention Heads. Each head in the multi-head-attention block of the Transformer learn to attend to different elements in the inputs, and therefore has different attention patterns.</figcaption>
 </figure>
 </div>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<p>Text-Only Attention Patterns</p>
 </div>
 </div>
 </div>
 </section>
 <section id="multimodal-tokens" class="level1">
 <h1>Multimodal Tokens</h1>
-<p>But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. In this post, we will focus on an exemplary VLMs: PaliGemma2 <span class="citation" data-cites="beyer2024paligemmaversatile3bvlm">(<a href="#ref-beyer2024paligemmaversatile3bvlm" role="doc-biblioref">Beyer et al. 2024</a>)</span>. A VLM consists of a vision encoder, an LLM and an adapter to combine both. The vision encoder is a vision transformer (ViT) <span class="citation" data-cites="dosovitskiy2021imageworth16x16words">(<a href="#ref-dosovitskiy2021imageworth16x16words" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span> that has been pre-trained with (image, text) pairs, like CLIP <span class="citation" data-cites="radford2021learningtransferablevisualmodels">(<a href="#ref-radford2021learningtransferablevisualmodels" role="doc-biblioref">Radford et al. 2021</a>)</span> or SigLIP <span class="citation" data-cites="zhai2023sigmoid">(<a href="#ref-zhai2023sigmoid" role="doc-biblioref">Zhai et al. 2023</a>)</span>. The VLM converts the image into a sequence of image tokens in two steps:</p>
+<p>But how are images turned into tokens? In contrast to text-only LLMs, VLMs can also process images. A VLM consists of a vision encoder, an LLM and a linear layer to combine both. The vision encoder is a vision transformer (ViT) <span class="citation" data-cites="dosovitskiy2021imageworth16x16words">(<a href="#ref-dosovitskiy2021imageworth16x16words" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span> that has been pre-trained with (image, text) pairs, like CLIP <span class="citation" data-cites="radford2021learningtransferablevisualmodels">(<a href="#ref-radford2021learningtransferablevisualmodels" role="doc-biblioref">Radford et al. 2021</a>)</span> or SigLIP <span class="citation" data-cites="zhai2023sigmoid">(<a href="#ref-zhai2023sigmoid" role="doc-biblioref">Zhai et al. 2023</a>)</span>. The VLM converts the image into a sequence of image tokens in two steps:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/vision-transformer.png" class="img-fluid figure-img" style="width:60.0%"></p>
+<p><a href="images/vision-transformer.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named [CLS] to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from [@dosovitskiy2021imageworth16x16words]"><img src="images/vision-transformer.png" class="img-fluid figure-img" style="width:60.0%" alt="1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named [CLS] to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from (Dosovitskiy et al. 2021)"></a></p>
 <figcaption>1. First, The image is cropped into a square and broken down into 16x16=256 non-overlapping patches, which are projected into 256 tokens. The ViT adds one additional token named <code>[CLS]</code> to hold global information about the entire image, for a total of 257 tokens. All patches are then passed through the ViT to create visual embeddings. Image taken from <span class="citation" data-cites="dosovitskiy2021imageworth16x16words">(<a href="#ref-dosovitskiy2021imageworth16x16words" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span></figcaption>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/llava-architecture.png" class="img-fluid figure-img" style="width:60.0%"></p>
+<p><a href="images/llava-architecture.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from [@liu2023visualinstructiontuning]"><img src="images/llava-architecture.png" class="img-fluid figure-img" style="width:60.0%" alt="2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from (Liu et al. 2023)"></a></p>
 <figcaption>2. Second, the visual embeddings are concatenated with the text embeddings and fed into the LLM. Image taken from <span class="citation" data-cites="liu2023visualinstructiontuning">(<a href="#ref-liu2023visualinstructiontuning" role="doc-biblioref">Liu et al. 2023</a>)</span></figcaption>
 </figure>
 </div>
-<p>In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in figure <a href="#fig-induction-head" class="quarto-xref">Figure&nbsp;1</a>. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.</p>
+<p>In theory, we could visualize the multimodal attention patterns in with the same approach as the text-only pattern, like in <a href="#fig-induction-head" class="quarto-xref">Figure&nbsp;1</a>. But the input sequence is very long now (257 tokens + text tokens), and the pattern grows quadratically with the number of tokens. Also, the image tokens are concatenated by row by row, so their vertical spatial structure is lost in the naive text-only visualization.</p>
 </section>
 <section id="visualizing-multimodal-attention" class="level1">
 <h1>Visualizing Multimodal Attention</h1>
@@ -319,82 +316,111 @@ Figure&nbsp;1: Example 1: Induction Head Pattern
 </section>
 <section id="case-study-paligemma2" class="level1">
 <h1>Case Study: PaliGemma2</h1>
-<p>I use the PaliGemma2 VLM <span class="citation" data-cites="steiner2024paligemma2familyversatile">(<a href="#ref-steiner2024paligemma2familyversatile" role="doc-biblioref">Steiner et al. 2024</a>)</span> by Google as an interesting case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt. In contrast to other VLMs, the PaliGemma2 model does not use the <code>[CLS]</code> token of the ViT.</p>
+<p>I use the PaliGemma2 VLM <span class="citation" data-cites="steiner2024paligemma2familyversatile">(<a href="#ref-steiner2024paligemma2familyversatile" role="doc-biblioref">Steiner et al. 2024</a>)</span> by Google as my case study, because it does not use a causal attention mask, but a prefix-attention mask. This means that the attention pattern is not triangular, and it means that early tokens can attend to the later tokens. In particular, the image tokens, which are concatenated first in the sequence, can attend to text tokens in the prompt. In contrast to other VLMs, the PaliGemma2 model does not use the <code>[CLS]</code> token of the ViT. However, PaliGemma2 prepends the text prompt with a <code>&lt;bos&gt;</code> (beginning of sentence) token, so the <code>&lt;bos&gt;</code> token becomes the first text token in the input sequence.</p>
+<div>
+
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/prefix-attn.png" class="img-fluid figure-img" style="width:50.0%"></p>
-<figcaption>PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens fully attend to each other. Only the output tokens have a causal mask. Image from <span class="citation" data-cites="beyer2024paligemmaversatile3bvlm">(<a href="#ref-beyer2024paligemmaversatile3bvlm" role="doc-biblioref">Beyer et al. 2024</a>)</span></figcaption>
+<p><a href="images/paligemma2-architecture.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="PaliGemma2 architecture. The VLM consists of a vision encoder (SigLIP), an LLM (Gemma2) and a linear layer to combine both. Google released 3 sizes of the model, and with 3 different image resolutions. from [@steiner2024paligemma2familyversatile]"><img src="images/paligemma2-architecture.png" class="img-fluid figure-img" style="width:120.0%" alt="PaliGemma2 architecture. The VLM consists of a vision encoder (SigLIP), an LLM (Gemma2) and a linear layer to combine both. Google released 3 sizes of the model, and with 3 different image resolutions. from (Steiner et al. 2024)"></a></p>
+<figcaption>PaliGemma2 architecture. The VLM consists of a vision encoder (SigLIP), an LLM (Gemma2) and a linear layer to combine both. Google released 3 sizes of the model, and with 3 different image resolutions. from <span class="citation" data-cites="steiner2024paligemma2familyversatile">(<a href="#ref-steiner2024paligemma2familyversatile" role="doc-biblioref">Steiner et al. 2024</a>)</span></figcaption>
 </figure>
 </div>
-<p>PaliGemma2 uses a special syntax for prompt. We must prefix the text question with “Answer en <question>” for the model to answer a question in the english (en) language. In the example below, the model correctly answers the question “Answer en what is the color of the frisbee?” with “purple”.</question></p>
-<p>It was surprising to find that the tokens in the text prompt attend most intensely to each other, rather than to the image tokens. This effect persists across layers. In the example below, to highlight the top attention tokens only, I set <code>max-attention = 1.0</code>. In the middle layers (layer 15), vertical bars are visible in almost every head. This indicates that most text tokens are attending to the <code>&lt;bos&gt;</code> token, which is the first token after the image tokens. Interestingly, the <code>&lt;bos&gt;</code> does not attend back to the other text tokens. We can tell because the first row of the colored pattern is completely white (close to 0 attention) in middle and late layers.</p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/paligemma-layer-00-heads.png" class="img-fluid figure-img"></p>
-<figcaption>Layer 0</figcaption>
+<p><a href="images/prefix-attn.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens (Prefix) fully attend to each other. Only the output tokens (Suffix/Target) have a causal mask. The <eos> token is the “end of sentence” token. Image from [@beyer2024paligemmaversatile3bvlm]"><img src="images/prefix-attn.png" class="img-fluid figure-img" style="width:80.0%" alt="PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens (Prefix) fully attend to each other. Only the output tokens (Suffix/Target) have a causal mask. The <eos> token is the “end of sentence” token. Image from (Beyer et al. 2024)"></a></p>
+<figcaption>PaliGemma Prefix Attention Pattern. Note that the image tokens and the text tokens (Prefix) fully attend to each other. Only the output tokens (Suffix/Target) have a causal mask. The <code>&lt;eos&gt;</code> token is the “end of sentence” token. Image from <span class="citation" data-cites="beyer2024paligemmaversatile3bvlm">(<a href="#ref-beyer2024paligemmaversatile3bvlm" role="doc-biblioref">Beyer et al. 2024</a>)</span></figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>PaliGemma2 uses a special syntax for the prompt: For the model to answer a question in the english (en) language, we must prefix the text question with <code>"Answer en &lt;question&gt;"</code>. For example, given the image of the dog with the frisbee, the model can correctly answer the question <code>"Answer en what is the color of the frisbee?"</code> with <code>"purple"</code>.</p>
+<section id="paligemma2s-attention-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="paligemma2s-attention-patterns">PaliGemma2’s Attention Patterns</h2>
+<p>We now drill down into PaliGemma2’s attention patterns. When looking at the attention patterns, the first thing that jumps out is that the text tokens are not attending to the image tokens very much, because the image is almost completely white (even at zero attention, the image remains visible to prevent it from dissapearing completely). This effect is consistent across layers (See <a href="#fig-paligemma-layer-00" class="quarto-xref">Figure&nbsp;2</a>, <a href="#fig-paligemma-layer-15" class="quarto-xref">Figure&nbsp;3</a>, <a href="#fig-paligemma-layer-25" class="quarto-xref">Figure&nbsp;4</a>). This is surprising, because the question can only be answered by attending to the image. How does then PaliGemma2 answer the question?</p>
+<div id="fig-paligemma-layer-00" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-paligemma-layer-00-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="images/paligemma-layer-00-heads.png" class="lightbox" data-gallery="quarto-lightbox-gallery-8" title="Figure&nbsp;2: Layer 0"><img src="images/paligemma-layer-00-heads.png" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-paligemma-layer-00-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Layer 0
+</figcaption>
 </figure>
 </div>
 <div id="fig-paligemma-layer-15" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-paligemma-layer-15-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/paligemma-layer-15-heads.png" class="img-fluid figure-img">
+<a href="images/paligemma-layer-15-heads.png" class="lightbox" data-gallery="quarto-lightbox-gallery-9" title="Figure&nbsp;3: Layer 15: Dark vertical bars, but first row (<bos> token) is white"><img src="images/paligemma-layer-15-heads.png" class="img-fluid figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-paligemma-layer-15-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Layer 15: Dark vertical bars, but first row (<code>&lt;bos&gt;</code> token) is white
+Figure&nbsp;3: Layer 15: Dark vertical bars, but first row (<code>&lt;bos&gt;</code> token) is white
 </figcaption>
 </figure>
 </div>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="images/paligemma-layer-25-heads.png" class="img-fluid figure-img"></p>
-<figcaption>Layer 25</figcaption>
+<div id="fig-paligemma-layer-25" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-paligemma-layer-25-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="images/paligemma-layer-25-heads.png" class="lightbox" data-gallery="quarto-lightbox-gallery-10" title="Figure&nbsp;4: Layer 25"><img src="images/paligemma-layer-25-heads.png" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-paligemma-layer-25-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Layer 25
+</figcaption>
 </figure>
 </div>
-<p>So what is the <code>&lt;bos&gt;</code> token attending to? Mostly to image tokens. To highlight this, I set <code>max-attention = 0.01</code> and compare the attentions with different destination text tokens. The <code>&lt;bos&gt;</code> token is attending uniformly to all the image tokens. The images below are all from intermediate layers (layer 15).</p>
+<p>In the middle layers (layer 15), vertical bars are visible in almost every head. This indicates that most text tokens are attending to the <code>&lt;bos&gt;</code> token, which is the first token after the image tokens. Interestingly, the <code>&lt;bos&gt;</code> does not attend back to the other text tokens. We can tell because the first row of the colored pattern is completely white (close to 0 attention) in middle and late layers.</p>
+<p>So what is the <code>&lt;bos&gt;</code> token attending to? Mostly to image tokens. To see this, I increase the contrast of the attention patterns using the slider and compare the attentions with different destination text tokens. The <code>&lt;bos&gt;</code> token is attending uniformly to many image tokens. The images below are all from intermediate layers (layer 15).</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/paligemma-layer-15-dest-token-bos-maxatt-low.png" class="img-fluid figure-img"></p>
-<figcaption>The <code>&lt;bos&gt;</code> token attends uniformly to all image tokens</figcaption>
+<p><a href="images/paligemma-layer-15-dest-token-bos-maxatt-low.png" class="lightbox" data-gallery="quarto-lightbox-gallery-11" title="The <bos> token attends uniformly to many image tokens"><img src="images/paligemma-layer-15-dest-token-bos-maxatt-low.png" class="img-fluid figure-img" alt="The <bos> token attends uniformly to many image tokens"></a></p>
+<figcaption>The <code>&lt;bos&gt;</code> token attends uniformly to many image tokens</figcaption>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/paligemma-layer-15-dest-token-first-maxatt-low.png" class="img-fluid figure-img"></p>
-<figcaption>The first text token mostly does not attend to image tokens</figcaption>
+<p><a href="images/paligemma-layer-15-dest-token-first-maxatt-low.png" class="lightbox" data-gallery="quarto-lightbox-gallery-12" title="The next text token attends sparsely to image tokens"><img src="images/paligemma-layer-15-dest-token-first-maxatt-low.png" class="img-fluid figure-img" alt="The next text token attends sparsely to image tokens"></a></p>
+<figcaption>The next text token attends sparsely to image tokens</figcaption>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/paligemma-layer-15-dest-token-last-maxatt-low.png" class="img-fluid figure-img"></p>
-<figcaption>The last text token attends to patches of image tokens</figcaption>
+<p><a href="images/paligemma-layer-15-dest-token-last-maxatt-low.png" class="lightbox" data-gallery="quarto-lightbox-gallery-13" title="The last text token also attends sparsely to image tokens, although more in patches."><img src="images/paligemma-layer-15-dest-token-last-maxatt-low.png" class="img-fluid figure-img" alt="The last text token also attends sparsely to image tokens, although more in patches."></a></p>
+<figcaption>The last text token also attends sparsely to image tokens, although more in patches.</figcaption>
 </figure>
 </div>
-<p>This suggest a hypothesis: Namely that the visual information flows from the image tokens into the <code>&lt;bos&gt;</code> token, and then from the <code>&lt;bos&gt;</code> token to the rest of the text tokens. To quantify this, I partition the input into 3 region: The image tokens, the <code>&lt;bos&gt;</code> token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.</p>
+<p>This suggests a hypothesis: Namely that the visual information flows from the image tokens into the <code>&lt;bos&gt;</code> token, and then from the <code>&lt;bos&gt;</code> token to the rest of the text tokens. To quantify this, I partition the input into 3 regions: The image tokens, the <code>&lt;bos&gt;</code> token, and the rest of the text tokens. By summing up the attention of the tokens in each region, we get a measure of the attention between regions. This yields a 3x3 matrix, where each row sums up to 1.</p>
 <div id="fig-blockwise-attn-sums-frisbee" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-blockwise-attn-sums-frisbee-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/blockwise-attn-sums.png" class="img-fluid figure-img">
+<a href="images/blockwise-attn-sums.png" class="lightbox" data-gallery="quarto-lightbox-gallery-14" title="Figure&nbsp;5: Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the <bos> token, (an example of information flowing back from text to image). The <bos> token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the <bos>token as to the image tokens, despite their ratio being 1:256."><img src="images/blockwise-attn-sums.png" class="img-fluid figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blockwise-attn-sums-frisbee-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the <code>&lt;bos&gt;</code> token, (an example of information flowing back from text to image). The <code>&lt;bos&gt;</code> token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the <code>&lt;bos&gt;</code>token as to the image tokens, despite their ratio being 1:256.
+Figure&nbsp;5: Self-attention over input regions. In lower layers, image tokens mostly attend to each other, despite having access to all tokens. Later, in middle and final layers, image tokens also attend to the <code>&lt;bos&gt;</code> token, (an example of information flowing back from text to image). The <code>&lt;bos&gt;</code> token increasingly attends to the image tokens as depth increases. Text tokens attend as much (or more) to the <code>&lt;bos&gt;</code>token as to the image tokens, despite their ratio being 1:256.
 </figcaption>
 </figure>
 </div>
 <p>These numbers suggest that <strong>PaliGemma2 has trained the <code>&lt;bos&gt;</code> token to be a “broker” token for visual information:</strong> The <code>&lt;bos&gt;</code> token “collects” and aggregates visual information from the image tokens into a single place, and then “serves” it back to text and image tokens. It plays a similar role as the <code>[CLS]</code> token in the ViT.</p>
+</section>
 <section id="do-the-numbers-generalize" class="level2">
 <h2 class="anchored" data-anchor-id="do-the-numbers-generalize">Do the Numbers Generalize?</h2>
 <p>To test if the hypothesis holds in general for (image, text) pairs other than the example of the dog with the frisbee, I ran the analysis on the first 1000 distinct images from the VQA dataset (train) and their corresponding questions. The dataset has multiple questions per image, but I used only the first question so as to have the most visual variation within the 1000 samples.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/vqa-grid-of-img-question-answer.png" class="img-fluid figure-img"></p>
+<p><a href="images/vqa-grid-of-img-question-answer.png" class="lightbox" data-gallery="quarto-lightbox-gallery-15" title="VQA images, questions, and model answers. The images are diverse real-life images, and the questions are short open- and closed-ended questions. Note that the questions are formatted in the PaliGemma2 QA format (“Answer en ”)."><img src="images/vqa-grid-of-img-question-answer.png" class="img-fluid figure-img" alt="VQA images, questions, and model answers. The images are diverse real-life images, and the questions are short open- and closed-ended questions. Note that the questions are formatted in the PaliGemma2 QA format (“Answer en ”)."></a></p>
 <figcaption>VQA images, questions, and model answers. The images are diverse real-life images, and the questions are short open- and closed-ended questions. Note that the questions are formatted in the PaliGemma2 QA format (“Answer en <question>”).</question></figcaption>
 </figure>
 </div>
 <p>I computed the self-attention matrix over regions for each (image, question) pair and computed the average and the standard deviation over the 1000 pairs. We observe that the standard deviations are very small, indicating that <strong>the “broker” role of the <code>&lt;bos&gt;</code> token is robust and independent of the image and question.</strong></p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="images/blockwise-attn-sums-vqa1000.png" class="img-fluid figure-img"></p>
-<figcaption>Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in <a href="#fig-blockwise-attn-sums-frisbee" class="quarto-xref">Figure&nbsp;3</a> are mostly within the 1-<span class="math inline">\(\sigma\)</span> confidence interval here, suggesting it is a typical example.</figcaption>
+<p><a href="images/blockwise-attn-sums-vqa1000.png" class="lightbox" data-gallery="quarto-lightbox-gallery-16" title="Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in Figure&nbsp;5 are mostly within the 1-\sigma confidence interval here, suggesting it is a typical example."><img src="images/blockwise-attn-sums-vqa1000.png" class="img-fluid figure-img" alt="Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in Figure&nbsp;5 are mostly within the 1-\sigma confidence interval here, suggesting it is a typical example."></a></p>
+<figcaption>Self-attention over input regions for 1000 VQA samples. The standard deviations are small. The numbers for previous example (purple frisbee) in <a href="#fig-blockwise-attn-sums-frisbee" class="quarto-xref">Figure&nbsp;5</a> are mostly within the 1-<span class="math inline">\(\sigma\)</span> confidence interval here, suggesting it is a typical example.</figcaption>
 </figure>
 </div>
 </section>
@@ -876,7 +902,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","selector":".lightbox","loop":false,"openEffect":"zoom","closeEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","loop":false,"descPosition":"bottom","closeEffect":"zoom","selector":".lightbox"});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
