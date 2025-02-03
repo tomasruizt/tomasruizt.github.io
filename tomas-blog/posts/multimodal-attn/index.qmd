@@ -22,7 +22,7 @@ lightbox: true
 ![Visualizing Multimodal Attention Patterns](images/multimodal-attn.png){width="70%" text-align="left" fig-alt="Visualizing Multimodal Attention" .lightbox}
 
 # Summary
-This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created for the `circuitsviz` library [link here](https://github.com/tomasruizt/CircuitsVis). My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its `<bos>` token to be a "broker" token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable.
+This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created [on a fork](https://github.com/tomasruizt/CircuitsVis) of the `circuitsviz` library. To interact with an example, [click here](https://storage.googleapis.com/tomas-ruiz-multimodal-attn/2025-02-03-visualization/PaliGemma2_layer_25_attention_heads.html). My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its `<bos>` token to be a "broker" token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable.
 
 # Mechanistic Interpretability
 Large language models (LLMs) are notoriously difficult to interpret (black-box). One approach to shed light on LLMs is mechanistic interpretability, which aims to understand the inner workings of the model by breaking down its components. The [distill.pub journal](https://distill.pub/) hosted early works on this topic, the team at [Anthropic](https://transformer-circuits.pub/) continued the tradition, and today researchers actively contribute to the field.
@@ -72,11 +72,11 @@ PaliGemma2 uses a special syntax for the prompt: For the model to answer a quest
 
 We now drill down into PaliGemma2's attention patterns. When looking at the attention patterns, the first thing that jumps out is that the text tokens are not attending to the image tokens very much, because the image is almost completely white (even at zero attention, the image remains visible to prevent it from dissapearing completely). This effect is consistent across layers (See @fig-paligemma-layer-00, @fig-paligemma-layer-15, @fig-paligemma-layer-25). This is surprising, because the question can only be answered by attending to the image. How does then PaliGemma2 answer the question? 
 
-![Layer 0](images/paligemma-layer-00-heads.png){#fig-paligemma-layer-00}
+![[Layer 0: Link to full visualization](https://storage.googleapis.com/tomas-ruiz-multimodal-attn/2025-02-03-visualization/PaliGemma2_layer_0_attention_heads.html)](images/paligemma-layer-00-heads.png){#fig-paligemma-layer-00}
 
-![Layer 15: Dark vertical bars, but first row (`<bos>` token) is white](images/paligemma-layer-15-heads.png){#fig-paligemma-layer-15}
+![[Layer 15: Link to full visualization](https://storage.googleapis.com/tomas-ruiz-multimodal-attn/2025-02-03-visualization/PaliGemma2_layer_15_attention_heads.html) Dark vertical bars, but first row (`<bos>` token) is white](images/paligemma-layer-15-heads.png){#fig-paligemma-layer-15}
 
-![Layer 25](images/paligemma-layer-25-heads.png){#fig-paligemma-layer-25}
+![[Layer 25: Link to full visualization](https://storage.googleapis.com/tomas-ruiz-multimodal-attn/2025-02-03-visualization/PaliGemma2_layer_25_attention_heads.html)](images/paligemma-layer-25-heads.png){#fig-paligemma-layer-25}
 
 In the middle layers (layer 15), vertical bars are visible in almost every head. This indicates that most text tokens are attending to the `<bos>` token, which is the first token after the image tokens. Interestingly, the `<bos>` does not attend back to the other text tokens. We can tell because the first row of the colored pattern is completely white (close to 0 attention) in middle and late layers.
 
