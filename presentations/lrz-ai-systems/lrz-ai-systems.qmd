@@ -17,12 +17,78 @@ format: revealjs
 <!-- https://drive.google.com/file/d/15mDl0dYuTx-j2GOqr1Oof9F6H0CvzWmG/view?usp=drive_link -->
 ![LRZ AI Systems Overview](lrz-ai-systems.drawio.png)
 
+# Interactive Part
+
+## SLURM Commands
+
+We are now in the **login node**.
+
+SLURM info: `sinfo`
+
+![](imgs/command-sinfo.png)
+
+## SLURM Commands
+
+Get Worker Node (Allocate): `salloc`
+
+![](imgs/command-salloc.png)
+
+## SLURM Commands
+
+Enter Worker Node: `srun`
+
+We are now in the **worker node**, and have a GPU.
+
+![](imgs/command-srun.png)
+
+## Enroot Containers
+
+However, we don't have `sudo`, so we can't install packages.
+To get `sudo` we need to use NVIDIA `enroot` containers[^1].
+We import a PyTorch docker image, and use it.
+
+![](imgs/command-enroot-import.png)
+
+[^1]: https://github.com/NVIDIA/enroot
+
+## Enroot Containers
+
+After `import` we have to `create` the container.
+
+![](imgs/command-enroot-create.png)
+
+## Enroot Containers
+
+Go into the container: `enroot start`. Finally, we have a GPU, and `sudo`. 
+
+![](imgs/command-enroot-start.png)
+
+## Enroot Containers
+
+Since we imported the PyTorch image, `torch` is installed and CUDA available.
+
+![](imgs/python-torch-cuda-available.png)
 
 ## LLM Inference
 - HuggingFace Transformers Example
 - vLLM
 - Async Throttling
 - Round-Robin for Multiple GPUs
+
+## LLM Inference
+HuggingFace Transfomers Example: Qwen3-32B [^1]
+
+[^1]: https://huggingface.co/Qwen/Qwen3-32B
+
+## LLM Inference 
+
+vLLM Engine: Optimized for high-throughput inference [^1]
+
+`pip install vllm`
+
+`vllm serve Qwen/Qwen3-0.6B`
+
+[^1]: https://github.com/vllm-project/vllm
 
 ## LLM Training
 - Single GPU: Simple Example
