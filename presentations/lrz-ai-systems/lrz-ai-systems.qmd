@@ -1,23 +1,31 @@
 ---
 title: "LRZ AI Systems"
-subtitle: "LLM Inference and Training"
+subtitle: "LLM Inference"
 author: "Tomas Ruiz"
 institute: "Computational Social Sciences - LMU"
 format: revealjs
 ---
 
+# Goals
+
+1. See LRZ AI Systems in Action
+2. Squeeze Performance out of Large GPUs
+
+# Part I
+::: {.subtitle}
+LRZ AI Systems
+:::
+
 ## LRZ AI Systems
-- Cluster with GPUs
-- Request GPU(s) for free
-- NVIDIA Enroot Containers (sudo)
-- Run code interactively
-- Run code on batch jobs
+- Cluster with over 160 GPUs ^[https://doku.lrz.de/1-general-description-and-resources-10746641.html]
+- Free to Use for LMU & TUM Researchers
+- Run code interactively or as batch jobs
 
 ## LRZ AI Systems - Overview
 <!-- https://drive.google.com/file/d/15mDl0dYuTx-j2GOqr1Oof9F6H0CvzWmG/view?usp=drive_link -->
 ![LRZ AI Systems Overview](lrz-ai-systems.drawio.png)
 
-# Interactive Part
+# Live Coding
 
 ## SLURM Commands
 
@@ -44,12 +52,12 @@ We are now in the **worker node**, and have a GPU.
 ## Enroot Containers
 
 However, we don't have `sudo`, so we can't install packages.
-To get `sudo` we need to use NVIDIA `enroot` containers[^1].
+To get `sudo` we need to use NVIDIA `enroot` containers[^2].
 We import a PyTorch docker image, and use it.
 
 ![](imgs/command-enroot-import.png)
 
-[^1]: https://github.com/NVIDIA/enroot
+[^2]: https://github.com/NVIDIA/enroot
 
 ## Enroot Containers
 
@@ -69,27 +77,48 @@ Since we imported the PyTorch image, `torch` is installed and CUDA available.
 
 ![](imgs/python-torch-cuda-available.png)
 
-## LLM Inference
-- HuggingFace Transformers Example
-- vLLM
-- Async Throttling
-- Round-Robin for Multiple GPUs
+# Part II
+::: {.subtitle}
+Using Large GPUs for LLMs
+:::
+
+## LLM Training vs Inference
+- **Training:** Updating model parameters (e.g. fine-tuning).
+   - Needs at least 3x more memory than inference.
+- **Inference:** Generating predictions, text, etc. Focus Today.
 
 ## LLM Inference
-HuggingFace Transfomers Example: Qwen3-32B [^1]
 
-[^1]: https://huggingface.co/Qwen/Qwen3-32B
+Our GPUs don't have enough VRAM for large models.
 
-## LLM Inference 
+- Our server GPU (RTX 3090) has 24GB VRAM
+- Rule of Thumb: VRAM = 3 x Params in B
 
-vLLM Engine: Optimized for high-throughput inference [^1]
+But fitting the model in VRAM is only the first step.
 
-`pip install vllm`
+We also need high **throughput** to process ever larger datasets.
 
-`vllm serve Qwen/Qwen3-0.6B`
+# Live Coding
 
-[^1]: https://github.com/vllm-project/vllm
+## LLM Inference
 
-## LLM Training
-- Single GPU: Simple Example
-- Multi-GPU: Example Using PyTorch DDP
+We will compare two LLM runtimes:
+
+1. HuggingFace Transformers
+```shell
+pip install transformers
+```
+
+1. vLLM ^[https://github.com/vllm-project/vllm]
+
+```shell
+pip install vllm
+```
+
+## LLM Inference
+
+What is the max GPU performance on paper?
+
+![Roofline Model for Performance[^5]](imgs/roofline-model.png)
+
+[^5]: https://en.wikipedia.org/wiki/Roofline_model
