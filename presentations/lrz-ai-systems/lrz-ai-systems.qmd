@@ -3,13 +3,16 @@ title: "LRZ AI Systems"
 subtitle: "LLM Inference"
 author: "Tomas Ruiz"
 institute: "Computational Social Sciences - LMU"
-format: revealjs
+self-contained: false
+format: 
+   revealjs:
+      slide-number: true
 ---
 
 # Goals
 
 1. See LRZ AI Systems in Action
-2. Squeeze Performance out of Large GPUs
+2. Maximize Performance of GPUs
 
 # Part I
 ::: {.subtitle}
@@ -22,8 +25,9 @@ LRZ AI Systems
 - Run code interactively or as batch jobs
 
 ## LRZ AI Systems - Overview
+
 <!-- https://drive.google.com/file/d/15mDl0dYuTx-j2GOqr1Oof9F6H0CvzWmG/view?usp=drive_link -->
-![LRZ AI Systems Overview](lrz-ai-systems.drawio.png)
+![LRZ AI Systems Overview](imgs/lrz-ai-systems.drawio.png)
 
 # Live Coding
 
@@ -51,9 +55,8 @@ We are now in the **worker node**, and have a GPU.
 
 ## Enroot Containers
 
-However, we don't have `sudo`, so we can't install packages.
-To get `sudo` we need to use NVIDIA `enroot` containers[^2].
-We import a PyTorch docker image, and use it.
+However, we don't have admin privileges, so we can't install packages. Therefore, we need NVIDIA `enroot` containers[^2].
+We import a PyTorch docker image^[https://hub.docker.com/r/pytorch/pytorch/tags], and use it.
 
 ![](imgs/command-enroot-import.png)
 
@@ -79,7 +82,7 @@ Since we imported the PyTorch image, `torch` is installed and CUDA available.
 
 # Part II
 ::: {.subtitle}
-Using Large GPUs for LLMs
+Maximize Performance of GPUs
 :::
 
 ## LLM Training vs Inference
@@ -89,10 +92,11 @@ Using Large GPUs for LLMs
 
 ## LLM Inference
 
-Our GPUs don't have enough VRAM for large models.
+Typically, our GPUs don't have enough VRAM for large models.
 
-- Our server GPU (RTX 3090) has 24GB VRAM
+- Our CSS GPU (RTX 3090) has 24GB VRAM
 - Rule of Thumb: VRAM = 3 x Params in B
+- E.g. Llama3 8B = 24GB VRAM
 
 But fitting the model in VRAM is only the first step.
 
@@ -108,11 +112,18 @@ HuggingFace Transformers
 ```shell
 pip install transformers
 ```
-vLLM ^[https://github.com/vllm-project/vllm]
+vLLM (High Throughput) ^[https://github.com/vllm-project/vllm]
 
 ```shell
 pip install vllm
 ```
+
+## Takeaways
+- Use powerful GPUs on LRZ AI Systems
+- Really push the GPUs! E.g. with vLLM
+- Test with your own data! Every setup is different.
+
+# Thank you!
 
 ## LLM Inference
 
