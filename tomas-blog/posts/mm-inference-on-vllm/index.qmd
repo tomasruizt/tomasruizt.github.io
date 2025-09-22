@@ -47,15 +47,23 @@ To alleviate this, we transcribe the audio using Whisper [@pmlr-v202-radford23a]
 Some models capable of processing audio natively came out recently (omni-style models), but they are not yet supported on vLLM.
 Additionally, these models often output speech, which is not something we needed.
 
-# GPU Cluster
+## GPU Cluster
 
 For our workload, we needed to run multiple instances of this large 72B model in parallel.
 To this end, we used the [LRZ AI Systems cluster](https://doku.lrz.de/lrz-ai-systems-11484278.html)
-We use mainly the BayernKI partition, which has 30 nodes, each with 4 Hopper H100 GPUs (94 GB VRAM per GPU).
+We use mainly the BayernKI partition, which has 30 nodes, each with 4 Hopper H100 GPUs (94 GB VRAM per GPU) connected over NVLink.
 These are beefy GPUs, but nevertheless, the 72B model still does not fit on a single GPU, even in bfloat16 precision, since only the model weights require around 144 GB VRAM.
 The model would fit on a single Blackwell B200 GPU (180GB VRAM), but those are not available on our cluster.
 Beyond the model weights, the model requires also space for the KV cache, model activations, etc.
 Therefore, we allocate 4 GPUs, totaling 376 GB VRAM, per model instance.
+To launch jobs, the cluster uses the SLURM job scheduler [@yoo2003slurm].
+
+## Parallelism Strategies
+vLLM support distributing the model on multiple GPUs, a strategy called **Tensor Parallelism**.
+In essence, this means that each tensor is split up across multiple GPUs so that no single GPU must hold the entire model in memory.
+The drawback of this is that the GPUs must communicate with each other to complete the model computations.
+Nevertheless, with the high bandwith NVLink, this overhead is acceptable for the ability to run larger models.
+
 
 # References
 <!-- 
