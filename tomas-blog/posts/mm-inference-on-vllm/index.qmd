@@ -17,7 +17,6 @@ engine: jupyter
 bibliography: refs.bib
 code-annotations: below
 citation: true
-draft: true
 ---
 
 **TL;DR:** In this post I describe my inference workflow with the vLLM inference engine [@DBLP:conf/sosp/KwonLZ0ZY0ZS23] to analyze 35k videos collected from TikTok.
@@ -36,12 +35,27 @@ Our dataset consists of 35,000 multimodal TikTok posts that are mostly made up o
 Therefore, we needed a multimodal model capable of consuming inputs with multiple modalities.
 The cues we were looking in the videos were often subtle and implicit, so we also needed the model to grasp subtle communication cues.
 Larger models, typically in the range of 70B parameters, are much more competent at this.
-Therefore, we used the `Qwen2.5-VL-72B-Instruct` model by the Qwen team [@bai2025qwen25vltechnicalreport] [(Hugging Face Link)](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct).
+
+We decided to use the `Qwen2.5-VL-72B-Instruct` model by the Qwen team [@bai2025qwen25vltechnicalreport] [(Hugging Face Link)](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct).
 Other multimodal models require you to cut up videos into individual frames and pass them as a stack of images, but the Qwen2.5-VL model instead natively consumes the videos directly.
 The key innovation to do this is called multidimensional RoPE (mRoPE) embeddings.
 mRoPE encodes the time dimension of the video into a separate dimension [@wang2024qwen2vlenhancingvisionlanguagemodels].
 Thus, Qwen2.5-VL understands the temporal relationship between individual video frames, unlike other multimodal models.
-The 72B model is quite large and does not fit on a single GPU, even in bfloat16 precision.
+
+The only shortcoming of this model is that it does not process audio natively, but most vision-language models don't either.
+To alleviate this, we transcribe the audio using Whisper [@pmlr-v202-radford23a] and include the transcript in the text input.
+Some models capable of processing audio natively came out recently (omni-style models), but they are not yet supported on vLLM.
+Additionally, these models often output speech, which is not something we needed.
+
+# GPU Cluster
+
+For our workload, we needed to run multiple instances of this large 72B model in parallel.
+To this end, we used the [LRZ AI Systems cluster](https://doku.lrz.de/lrz-ai-systems-11484278.html)
+We use mainly the BayernKI partition, which has 30 nodes, each with 4 Hopper H100 GPUs (94 GB VRAM per GPU).
+These are beefy GPUs, but nevertheless, the 72B model still does not fit on a single GPU, even in bfloat16 precision, since only the model weights require around 144 GB VRAM.
+The model would fit on a single Blackwell B200 GPU (180GB VRAM), but those are not available on our cluster.
+Beyond the model weights, the model requires also space for the KV cache, model activations, etc.
+Therefore, we allocate 4 GPUs, totaling 376 GB VRAM, per model instance.
 
 # References
 <!-- 
