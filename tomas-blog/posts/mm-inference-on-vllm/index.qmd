@@ -1,0 +1,60 @@
+---
+title: "Analyzing 35,000 Videos with Multimodal LLMs and the vLLM Engine"
+author:
+  - name: Tomas Ruiz
+    email: t.ruiz@lmu.de
+    affiliations: Ludwig-Maximilians-Universität München
+date: "2025-09-22"
+categories: [GPUs, vLLM, Transformers]
+format:
+  html:
+    toc: true
+    code-line-numbers: true
+editor:
+    render-on-save: true
+# image: tiled-matrix-multiplication-squared.jpg
+engine: jupyter
+bibliography: refs.bib
+code-annotations: below
+citation: true
+draft: true
+---
+
+**TL;DR:** In this post I describe my inference workflow with the vLLM inference engine [@DBLP:conf/sosp/KwonLZ0ZY0ZS23] to analyze 35k videos collected from TikTok.
+
+## Motivation
+
+For the research project I collaborated with [Renata Topinkova](https://renatatopinkova.github.io/), 
+a computational social sciences researcher. 
+Our goal was to detect subtle product sales by influencers on the platform, and we presented a [poster with our findings](./other-files/poster_ic2s2_25.pdf) at the IC2S2 conference in 2025
+This post focuses mainly on the **large inference workload**, which required running a large multimodal LLMs (70B parameters) on 35k videos as quickly as possible before the deadline.
+The only way to get this done in any reasonable time was with an _inference engine_, specifically vLLM.
+I have not tested yet the alternative engines _SGLang_ [@zheng2024sglang] or NVIDIA Dynamo^[https://github.com/ai-dynamo/dynamo].
+
+## Dataset and Model
+Our dataset consists of 35,000 multimodal TikTok posts that are mostly made up of a video, image(s), audio and text.
+Therefore, we needed a multimodal model capable of consuming inputs with multiple modalities.
+The cues we were looking in the videos were often subtle and implicit, so we also needed the model to grasp subtle communication cues.
+Larger models, typically in the range of 70B parameters, are much more competent at this.
+Therefore, we used the `Qwen2.5-VL-72B-Instruct` model by the Qwen team [@bai2025qwen25vltechnicalreport] [(Hugging Face Link)](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct).
+Other multimodal models require you to cut up videos into individual frames and pass them as a stack of images, but the Qwen2.5-VL model instead natively consumes the videos directly.
+The key innovation to do this is called multidimensional RoPE (mRoPE) embeddings.
+mRoPE encodes the time dimension of the video into a separate dimension [@wang2024qwen2vlenhancingvisionlanguagemodels].
+Thus, Qwen2.5-VL understands the temporal relationship between individual video frames, unlike other multimodal models.
+The 72B model is quite large and does not fit on a single GPU, even in bfloat16 precision.
+
+# References
+<!-- 
+What to write about
+The model, how many GPUs are needed (Tensor Parallelism)
+that we transcribe using whisper
+How I split the dataset (Data Parallelism)
+The LRZ, what GPUs and nodes are available
+   how these are connected to each other
+SLURM, how array jobs work
+    preventing port clashes
+How much storage is 35k videos in TB
+The posts are multimodal: videos, imgs, text
+Incremental progress by splitting requests from backend server
+Client-side throttling, since different models have different reqs
+-->
