@@ -123,6 +123,13 @@ Also, we delete the created enroot container after the job is finished.
 
 # Conclusion
 
+Successfully processing 35,000 multimodal TikTok videos with a 72B parameter model required combining vLLM's tensor parallelism across 4 H100 GPUs with data parallelism via SLURM job arrays.
+Key lessons learned include using asynchronous processing for better fault tolerance, client-side throttling to prevent vLLM server overload, and proper job isolation to avoid conflicts between tasks colocated on the same node.
+I hope this post is useful to other researchers looking to analyze large multimodal/video datasets with LLMs that require multiple GPUs.
+
+In the future I hope to scale this pipeline to 1M videos, and push the throughput limits with quantization methods, speculative decoding, and test audio-capable models.
+If you are interested in collaborating on large-scale inference, reach out to me! 🚀
+
 # SLURM File {#sec-slurm-file}
 Below is a Github gist of the SLURM file we used to submit our workload on the LRZ AI Systems.
 It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, setup & teardown of enroot container, etc.
