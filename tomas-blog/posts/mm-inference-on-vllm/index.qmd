@@ -19,7 +19,7 @@ code-annotations: below
 citation: true
 ---
 
-**TL;DR:** In this post I describe my inference workflow with the vLLM inference engine to classify 35k videos collected from TikTok.
+**TL;DR:** In this post I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok.
 I share Python code for video classification using the vLLM library in @sec-python-code, 
 as well as the SLURM file for our workload in @sec-slurm-file.
 
@@ -69,8 +69,7 @@ On the LRZ AI Systems, one cannot install and customize a Python environment on 
 Instead, one has to use NVIDIA [enroot containers](https://github.com/NVIDIA/enroot).
 These are conceptually similar to Docker containers, and the LRZ has introductory documentation about enroot [here](https://doku.lrz.de/4-1-enroot-introduction-1895502566.html).
 There are a couple of useful commands to create and start containers including `enroot import`, `enroot create` and `enroot start`.
-These commands are used within the SLURM file for our workload in @sec-slurm-file.
-
+The code in @sec-slurm-file shows how to use these commands in a SLURM file.
 
 # Parallelism Strategies
 vLLM support distributing the model on multiple GPUs, a strategy called **Tensor Parallelism**.
@@ -86,6 +85,7 @@ SLURM supports a feature called [Job Arrays](https://slurm.schedmd.com/job_array
 Each job in the collection gets a unique serial ID (e.g., 0, 1, ..., 100), which SLURM sets in the environment variable `SLURM_ARRAY_TASK_ID`.
 The model instance can read this ID (its _rank_) and understand which partition of the dataset it is assigned to process.
 I found the descriptions of these parallelism strategies on the [Hugging Face Parallelism Methods page](https://huggingface.co/docs/transformers/main/perf_train_gpu_many) useful, for starters.
+The code in @sec-slurm-file shows how `SLURM_ARRAY_TASK_ID` is used in a SLURM file.
 
 
 ![Different Parallelism Strategies: Data Parallelism partitions the dataset so that $N$ different model instances process different parts of the dataset. Tensor Parallelism distributes a model instance across $K$ separate GPUs. In our workload $N=10$ and $K=4$.](imgs/parallelism-strategies.png){width="40%" text-align="left" fig-alt="Different Parallelism Strategies" .lightbox}
@@ -97,9 +97,9 @@ and them return the results.
 Alternatively, its possible to spin up an inference server behind an OpenAI-compatible API,
 which can take requests _asynchronously_, and return the results as they are ready.
 For our large workload, I expected the batch processing to be more efficient, but at the time of writing,
-the batch processing code waited until all requests were completed before returning.
+the batch processing code **blocked** until all requests were completed before returning.
 If any error occurred during processing, the entire batch would fail, and failures were more common than one would expect:
-E.g. an exception was raised mid-workload because a long video did not fit into the context length.
+E.g. an exception was raised mid-workload because a long video did not fit in the context window.
 
 Therefore, I opted for the asynchronous inference mode, which offered better **fault tolerance**.
 As soon as a request completed, we dumped its result to a file with JSON-lines format.
@@ -111,10 +111,10 @@ Therefore once result files are complete, we converted them to the [parquet form
 Sending thousands of multimodal requests at the server **concurrently** will choke it, because the server accepts all requests and starts processing all videos (e.g. loading from disk), but neglects generating tokens.
 On top of this, processing too many requests concurrently will fill up the KV cache very quickly.
 You can observe this in the vLLM logs because the KV cache utilization spikes to 100% and stays there for most of the workload.
-To cope with this, the server evicts blocks from the cache, and puts most requests back in the queue, where they effectively sit idle.
+To cope with this, the server evicts blocks from the KV cache, and puts most requests back in the queue, where they effectively sit idle.
 To prevent this situation, I implemented a client-side throttling mechanism, which limits the number of requests sent to the server at the same time.
 We set 16 concurrent requests for QwenVL-2.5-72B.
-Getting this to work properly with Python's `asyncio` library and correct timeouts was tricky, but now you can just [copy the code from my repo](https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174).
+Getting this to work properly with Python's `asyncio` library and correct timeouts was tricky, but now you can just [copy the code from my repo](https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174) or use the Python code from @sec-python-code directly.
 
 ## Preventing Clashes
 Multiple model instances might be colocated on the same node, e.g. a 8 GPU node can host 2x4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
@@ -123,18 +123,18 @@ Also, we delete the created enroot container after the job is finished.
 
 # Conclusion
 
-# Python Code {#sec-python-code}
-The code below shows how to use Python to 1. start up the vLLM server, and 2. send
-concurrent requests to the server. It uses a library I wrote for this purpose: [Github/tomasruizt/llm_app](https://github.com/tomasruizt/llm_app). You can find the same code in the `examples/` directory.
-
-<script src="https://emgithub.com/embed-v2.js?target=https%3A%2F%2Fgithub.com%2Ftomasruizt%2Fllm_app%2Fblob%2Fmain%2Fexamples%2Fvllm-video-inference.py&style=github&type=code&showBorder=on&showLineNumbers=on&showFileMeta=on&showFullPath=on&showCopy=on"></script>
-
 # SLURM File {#sec-slurm-file}
 Below is a Github gist of the SLURM file we used to submit our workload on the LRZ AI Systems.
 It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, setup & teardown of enroot container, etc.
 Unlike the Python code, this will not run without the dataset, but it shows the general workflow.
 
 <script src="https://gist.github.com/tomasruizt/6b48b51c343b48ee2f1a3ebb9a6ea129.js"></script>
+
+# Python Code {#sec-python-code}
+The code below shows how to use Python to (1) start up the vLLM server, and (2) send
+concurrent requests to the server. It uses a library I wrote for this purpose: [Github/tomasruizt/llm_app](https://github.com/tomasruizt/llm_app). The snippet below is in the repo's `examples/` directory.
+
+<script src="https://emgithub.com/embed-v2.js?target=https%3A%2F%2Fgithub.com%2Ftomasruizt%2Fllm_app%2Fblob%2Fmain%2Fexamples%2Fvllm-video-inference.py&style=github&type=code&showBorder=on&showLineNumbers=on&showFileMeta=on&showFullPath=on&showCopy=on"></script>
 
 # References
 <!-- 
