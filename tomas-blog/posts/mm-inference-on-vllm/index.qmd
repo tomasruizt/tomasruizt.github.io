@@ -20,7 +20,8 @@ citation: true
 ---
 
 **TL;DR:** In this post I describe my inference workflow with the vLLM inference engine to classify 35k videos collected from TikTok.
-The SLURM file for our workload is in @sec-slurm-file.
+I share Python code for video classification using the vLLM library in @sec-python-code, 
+as well as the SLURM file for our workload in @sec-slurm-file.
 
 # Motivation
 
@@ -122,9 +123,16 @@ Also, we delete the created enroot container after the job is finished.
 
 # Conclusion
 
+# Python Code {#sec-python-code}
+The code below shows how to use Python to 1. start up the vLLM server, and 2. send
+concurrent requests to the server. It uses a library I wrote for this purpose: [Github/tomasruizt/llm_app](https://github.com/tomasruizt/llm_app). You can find the same code in the `examples/` directory.
+
+<script src="https://emgithub.com/embed-v2.js?target=https%3A%2F%2Fgithub.com%2Ftomasruizt%2Fllm_app%2Fblob%2Fmain%2Fexamples%2Fvllm-video-inference.py&style=github&type=code&showBorder=on&showLineNumbers=on&showFileMeta=on&showFullPath=on&showCopy=on"></script>
+
 # SLURM File {#sec-slurm-file}
 Below is a Github gist of the SLURM file we used to submit our workload on the LRZ AI Systems.
 It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, setup & teardown of enroot container, etc.
+Unlike the Python code, this will not run without the dataset, but it shows the general workflow.
 
 <script src="https://gist.github.com/tomasruizt/6b48b51c343b48ee2f1a3ebb9a6ea129.js"></script>
 
@@ -144,6 +152,6 @@ What to write about
 
 ✅ How much storage is 35k videos in TB
 ✅ Write about enroot containers
-make a pciture display tensor parallelism & data parallelism
-Include a snippet about how to use your llm_app library.
+✅ make a pciture display tensor parallelism & data parallelism
+✅ Include a snippet about how to use your llm_app library.
 -->
