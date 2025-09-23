@@ -28,7 +28,7 @@ a computational social sciences researcher.
 Our goal was to detect subtle product sales by influencers on the platform, and we presented a [poster with our findings](./other-files/poster_ic2s2_25.pdf) at the IC2S2 conference in 2025
 This post focuses mainly on the **large inference workload**, which required running a large multimodal LLMs (70B parameters) on 35k videos as quickly as possible before the deadline.
 The only way to get this done in any reasonable time was with an _inference engine_, specifically vLLM.
-I have not tested yet the alternative engines _SGLang_ [@zheng2024sglang] or NVIDIA Dynamo^[https://github.com/ai-dynamo/dynamo].
+I have not tested yet the alternative engines _SGLang_ [@zheng2024sglang] or [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo).
 
 ## Dataset and Model
 Our dataset consists of 35,000 multimodal TikTok posts that are mostly made up of a video, image(s), audio and text.
@@ -63,7 +63,43 @@ vLLM support distributing the model on multiple GPUs, a strategy called **Tensor
 In essence, this means that each tensor is split up across multiple GPUs so that no single GPU must hold the entire model in memory.
 The drawback of this is that the GPUs must communicate with each other to complete the model computations.
 Nevertheless, with the high bandwith NVLink, this overhead is acceptable for the ability to run larger models.
+The flag to use multiple GPUs in vLLM is very simple: `vllm serve ... --tensor-parallel-size=4`.
 
+Each model instance processes a only a portion of the full dataset, a strategy called **Data Parallelism**.
+I implemented data parallelism on the client side, outside vLLM,
+which means that the client decides what data to send to the vLLM server based on its own _rank_ within the full workload.
+SLURM supports a feature called [Job Arrays](https://slurm.schedmd.com/job_array.html), which allow to submit a collection of similar jobs.
+Each job in the collection gets a unique serial ID (e.g., 0, 1, ..., 100), which SLURM sets in the environment variable `SLURM_ARRAY_TASK_ID`.
+The model instance can read this ID (its _rank_) and understand which partition of the dataset it is assigned to process.
+I found the descriptions of these parallelism strategies on the [Hugging Face Parallelism Methods page](https://huggingface.co/docs/transformers/main/perf_train_gpu_many) useful, for starters.
+
+## Fault Tolerance
+The vLLM library supports different inference modes:
+It is possible to use _batch processing_, which will take a batch of requests at once, process them
+and them return the results.
+Alternatively, its possible to spin up an inference server behind an OpenAI-compatible API,
+which can take requests _asynchronously_, and return the results as they are ready.
+For our large workload, I expected the batch processing to be more efficient, but at the time of writing,
+the batch processing code waited until all requests were completed before returning.
+If any error occurred during processing, the entire batch would fail, and failures were more common than one would expect:
+E.g. an exception was raised mid-workload because a long video did not fit into the context length.
+
+Therefore, I opted for the asynchronous inference mode, which offered better **fault tolerance**.
+As soon as a request completed, we dumped its result to a file with JSON-lines format.
+If the workload fails halfway, we still have all previous results on disk.
+If a single request fails (e.g. video too long), that is also logged to the results file.
+This approach makes it possible to restart the a failed workload later, by determining which requests are still missing from the results file. The JSON-lines file format allows for efficient append-only incremental writes, but is not a very efficient data format for downstream use, because it takes up a lot of space and is slow to read.
+Therefore once result files are complete, we converted them to the [parquet format](https://github.com/apache/parquet-format), which has great lossless compression, and is super fast to read.
+
+Sending thousands of multimodal requests at the server **concurrently** will choke it, because the server accepts all requests and starts processing all videos (e.g. loading from disk), but neglects generating tokens.
+On top of this, processing too many requests concurrently will fill up the KV cache very quickly.
+You can observe this in the vLLM logs because the KV cache utilization spikes to 100% and stays there for most of the workload.
+To cope with this, the server evicts blocks from the cache, and puts most requests back in the queue, where they effectively sit idle.
+To prevent this situation, I implemented a client-side throttling mechanism, which limits the number of requests sent to the server at the same time.
+We set 16 concurrent requests for QwenVL-2.5-72B.
+Getting this to work properly with Python's `asyncio` library and correct timeouts was tricky, but now you can just [copy the code from my repo](https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174).
+
+One more note about running the vLLM server in parallel: Multiple model instances might be colocated on the same node, e.g. a 8 GPU node can host 2x4 GPU jobs. To prevent the jobs from clashing over the same **vLLM port**, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
 
 # References
 <!-- 
