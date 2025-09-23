@@ -1,5 +1,5 @@
 ---
-title: "Analyzing 35,000 Videos with Multimodal LLMs and the vLLM Engine"
+title: "Classifying 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -19,35 +19,41 @@ code-annotations: below
 citation: true
 ---
 
-**TL;DR:** In this post I describe my inference workflow with the vLLM inference engine [@DBLP:conf/sosp/KwonLZ0ZY0ZS23] to analyze 35k videos collected from TikTok.
+**TL;DR:** In this post I describe my inference workflow with the vLLM inference engine to classify 35k videos collected from TikTok.
+The SLURM file for our workload is in @sec-slurm-file.
 
-## Motivation
+# Motivation
 
-For the research project I collaborated with [Renata Topinkova](https://renatatopinkova.github.io/), 
-a computational social sciences researcher. 
-Our goal was to detect subtle product sales by influencers on the platform, and we presented a [poster with our findings](./other-files/poster_ic2s2_25.pdf) at the IC2S2 conference in 2025
-This post focuses mainly on the **large inference workload**, which required running a large multimodal LLMs (70B parameters) on 35k videos as quickly as possible before the deadline.
-The only way to get this done in any reasonable time was with an _inference engine_, specifically vLLM.
-I have not tested yet the alternative engines _SGLang_ [@zheng2024sglang] or [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo).
+For the research project I collaborated with my colleague at LMU Munich, [Renata Topinkova](https://renatatopinkova.github.io/), a computational social sciences researcher. 
+Our goal was to detect subtle product sales by influencers on the platform. We presented a [poster with our findings](./other-files/poster_ic2s2_25.pdf) at the IC2S2 conference in 2025.
 
-## Dataset and Model
-Our dataset consists of 35,000 multimodal TikTok posts that are mostly made up of a video, image(s), audio and text.
+This post focuses mainly on the **large inference workload**, which required running a large multimodal LLM (72B parameters) on 35k videos as quickly as possible before the deadline.
+The only way to get this done in reasonable time was with an _inference engine_. I used vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23], because its the engine I am most familiar with.
+There are other alternative engines like _SGLang_ [@zheng2024sglang] or [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) that you can try.
+
+# Dataset and Model
+Our dataset consists of 35,000 multimodal TikTok posts made up of videos, images, audio and text.
 Therefore, we needed a multimodal model capable of consuming inputs with multiple modalities.
-The cues we were looking in the videos were often subtle and implicit, so we also needed the model to grasp subtle communication cues.
-Larger models, typically in the range of 70B parameters, are much more competent at this.
+On top of that, the cues we were looking in the videos were often subtle and implicit: E.g.,
+
+> _"Does the post suggest a follow-up transaction or sales interaction?"_
+
+So we also needed the model to grasp subtle communication cues in the videos.
+Larger models, typically in the range of 70B+ parameters, are much more competent at this than the widely used 8B models.
 
 We decided to use the `Qwen2.5-VL-72B-Instruct` model by the Qwen team [@bai2025qwen25vltechnicalreport] [(Hugging Face Link)](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct).
-Other multimodal models require you to cut up videos into individual frames and pass them as a stack of images, but the Qwen2.5-VL model instead natively consumes the videos directly.
+Other multimodal models require you to cut up videos into individual frames and pass a video as a "stack of images", but the Qwen2.5-VL model instead natively consumes the videos directly.
 The key innovation to do this is called multidimensional RoPE (mRoPE) embeddings.
 mRoPE encodes the time dimension of the video into a separate dimension [@wang2024qwen2vlenhancingvisionlanguagemodels].
 Thus, Qwen2.5-VL understands the temporal relationship between individual video frames, unlike other multimodal models.
 
-The only shortcoming of this model is that it does not process audio natively, but most vision-language models don't either.
+The only shortcoming of this model is that it does not process audio natively.
 To alleviate this, we transcribe the audio using Whisper [@pmlr-v202-radford23a] and include the transcript in the text input.
-Some models capable of processing audio natively came out recently (omni-style models), but they are not yet supported on vLLM.
-Additionally, these models often output speech, which is not something we needed.
+Some models that are capable of processing audio natively have been released recently (Qwen-Omni, Phi4, etc.).
+However, the support for vLLM was limited until recently, the models remain relatively small in terms of size, and often output speech, which is not something we needed.
+Neverthelss, they are a very promising next step to explore.
 
-## GPU Cluster
+# GPU Cluster
 
 For our workload, we needed to run multiple instances of this large 72B model in parallel.
 To this end, we used the [LRZ AI Systems cluster](https://doku.lrz.de/lrz-ai-systems-11484278.html)
@@ -58,7 +64,14 @@ Beyond the model weights, the model requires also space for the KV cache, model 
 Therefore, we allocate 4 GPUs, totaling 376 GB VRAM, per model instance.
 To launch jobs, the cluster uses the SLURM job scheduler [@yoo2003slurm].
 
-## Parallelism Strategies
+On the LRZ AI Systems, one cannot install and customize a Python environment on the worker nodes directly.
+Instead, one has to use NVIDIA [enroot containers](https://github.com/NVIDIA/enroot).
+These are conceptually similar to Docker containers, and the LRZ has introductory documentation about enroot [here](https://doku.lrz.de/4-1-enroot-introduction-1895502566.html).
+There are a couple of useful commands to create and start containers including `enroot import`, `enroot create` and `enroot start`.
+These commands are used within the SLURM file for our workload in @sec-slurm-file.
+
+
+# Parallelism Strategies
 vLLM support distributing the model on multiple GPUs, a strategy called **Tensor Parallelism**.
 In essence, this means that each tensor is split up across multiple GPUs so that no single GPU must hold the entire model in memory.
 The drawback of this is that the GPUs must communicate with each other to complete the model computations.
@@ -73,7 +86,7 @@ Each job in the collection gets a unique serial ID (e.g., 0, 1, ..., 100), which
 The model instance can read this ID (its _rank_) and understand which partition of the dataset it is assigned to process.
 I found the descriptions of these parallelism strategies on the [Hugging Face Parallelism Methods page](https://huggingface.co/docs/transformers/main/perf_train_gpu_many) useful, for starters.
 
-## Fault Tolerance
+# Fault Tolerance
 The vLLM library supports different inference modes:
 It is possible to use _batch processing_, which will take a batch of requests at once, process them
 and them return the results.
@@ -99,20 +112,35 @@ To prevent this situation, I implemented a client-side throttling mechanism, whi
 We set 16 concurrent requests for QwenVL-2.5-72B.
 Getting this to work properly with Python's `asyncio` library and correct timeouts was tricky, but now you can just [copy the code from my repo](https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174).
 
-One more note about running the vLLM server in parallel: Multiple model instances might be colocated on the same node, e.g. a 8 GPU node can host 2x4 GPU jobs. To prevent the jobs from clashing over the same **vLLM port**, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
+## Preventing Clashes
+Multiple model instances might be colocated on the same node, e.g. a 8 GPU node can host 2x4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
+We also gave each model instance a unique enroot container name based on the `SLURM_ARRAY_TASK_ID`, to prevent co-located jobs from clashing over the same container name.
+Also, we delete the created enroot container after the job is finished.
+
+# Conclusion
+
+# SLURM File {#sec-slurm-file}
+Below is a Github gist of the SLURM file we used to submit our workload on the LRZ AI Systems.
+It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, setup & teardown of enroot container, etc.
+
+<script src="https://gist.github.com/tomasruizt/6b48b51c343b48ee2f1a3ebb9a6ea129.js"></script>
 
 # References
 <!-- 
 What to write about
-The model, how many GPUs are needed (Tensor Parallelism)
-that we transcribe using whisper
-How I split the dataset (Data Parallelism)
-The LRZ, what GPUs and nodes are available
-   how these are connected to each other
-SLURM, how array jobs work
-    preventing port clashes
-How much storage is 35k videos in TB
-The posts are multimodal: videos, imgs, text
-Incremental progress by splitting requests from backend server
-Client-side throttling, since different models have different reqs
+✅ The model, how many GPUs are needed (Tensor Parallelism)
+✅ that we transcribe using whisper
+✅ How I split the dataset (Data Parallelism)
+✅ The LRZ, what GPUs and nodes are available
+   ✅ how these are connected to each other
+✅ SLURM, how array jobs work
+  ✅ preventing port clashes
+✅ The posts are multimodal: videos, imgs, text
+✅ Incremental progress by splitting requests from backend server
+✅Client-side throttling, since different models have different reqs
+
+✅ How much storage is 35k videos in TB
+✅ Write about enroot containers
+make a pciture display tensor parallelism & data parallelism
+Include a snippet about how to use your llm_app library.
 -->
