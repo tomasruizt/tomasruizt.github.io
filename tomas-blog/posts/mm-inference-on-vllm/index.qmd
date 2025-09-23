@@ -12,7 +12,7 @@ format:
     code-line-numbers: true
 editor:
     render-on-save: true
-# image: tiled-matrix-multiplication-squared.jpg
+image: imgs/parallelism-strategies-square.png
 engine: jupyter
 bibliography: refs.bib
 code-annotations: below
@@ -85,6 +85,9 @@ SLURM supports a feature called [Job Arrays](https://slurm.schedmd.com/job_array
 Each job in the collection gets a unique serial ID (e.g., 0, 1, ..., 100), which SLURM sets in the environment variable `SLURM_ARRAY_TASK_ID`.
 The model instance can read this ID (its _rank_) and understand which partition of the dataset it is assigned to process.
 I found the descriptions of these parallelism strategies on the [Hugging Face Parallelism Methods page](https://huggingface.co/docs/transformers/main/perf_train_gpu_many) useful, for starters.
+
+
+![Different Parallelism Strategies: Data Parallelism partitions the dataset so that $N$ different model instances process different parts of the dataset. Tensor Parallelism distributes a model instance across $K$ separate GPUs. In our workload $N=10$ and $K=4$.](imgs/parallelism-strategies.png){width="40%" text-align="left" fig-alt="Different Parallelism Strategies" .lightbox}
 
 # Fault Tolerance
 The vLLM library supports different inference modes:
