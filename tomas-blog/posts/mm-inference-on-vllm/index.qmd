@@ -130,12 +130,22 @@ Its possible to restart individual job tasks within a job array with SLURM: `sba
 
 In terms of the inference workload, we processed over 552 million input tokens, and generated over 9 million output tokens.
 Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average.
-That is a ratio of 61 input tokens per output token, much in contrast to other workloads like mathematical problem solving that often have the reverse ratio.
+That is a ratio of 61 input tokens per output token, much in contrast to other workloads like solving mathematical problems that often have the reverse ratio.
 In @fig-input-tokens and @fig-output-tokens shows the distribution of input and output tokens for the entire workload.
 
 ![**Distribution of Input Tokens**. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.](imgs/input_tokens.png){width="80%" text-align="left" fig-alt="Number of input tokens" .lightbox #fig-input-tokens}
 
 ![**Distribution of Output Tokens**. Its important to note that the x-scale is _100 times smaller_ than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is caused likely because our prompt instructed the model to respond follow-up questions only in specific cases.](imgs/output_tokens.png){width="80%" text-align="left" fig-alt="Number of output tokens" .lightbox #fig-output-tokens}
+
+I estimated from the logs that the **throughput** per model instance was ~2,95 seconds per request (~3 for simplicity).
+Dividing the ~15k input tokens and ~60 output tokens per request, give a throughput of 5k input tokens and 20 output tokens per second per model instance.
+In terms of total time, the workload required 3s/post * 35k posts = 105k s $\approx$ 29hr.
+
+The cost of renting an equivalent H100 GPU on [Runpod.io](https://www.runpod.io/) is $3,07/hr per GPU (as of 2025-09-24).
+The total cost of the workload would be $3,07 * 4 GPUs * 29hr = $356,12 (not a very expensive workload).
+Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance, i.e. $12/hr equivalent.
+
+![**H100 NVL Rent Cost.** The cost shown is per GPU per hour. The workload required 4 GPUs per model insance for 29 hours.](imgs/h100-nvl-cost-per-hour.png){width="60%" fig-alt="H100 NVL Renting Costs" .lightbox #fig-h100-nvl-cost-per-hour}
 
 In terms of social science, we found interesting results, e.g. that a lot of posts promoted a product (42%), and the most common product was dietary supplements (16%).
 More details in the [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
