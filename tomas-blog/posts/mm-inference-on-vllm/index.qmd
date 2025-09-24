@@ -123,6 +123,8 @@ Getting this to work properly with Python's `asyncio` library and correct timeou
 Multiple model instances might be colocated on the same node, e.g. a 8 GPU node can host 2x4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
 We also gave each model instance a unique enroot container name based on the `SLURM_ARRAY_TASK_ID`, to prevent co-located jobs from clashing over the same container name.
 Also, we deleted the created enroot container after the job finished.
+To diagnose the failure of an individual job task within a job array, its useful to pipe `stderr` and `stdout` of each job task to different files, as shown in lines 5 and 6 of our SLURM file in @sec-slurm-file. 
+Its possible to restart individual job tasks within a job array with SLURM: `sbatch <slurm-file> --array=<failed-task-id>`.
 
 # Results
 
