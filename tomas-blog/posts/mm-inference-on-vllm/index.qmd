@@ -124,6 +124,20 @@ Multiple model instances might be colocated on the same node, e.g. a 8 GPU node 
 We also gave each model instance a unique enroot container name based on the `SLURM_ARRAY_TASK_ID`, to prevent co-located jobs from clashing over the same container name.
 Also, we deleted the created enroot container after the job finished.
 
+# Results
+
+In terms of the inference workload, we processed over 552 million input tokens, and generated over 9 million output tokens.
+Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average.
+That is a ratio of 61 input tokens per output token, much in contrast to other workloads like mathematical problem solving that often have the reverse ratio.
+In @fig-input-tokens and @fig-output-tokens shows the distribution of input and output tokens for the entire workload.
+
+![**Distribution of Input Tokens**. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.](imgs/input_tokens.png){width="80%" text-align="left" fig-alt="Number of input tokens" .lightbox #fig-input-tokens}
+
+![**Distribution of Output Tokens**. Its important to note that the x-scale is _100 times smaller_ than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is caused likely because our prompt instructed the model to respond follow-up questions only in specific cases.](imgs/output_tokens.png){width="80%" text-align="left" fig-alt="Number of output tokens" .lightbox #fig-output-tokens}
+
+In terms of social science, we found interesting results, e.g. that a lot of posts promoted a product (42%), and the most common product was dietary supplements (16%).
+More details in the [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
+
 # Conclusion
 
 Successfully processing 35,000 multimodal TikTok videos with a 72B parameter model required combining vLLM's tensor parallelism across 4 H100 GPUs with data parallelism via SLURM job arrays.
@@ -165,4 +179,8 @@ What to write about
 ✅ Write about enroot containers
 ✅ make a pciture display tensor parallelism & data parallelism
 ✅ Include a snippet about how to use your llm_app library.
+Results: 
+  ✅ How many tokens did we process?
+  ✅How many posts actually promote a product?
+  How long did it take to process the dataset?
 -->
