@@ -126,26 +126,53 @@ Also, we deleted the created enroot container after the job finished.
 To diagnose the failure of an individual job task within a job array, its useful to pipe `stderr` and `stdout` of each job task to different files, as shown in lines 5 and 6 of our SLURM file in @sec-slurm-file. 
 Its possible to restart individual job tasks within a job array with SLURM: `sbatch <slurm-file> --array=<failed-task-id>`.
 
-# Results
+# Prefill-Decode Ratio
 
-In terms of the inference workload, we processed over 552 million input tokens, and generated over 9 million output tokens.
+We processed over 552 million input tokens, and generated over 9 million output tokens.
 Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average.
-That is a ratio of 61 input tokens per output token, much in contrast to other workloads like solving mathematical problems that often have the reverse ratio.
-In @fig-input-tokens and @fig-output-tokens shows the distribution of input and output tokens for the entire workload.
+The ratio of input tokens to output tokens is very skewed (61 to 1).
+It means that most compute in our workload was not spent decoding long answers, but rather processing the many input tokens.
+The workload is therefore called "prefill-heavy".
+This contrasts to "decode-heavy" workloads, like those involved in solving mathematical problems that generate a long answer including reasoning.
+The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs.
+@fig-input-tokens and @fig-output-tokens shows the distribution of input and output tokens for the entire workload.
 
 ![**Distribution of Input Tokens**. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.](imgs/input_tokens.png){width="80%" text-align="left" fig-alt="Number of input tokens" .lightbox #fig-input-tokens}
 
 ![**Distribution of Output Tokens**. Its important to note that the x-scale is _100 times smaller_ than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is caused likely because our prompt instructed the model to respond follow-up questions only in specific cases.](imgs/output_tokens.png){width="80%" text-align="left" fig-alt="Number of output tokens" .lightbox #fig-output-tokens}
 
-I estimated from the logs that the **throughput** per model instance was ~2,95 seconds per request (~3 for simplicity).
-Dividing the ~15k input tokens and ~60 output tokens per request, give a throughput of 5k input tokens and 20 output tokens per second per model instance.
-In terms of total time, the workload required 3s/post * 35k posts = 105k s $\approx$ 29hr.
+# Throughput Stats
 
+I estimated from the logs that the **throughput** per model instance was ~2,95 seconds per request (~3 for simplicity).
+Dividing the ~15k input tokens and ~60 output tokens per request, give a throughput of 5k input tokens and 20 output tokens per second per model instance (5020 tokens/s total throughput).
+This is a high throughput compared to other benchmarks:
+The vLLM documentation reports a [synthetic benchmark](https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen2.5-VL.html#qwen25vl-72b-benchmark-on-random-synthetic-dataset) with a ratio of ~9:1 input tokens per output token,
+which achieves a lower throughput of 1461 tokens/s.
+The higher throughput of our workload might be because its more prefill-heavy and better saturates the GPUs compute capacity.
+NVIDIA has also reported [performance benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results) for the similarly sized Llama-3.3-70b-instruct running  on 4 H100 GPUs and their [NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) inference framework.
+However, the peak throughputs reported by NVIDIA vary _a lot_ depending not only on the ratio of input to output tokens, but also the total number of tokens per request, with throughputs peaks ranging from 349 to 6085 tokens/s (I report their best results in @tbl-throughput-stats).
+The throughput we achieved is competitive without being "too good to be true" 🚀.
+
+| Benchmark | Model | In. Toks | Out. Toks | Tok. Ratio | GPUs | Throughput $\uparrow$|
+|----|----|---|---|---|----|----|
+| NVIDIA NIM | Llama-3.3-70b | 1000 | 1000 | 1:1 | 4 H100 80GB | **6085 tok/s** |
+| Ours (Videos) | Qwen2.5-VL-72B | 15000 | 250 | 61:1 | 4 H100 96GB | 5020 tok/s |
+| vLLM (Synthetic) | Qwen2.5-VL-72B | 8000 | 900 | 9:1 | 4 A100 80GB | 1461 tok/s |
+
+: **Throughput Comparison.** All benchmarks use instruct models. Input and output tokens are per request. The token ratio tells if the workload is prefill- or decode-heavy. The NVIDIA numbers are the most optimistic from their benchmarks. {#tbl-throughput-stats}
+
+All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found [this comparison](https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/) which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3,9 vs 3,35 TB/s), so its not clear if they offer clear advantages to either side.
+
+# Costs
+
+In terms of total runtime, the workload required 3s/post * 35k posts = 105k s $\approx$ 29hr.
 The cost of renting an equivalent H100 GPU on [Runpod.io](https://www.runpod.io/) is $3,07/hr per GPU (as of 2025-09-24).
 The total cost of the workload would be $3,07 * 4 GPUs * 29hr = $356,12 (not a very expensive workload).
 Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance, i.e. $12/hr equivalent.
 
 ![**H100 NVL Rent Cost.** The cost shown is per GPU per hour. The workload required 4 GPUs per model insance for 29 hours.](imgs/h100-nvl-cost-per-hour.png){width="60%" fig-alt="H100 NVL Renting Costs" .lightbox #fig-h100-nvl-cost-per-hour}
+
+# Results
 
 In terms of social science, we found interesting results, e.g. that a lot of posts promoted a product (42%), and the most common product was dietary supplements (16%).
 More details in the [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
