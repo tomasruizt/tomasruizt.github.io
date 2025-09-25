@@ -1,5 +1,5 @@
 ---
-title: "Classifying 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine"
+title: "A Guide to Classify 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -21,20 +21,20 @@ citation: true
 
 # Summary
 
-In this post I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok for a research project.
-I share lessons learned about computing on SLURM, about parallelism strategies (tensor- and data-parallelism), and share practical tips for fault tolerance and for video inference with vLLM.
+In this post, I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok for a research project.
+I share lessons learned about computing on SLURM, parallelism strategies (tensor- and data-parallelism), and practical tips for fault tolerance and video inference with vLLM.
 I also dive into concrete token throughput statistics of our workload, which is extremely prefill-heavy.
 Finally, I show how we corrected for the bias of the Qwen2.5-VL-72B model to make statistically valid statements about our dataset.
-As a goodie, I also share Python code for video classification using the vLLM library in @sec-python-code, 
+As a bonus, I also share Python code for video classification using the vLLM library in @sec-python-code, 
 as well as the SLURM file for our workload in @sec-slurm-file.
 
 # Motivation
 
-For the research project I collaborated with my colleague at LMU Munich, [Renata Topinkova](https://renatatopinkova.github.io/), a computational social scientist.
+For this research project, I collaborated with my colleague at LMU Munich, [Renata Topinkova](https://renatatopinkova.github.io/), a computational social scientist.
 Our goal was to detect subtle product sales by influencers on the platform. We presented a [poster with our findings](./other-files/poster_ic2s2_25.pdf) at the IC2S2 conference in 2025.
 
 This post focuses mainly on our large **inference workload**, which required running a large multimodal LLM (72B parameters) on 35k videos as quickly as possible before the deadline.
-The only way to get this done in reasonable time was with an _inference engine_. I used vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23], because its the engine I am most familiar with.
+The only way to get this done in reasonable time was with an _inference engine_. I used vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23], because it's the engine I am most familiar with.
 There are other alternative engines like _SGLang_ [@zheng2024sglang] or [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) that you can try.
 
 # Dataset and Model
@@ -50,7 +50,7 @@ On top of that, the cues we looked for in the videos were often subtle and impli
 So we also needed the model to grasp subtle communication cues in the videos.
 Larger models, typically in the range of 70B+ parameters, are much more competent at this than the widely used 8B models.
 
-We decided to use the `Qwen2.5-VL-72B-Instruct` model by the Qwen team [@bai2025qwen25vltechnicalreport] [(Hugging Face Link)](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct).
+We decided to use the `Qwen2.5-VL-72B-Instruct` model by the Qwen team [@bai2025qwen25vltechnicalreport] [(Hugging Face link)](https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct).
 Other multimodal models require you to cut up videos into individual frames and pass a video as a "stack of images", but the Qwen2.5-VL model instead natively consumes the videos directly.
 The key innovation to do this is called multidimensional RoPE (mRoPE) embeddings.
 mRoPE encodes the time dimension of the video into a separate dimension [@wang2024qwen2vlenhancingvisionlanguagemodels].
@@ -60,20 +60,20 @@ Thus, Qwen2.5-VL understands the temporal relationship between individual video 
 To alleviate this, we transcribed the audio using Whisper [@pmlr-v202-radford23a] and included the transcript in the text input.
 Some models that are capable of processing audio natively have been released recently: Qwen2.5-Omni or Phi-4 [@xu2025qwen25omnitechnicalreport;@abdin2024phi4technicalreport].
 However, the support for vLLM was limited until recently, the models remain relatively small in terms of size, and often output speech, which is not something we needed.
-Neverthelss, they are a very promising direction to explore.
+Nevertheless, they are a very promising direction to explore.
 
-**Video Input:** Feeding a video to model through vLLM requires a specific set up:
-Many examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload (e.g. OpenAI [docs](https://platform.openai.com/docs/guides/images-vision?api-mode=chat&format=base64-encoded#analyze-images), Google [docs](https://ai.google.dev/gemini-api/docs/video-understanding), even vLLM [examples](https://docs.vllm.ai/en/stable/examples/online_serving/openai_chat_completion_client_for_multimodal.html)).
+**Video Input:** Feeding a video to the model through vLLM requires a specific setup:
+Many examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload (e.g., OpenAI [docs](https://platform.openai.com/docs/guides/images-vision?api-mode=chat&format=base64-encoded#analyze-images), Google [docs](https://ai.google.dev/gemini-api/docs/video-understanding), even vLLM [examples](https://docs.vllm.ai/en/stable/examples/online_serving/openai_chat_completion_client_for_multimodal.html)).
 However, I found that this was not scalable for videos, because it blocked the server while it processed the payloads, and left the GPU idle.
 Instead, we only send the local file path _referencing_ the video in the payload.
 vLLM reads the file from disk, processes it, and feeds it to the model.
-This removes the serialization and de-serialization overhead.
+This removes the serialization and deserialization overhead.
 For this to work, we must give the vLLM server explicit permission to read from a specific directory (and subdirectories) using [this option](https://docs.vllm.ai/en/latest/configuration/engine_args.html#-allowed-local-media-path): 
 
 ```shell
 vllm serve ... --allowed-local-media-path=/path/to/your/files/
 ``` 
-The way to include a video file path in the payload is shwon below. Note that the prefix `file://` is important. Both this file path and the path passed to `allowed-local-media-path` must be absolute paths. A full example can be found [their documentation](https://github.com/QwenLM/Qwen3-VL/blob/6e98a0a62bce167c5802ae6f5f95fcd97d2634cf/README.md?plain=1#L286).
+The way to include a video file path in the payload is shown below. Note that the prefix `file://` is important. Both this file path and the path passed to `allowed-local-media-path` must be absolute paths. A full example can be found in their documentation: [link](https://github.com/QwenLM/Qwen3-VL/blob/6e98a0a62bce167c5802ae6f5f95fcd97d2634cf/README.md?plain=1#L286).
 ```python
 filepath = "/path/to/your/files/my-video.mp4"
 messages = [
@@ -90,8 +90,8 @@ For our workload, we needed to run multiple instances of this large 72B model in
 To this end, we used the [LRZ AI Systems cluster](https://doku.lrz.de/lrz-ai-systems-11484278.html).
 We used the BayernKI partition, which has 30 nodes, each with 4 Hopper H100 GPUs (94 GB VRAM per GPU) connected over NVLink.
 These are beefy GPUs, but nevertheless, the 72B model would not fit on a single GPU, even in bfloat16 precision, since only the model weights require around 144 GB VRAM.
-The model would fit on a single Blackwell B200 GPU (180GB VRAM), but those are not available on our cluster.
-Beyond the model weights, the model requires also space for the KV cache, model activations, etc.
+The model would fit on a single Blackwell B200 GPU (180 GB VRAM), but those are not available on our cluster.
+Beyond the model weights, the model also requires space for the KV cache, model activations, etc.
 Therefore, we allocated 4 GPUs, totaling 376 GB VRAM, per model instance.
 To launch jobs, the cluster uses the SLURM job scheduler [@yoo2003slurm].
 
@@ -101,24 +101,24 @@ These are conceptually similar to Docker containers, and the LRZ has introductor
 There are a couple of useful commands to create and start containers including `enroot import`, `enroot create` and `enroot start`.
 The code in @sec-slurm-file shows how we used these commands in our SLURM file.
 
-**Data Transfer:** To move your data into the LRZ AI System, they integrated a tool called [Globus Data Transfer](https://doku.lrz.de/dss-how-globus-data-transfer-and-globus-sharing-for-dss-works-11484489.html)).
+**Data Transfer:** To move your data into the LRZ AI System, they integrated a tool called [Globus Data Transfer](https://doku.lrz.de/dss-how-globus-data-transfer-and-globus-sharing-for-dss-works-11484489.html).
 This is special software to transfer large amounts of data between different servers.
-It is preinstalled on the LRZ AI Systems, and we installed it in on our server as well.
+It is preinstalled on the LRZ AI Systems, and we installed it on our server as well.
 Then we used the [web interface](https://app.globus.org/) to transfer our dataset to the GPU cluster.
-The transfer is asynchronous and will email you when its done.
-Its works also the other way around, to transfer data back from the LRZ back to your server.
+The transfer is asynchronous and will email you when it's done.
+It also works the other way around, to transfer data back from the LRZ to your server.
 
 # Parallelism Strategies
 vLLM supports distributing the model on multiple GPUs, a strategy called **Tensor Parallelism**.
 In essence, this means that each model tensor is split up across multiple GPUs so that no single GPU must hold the entire model in memory.
 The drawback of this is that the GPUs must communicate with each other to generate the model outputs.
-Nevertheless, with the high bandwith NVLink, this overhead is acceptable for the ability to run larger models.
+Nevertheless, with the high-bandwidth NVLink, this overhead is acceptable for the ability to run larger models.
 The option to use multiple GPUs in vLLM is very simple: `vllm serve ... --tensor-parallel-size=4`.
 
-In our workload, each model instance processed a only a portion of the full dataset, a strategy called **Data Parallelism**.
+In our workload, each model instance processed only a portion of the full dataset, a strategy called **Data Parallelism**.
 I implemented data parallelism on the client side, outside vLLM,
 which means that the client decides what data to send to the vLLM server based on its own _rank_ within the full workload.
-SLURM supports a feature called [Job Arrays](https://slurm.schedmd.com/job_array.html), which allow to submit a collection of similar jobs.
+SLURM supports a feature called [Job Arrays](https://slurm.schedmd.com/job_array.html), which allow you to submit a collection of similar jobs.
 Each job in the collection gets a unique serial ID (e.g., 0, 1, ..., 100), which SLURM sets in the environment variable `SLURM_ARRAY_TASK_ID`.
 The model instance can read this ID (its _rank_) and understand which partition of the dataset it is assigned to process.
 I found the descriptions of these parallelism strategies on the [Hugging Face Parallelism Methods page](https://huggingface.co/docs/transformers/main/perf_train_gpu_many) useful, for starters.
@@ -131,35 +131,35 @@ The code in @sec-slurm-file shows how we used `SLURM_ARRAY_TASK_ID` in our SLURM
 The vLLM library supports different inference modes:
 It is possible to use _batch processing_, which takes a batch of requests at once, processes them
 and returns the results.
-Alternatively, its possible to spin up an inference server behind an OpenAI-compatible API,
+Alternatively, it's possible to spin up an inference server behind an OpenAI-compatible API,
 which takes requests _asynchronously_, and returns the results individually as they become available.
 For our large workload, we expected the batch processing to be more efficient, but at the time of writing,
 the batch processing code **blocked** until all requests were completed before returning.
 If any error occurred during processing, the entire batch would fail, and failures were more common than one would expect:
-E.g. an exception was raised mid-workload because a long video did not fit in the context window.
+e.g., an exception was raised mid-workload because a long video did not fit in the context window.
 
 Therefore, I opted for the asynchronous inference mode, which offered better **fault tolerance**.
 As soon as a request completed, we dumped its result to a file with JSON-lines format.
 If the workload failed halfway, we still had all previous results on disk.
 If a single request failed (e.g. video too long), it was also logged to the results file.
-This approach made it possible to restart the a failed workload later, by determining which requests were still missing from the results file.
+This approach made it possible to restart a failed workload later, by determining which requests were still missing from the results file.
 The JSON-lines file format allows for efficient append-only incremental writes, but is not a very efficient data format for downstream use, because it takes up a lot of disk space and is slow to read.
-Therefore, once result files were complete, we converted them to the [parquet format](https://github.com/apache/parquet-format), which has great lossless compression, and is super fast to read.
+Therefore, once result files were complete, we converted them to the [Parquet format](https://github.com/apache/parquet-format), which has great lossless compression and is super fast to read.
 
-Sending thousands of multimodal requests at the server **concurrently** choked it, because the server accepted all requests and started processing all videos (e.g. loading from disk), but neglected generating tokens.
+Sending thousands of multimodal requests to the server **concurrently** choked it, because the server accepted all requests and started processing all videos (e.g., loading from disk), but neglected to generate tokens.
 On top of this, processing too many concurrent requests filled up the KV cache very quickly.
 You could observe this in the vLLM logs: the KV cache utilization spiked to 100% and stayed there for most of the workload.
 To cope with this, the server evicted blocks from the KV cache, and put most requests back in the queue, where they effectively sat idle.
 To prevent this situation, I implemented a client-side throttling mechanism, which limited the number of requests sent to the server at the same time.
-We set 16 concurrent requests for QwenVL-2.5-72B.
+We set 16 concurrent requests for Qwen2.5-VL-72B.
 Getting this to work properly with Python's `asyncio` library and correct timeouts was tricky, but now you can just [copy the code from my repo](https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174) or use the Python code from @sec-python-code directly.
 
 ## Preventing Clashes
-Multiple model instances might be colocated on the same node, e.g. a 8 GPU node can host 2x4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
+Multiple model instances might be co-located on the same node, e.g., an 8 GPU node can host 2×4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (`SLURM_ARRAY_TASK_ID`).
 We also gave each model instance a unique enroot container name based on the `SLURM_ARRAY_TASK_ID`, to prevent co-located jobs from clashing over the same container name.
 Also, we deleted the created enroot container after the job finished.
-To diagnose the failure of an individual job task within a job array, its useful to pipe `stderr` and `stdout` of each job task to different files, as shown in lines 5 and 6 of our SLURM file in @sec-slurm-file. 
-Its possible to restart individual job tasks within a job array with SLURM: `sbatch <slurm-file> --array=<failed-task-id>`.
+To diagnose the failure of an individual job task within a job array, it's useful to pipe `stderr` and `stdout` of each job task to different files, as shown in lines 5 and 6 of our SLURM file in @sec-slurm-file. 
+It's possible to restart individual job tasks within a job array with SLURM: `sbatch <slurm-file> --array=<failed-task-id>`.
 
 # Prefill-Decode Ratio
 
@@ -170,22 +170,22 @@ It means that most compute in our workload was not spent decoding long answers, 
 The workload is therefore called "prefill-heavy".
 This contrasts to "decode-heavy" workloads, like those involved in solving mathematical problems that generate a long answer including reasoning.
 The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs.
-@fig-input-tokens and @fig-output-tokens shows the distribution of input and output tokens for the entire workload.
+@fig-input-tokens and @fig-output-tokens show the distribution of input and output tokens for the entire workload.
 
 ![**Distribution of Input Tokens**. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.](imgs/input_tokens.png){width="80%" text-align="left" fig-alt="Number of input tokens" .lightbox #fig-input-tokens}
 
-![**Distribution of Output Tokens**. Its important to note that the x-scale is _100 times smaller_ than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is caused likely because our prompt instructed the model to respond follow-up questions only in specific cases.](imgs/output_tokens.png){width="80%" text-align="left" fig-alt="Number of output tokens" .lightbox #fig-output-tokens}
+![**Distribution of Output Tokens**. It's important to note that the x-scale is _100 times smaller_ than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases.](imgs/output_tokens.png){width="80%" text-align="left" fig-alt="Number of output tokens" .lightbox #fig-output-tokens}
 
 # Throughput Stats
 
-I estimated from the logs that the **throughput** per model instance was ~2,95 seconds per request (~3 for simplicity).
-Dividing the ~15k input tokens and ~60 output tokens per request, give a throughput of 5k input tokens and 20 output tokens per second per model instance (5020 tokens/s total throughput).
+I estimated from the logs that the **throughput** per model instance was ~2.95 seconds per request (~3 for simplicity).
+Dividing the ~15k input tokens and ~250 output tokens per request gives a throughput of ~5k input tokens and ~83 output tokens per second per model instance (≈5,080 tokens/s total throughput).
 
 This is a high throughput compared to other benchmarks:
 The vLLM documentation reports a [synthetic benchmark](https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen2.5-VL.html#qwen25vl-72b-benchmark-on-random-synthetic-dataset) with a ratio of ~9:1 input tokens per output token,
 which achieves a lower throughput of 1461 tokens/s.
-The higher throughput of our workload might be because its more prefill-heavy and better saturates the GPUs compute capacity.
-NVIDIA has also reported [performance benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results) for the similarly sized Llama-3.3-70b-instruct running  on 4 H100 GPUs and their [NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) inference framework.
+The higher throughput of our workload might be just because we use a better GPU (H100 vs A100).
+NVIDIA has also reported [performance benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results) for the similarly sized Llama-3.3-70b-instruct running on 4 H100 GPUs and their [NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) inference framework.
 However, the peak throughputs reported by NVIDIA vary _a lot_ depending not only on the ratio of input to output tokens, but also the total number of tokens per request, with throughput peaks ranging from 349 to 6085 tokens/s (I report their best results in @tbl-throughput-stats).
 The throughput we achieved is competitive without being "too good to be true" 🚀.
 
@@ -197,26 +197,26 @@ The throughput we achieved is competitive without being "too good to be true" �
 
 : **Throughput Comparison.** All benchmarks use instruct models. Input and output tokens are per request. The token ratio tells if the workload is prefill- or decode-heavy. The NVIDIA numbers are the most optimistic from their benchmarks. {#tbl-throughput-stats}
 
-All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found [this comparison](https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/) which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3,9 vs 3,35 TB/s), so its not clear if they offer clear advantages to either side.
+All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found [this comparison](https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/) which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3.9 vs 3.35 TB/s), so it's not clear if they offer clear advantages to either side.
 
 # Costs
 
 In terms of total runtime, the workload required 3s/post * 35k posts = 105k s $\approx$ 29hr.
-The cost of renting an equivalent H100 GPU on [Runpod.io](https://www.runpod.io/) is $3,07/hr per GPU (as of 2025-09-24).
-The total cost of the workload would be $3,07 * 4 GPUs * 29hr = $356,12 (not a very expensive workload).
-Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance, i.e. $12/hr equivalent.
+The cost of renting an equivalent H100 GPU on [Runpod.io](https://www.runpod.io/) is $3.07/hr per GPU (as of 2025-09-24).
+The total cost of the workload would be $3.07 * 4 GPUs * 29hr = $356.12 (not a very expensive workload).
+Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance (~$12/hr).
 
-![**H100 NVL Rent Cost.** The cost shown is per GPU per hour. The workload required 4 GPUs per model insance for 29 hours.](imgs/h100-nvl-cost-per-hour.png){width="60%" fig-alt="H100 NVL Renting Costs" .lightbox #fig-h100-nvl-cost-per-hour}
+![**H100 NVL Rent Cost.** The cost shown is per GPU per hour. The workload required 4 GPUs per model instance for 29 hours.](imgs/h100-nvl-cost-per-hour.png){width="60%" fig-alt="H100 NVL Renting Costs" .lightbox #fig-h100-nvl-cost-per-hour}
 
 # Results
 
-In terms of social science, we found interesting results, e.g. that a lot of posts promoted a product (42%), and that the most common product sold were dietary supplements (16%).
+In terms of social science, we found interesting results, e.g., that a lot of posts promoted a product (42%), and that the most common product sold was dietary supplements (16%).
 For quality control, we compared the Qwen labels with human labels in a random subset of ~150 posts on a specific product detection question:
 
 > _"Does the post mention a product or service that is being offered, promoted, or recommended? Answer with 'yes' or 'no'."_
 
-On this subset, we also used Gemini-2.5-Pro for classification, intended as upper performance reference.
-We compare both models in terms of precision, recall, and F1 scores in @tbl-model-comparison. 
+On this subset, we also used Gemini-2.5-Pro for classification, intended as an upper performance reference.
+We compared both models in terms of precision, recall, and F1 scores in @tbl-model-comparison. 
 In plain words, the table shows that Qwen was too strict about what constitutes a product mention, while Gemini was too lax, but achieved a better balance.
 
 | Model | Precision | Recall | F1 Score |
@@ -228,14 +228,14 @@ In plain words, the table shows that Qwen was too strict about what constitutes 
 
 **Correcting for AI Bias:** 
 The numbers showed that both models had a bias in a specific direction that needed correction when estimating what fraction of the 35k posts _really_ mentioned a product.
-I.e. _if humans were to label all 35k posts_, what fraction would they label as mentioning a product?
-Its possible to combine the few human labels with the thousands of structurally biased AI labels to make this estimate.
+I.e., _if humans were to label all 35k posts_, what fraction would they label as mentioning a product?
+It's possible to combine the few human labels with the thousands of structurally biased AI labels to make this estimate.
 We followed a method described in _Confidence-Driven Inference_ by @gligoric-etal-2025-unconfident (also [presented](https://sites.google.com/view/ic2s2-bridging-human/home) in IC2S2).
 When computing an average using the combined human and AI labels, the method weights the AI labels with a weight $\lambda \in [0,1]$.
 The weight is 0 when the AI labels are completely uncorrelated to the human labels, and 1 when they are completely correlated.
 This method allowed us to correct for AI biases in our estimates, and also to make statements about confidence intervals like the following:
 
-> _"The percentage of the 35k posts mentioning a product is ~53%, with the 95% confidence interval being 47% to 59%._
+> _"The percentage of the 35k posts mentioning a product is ~53%, with the 95% confidence interval being 47% to 59%."_
 
 The confidence intervals are useful for hypothesis testing, and for making statements about statistical significance.
 More details in our [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
@@ -243,24 +243,24 @@ More details in our [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
 # Conclusion
 I showed a practical recipe to classify a dataset of 35,000 videos with a 72B parameter model.
 We went over the infrastructure needed in terms of GPUs, tensor- and data-parallelism strategies, SLURM commands, concrete precautions for fault tolerance, and tips on video inference with vLLM.
-Our workload was a prefill-heavy workload, and I showed how our achieved throughput is competitive with existing benchmarks by NVIDIA and vLLM.
-Finally, I explained how to use thousands of potentially biased AI labels to make statitically valid arguments.
-I hope this post is useful to other researchers aiming to analyze large video datasets with multimodal LLMs that require multiple GPUs.
+Our workload was a prefill-heavy workload, and I showed how the throughput we achieved is competitive with existing benchmarks by NVIDIA and vLLM.
+Finally, I explained how to use thousands of potentially biased AI labels to make statistically valid arguments.
+I hope this guide is useful to other researchers aiming to analyze large video datasets with multimodal LLMs that require multiple GPUs.
 
-**Outlook:** In the future I hope to scale this pipeline to 1M videos, and push the throughput limits with quantization methods and speculative decoding.
+**Outlook:** In the future, I hope to scale this pipeline to 1M videos and push the throughput limits with quantization methods and speculative decoding.
 Testing audio-capable models is also high on my agenda.
 If you are interested in collaborating on large-scale inference, reach out to me! 🚀
 
 # SLURM File {#sec-slurm-file}
-Below is a Github gist of the SLURM file to submit our workload on the LRZ AI Systems.
-It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, setup & teardown of enroot container, etc.
+Below is a GitHub Gist of the SLURM file to submit our workload on the LRZ AI Systems.
+It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, and set up and tear down the enroot container, etc.
 Unlike the Python code, this will not run without the dataset, but it shows the general workflow.
 
 <script src="https://gist.github.com/tomasruizt/6b48b51c343b48ee2f1a3ebb9a6ea129.js"></script>
 
 # Python Code {#sec-python-code}
 The code below shows how to use Python to (1) start up the vLLM server, and (2) send
-concurrent requests to the server. It uses a library I wrote for this purpose: [Github/tomasruizt/llm_app](https://github.com/tomasruizt/llm_app). The snippet below is in the repo's `examples/` directory.
+concurrent requests to the server. It uses a library I wrote for this purpose: [GitHub/tomasruizt/llm_app](https://github.com/tomasruizt/llm_app). The snippet below is in the repo's `examples/` directory.
 
 <script src="https://emgithub.com/embed-v2.js?target=https%3A%2F%2Fgithub.com%2Ftomasruizt%2Fllm_app%2Fblob%2Fmain%2Fexamples%2Fvllm-video-inference.py&style=github&type=code&showBorder=on&showLineNumbers=on&showFileMeta=on&showFullPath=on&showCopy=on"></script>
 
@@ -276,14 +276,14 @@ What to write about
   ✅ preventing port clashes
 ✅ The posts are multimodal: videos, imgs, text
 ✅ Incremental progress by splitting requests from backend server
-✅Client-side throttling, since different models have different reqs
+✅ Client-side throttling, since different models have different reqs
 
 ✅ How much storage is 35k videos in TB
 ✅ Write about enroot containers
-✅ make a pciture display tensor parallelism & data parallelism
+✅ make a picture display tensor parallelism & data parallelism
 ✅ Include a snippet about how to use your llm_app library.
 Results: 
   ✅ How many tokens did we process?
   ✅How many posts actually promote a product?
-  How long did it take to process the dataset?
+  ✅How long did it take to process the dataset?
 -->
