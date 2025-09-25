@@ -172,7 +172,7 @@ This contrasts to "decode-heavy" workloads, like those involved in solving mathe
 The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs.
 @fig-input-tokens and @fig-output-tokens show the distribution of input and output tokens for the entire workload.
 
-![**Distribution of Input Tokens**. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.](imgs/input_tokens.png){width="80%" text-align="left" fig-alt="Number of input tokens" .lightbox #fig-input-tokens}
+![**Distribution of Input Tokens**. The distribution is skewed to the left, and most requests required between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.](imgs/input_tokens.png){width="80%" text-align="left" fig-alt="Number of input tokens" .lightbox #fig-input-tokens}
 
 ![**Distribution of Output Tokens**. It's important to note that the x-scale is _100 times smaller_ than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases.](imgs/output_tokens.png){width="80%" text-align="left" fig-alt="Number of output tokens" .lightbox #fig-output-tokens}
 
@@ -184,8 +184,8 @@ Dividing the ~15k input tokens and ~250 output tokens per request gives a throug
 This is a high throughput compared to other benchmarks:
 The vLLM documentation reports a [synthetic benchmark](https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen2.5-VL.html#qwen25vl-72b-benchmark-on-random-synthetic-dataset) with a ratio of ~9:1 input tokens per output token,
 which achieves a lower throughput of 1461 tokens/s.
-The higher throughput of our workload might be just because we use a better GPU (H100 vs A100).
-NVIDIA has also reported [performance benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results) for the similarly sized Llama-3.3-70b-instruct running on 4 H100 GPUs and their [NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) inference framework.
+The higher throughput of our workload might be just because we use better GPUs (H100s vs A100s).
+NVIDIA has also reported [performance benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results) for the similarly-sized model Llama-3.3-70b-instruct running on 4 H100 GPUs and their [NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) inference framework.
 However, the peak throughputs reported by NVIDIA vary _a lot_ depending not only on the ratio of input to output tokens, but also the total number of tokens per request, with throughput peaks ranging from 349 to 6085 tokens/s (I report their best results in @tbl-throughput-stats).
 The throughput we achieved is competitive without being "too good to be true" ðŸš€.
 
@@ -197,11 +197,11 @@ The throughput we achieved is competitive without being "too good to be true" ðŸ
 
 : **Throughput Comparison.** All benchmarks use instruct models. Input and output tokens are per request. The token ratio tells if the workload is prefill- or decode-heavy. The NVIDIA numbers are the most optimistic from their benchmarks. {#tbl-throughput-stats}
 
-All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found [this comparison](https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/) which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3.9 vs 3.35 TB/s), so it's not clear if they offer clear advantages to either side.
+All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found [this comparison](https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/) which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3.9 vs 3.35 TB/s), so it's not clear if they either one is better.
 
 # Costs
 
-In terms of total runtime, the workload required 3s/post * 35k posts = 105k s $\approx$ 29hr.
+In terms of total runtime, the workload required 3s/post * 35k posts = 105k s $\approx$ 29hr running a single model instance (4 GPUs).
 The cost of renting an equivalent H100 GPU on [Runpod.io](https://www.runpod.io/) is $3.07/hr per GPU (as of 2025-09-24).
 The total cost of the workload would be $3.07 * 4 GPUs * 29hr = $356.12 (not a very expensive workload).
 Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance (~$12/hr).
@@ -227,13 +227,15 @@ In plain words, the table shows that Qwen was too strict about what constitutes 
 : **Model Comparison.** Gemini outperformed Qwen in recall, and in F1, but Qwen had higher precision. {#tbl-model-comparison}
 
 **Correcting for AI Bias:** 
-The numbers showed that both models had a bias in a specific direction that needed correction when estimating what fraction of the 35k posts _really_ mentioned a product.
-I.e., _if humans were to label all 35k posts_, what fraction would they label as mentioning a product?
-It's possible to combine the few human labels with the thousands of structurally biased AI labels to make this estimate.
+The numbers showed that both models had a bias in a specific direction that needed to be corrected to answer a question like the following: 
+
+>_"If humans were to label all 35k posts, what fraction would they label as mentioning a product?"_
+
+It's possible to combine the few human labels with the thousands of structurally biased AI labels to answer this question.
 We followed a method described in _Confidence-Driven Inference_ by @gligoric-etal-2025-unconfident (also [presented](https://sites.google.com/view/ic2s2-bridging-human/home) in IC2S2).
 When computing an average using the combined human and AI labels, the method weights the AI labels with a weight $\lambda \in [0,1]$.
 The weight is 0 when the AI labels are completely uncorrelated to the human labels, and 1 when they are completely correlated.
-This method allowed us to correct for AI biases in our estimates, and also to make statements about confidence intervals like the following:
+This method allowed us to correct the Qwen model bias in our estimates, and also to make statements about confidence intervals like the following:
 
 > _"The percentage of the 35k posts mentioning a product is ~53%, with the 95% confidence interval being 47% to 59%."_
 
