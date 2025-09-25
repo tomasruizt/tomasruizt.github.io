@@ -10,7 +10,351 @@
 <atom:link href="https://tomasruizt.github.io/index.xml" rel="self" type="application/rss+xml"/>
 <description>Tomas Ruiz&#39;s blog</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Fri, 31 Jan 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sun, 21 Sep 2025 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>A Guide to Classify 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine</title>
+  <dc:creator>Tomas Ruiz</dc:creator>
+  <link>https://tomasruizt.github.io/posts/mm-inference-on-vllm/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="summary" class="level1">
+<h1>Summary</h1>
+<p>In this post, I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok for a research project. I share lessons learned about computing on SLURM, parallelism strategies (tensor- and data-parallelism), and practical tips for fault tolerance and video inference with vLLM. I also dive into concrete token throughput statistics of our workload, which is extremely prefill-heavy. Finally, I show how we corrected for the bias of the Qwen2.5-VL-72B model to make statistically valid statements about our dataset. As a bonus, I also share Python code for video classification using the vLLM library in Section&nbsp;13, as well as the SLURM file for our workload in Section&nbsp;12.</p>
+</section>
+<section id="motivation" class="level1">
+<h1>Motivation</h1>
+<p>For this research project, I collaborated with my colleague at LMU Munich, <a href="https://renatatopinkova.github.io/">Renata Topinkova</a>, a computational social scientist. Our goal was to detect subtle product sales by influencers on the platform. We presented a <a href="./other-files/poster_ic2s2_25.pdf">poster with our findings</a> at the IC2S2 conference in 2025.</p>
+<p>This post focuses mainly on our large <strong>inference workload</strong>, which required running a large multimodal LLM (72B parameters) on 35k videos as quickly as possible before the deadline. The only way to get this done in reasonable time was with an <em>inference engine</em>. I used vLLM <span class="citation" data-cites="DBLP:conf/sosp/KwonLZ0ZY0ZS23">(Kwon et al. 2023)</span>, because it’s the engine I am most familiar with. There are other alternative engines like <em>SGLang</em> <span class="citation" data-cites="zheng2024sglang">(Zheng et al. 2024)</span> or <a href="https://github.com/ai-dynamo/dynamo">NVIDIA Dynamo</a> that you can try.</p>
+</section>
+<section id="dataset-and-model" class="level1">
+<h1>Dataset and Model</h1>
+<p>Our dataset consists of 35,000 multimodal TikTok posts made up of videos, images, audio and text. The size of the dataset is around 180GB, the majority of which is from the videos. The dataset is a special subsample of a much bigger and more general dataset of ~1M posts we have.</p>
+<p>To analyze this dataset, we needed a multimodal model capable of consuming inputs with multiple modalities. On top of that, the cues we looked for in the videos were often subtle and implicit: E.g.,</p>
+<blockquote class="blockquote">
+<p><em>“Does the post suggest a follow-up transaction or sales interaction?”</em></p>
+</blockquote>
+<p>So we also needed the model to grasp subtle communication cues in the videos. Larger models, typically in the range of 70B+ parameters, are much more competent at this than the widely used 8B models.</p>
+<p>We decided to use the <code>Qwen2.5-VL-72B-Instruct</code> model by the Qwen team <span class="citation" data-cites="bai2025qwen25vltechnicalreport">(Bai et al. 2025)</span> <a href="https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct">(Hugging Face link)</a>. Other multimodal models require you to cut up videos into individual frames and pass a video as a “stack of images”, but the Qwen2.5-VL model instead natively consumes the videos directly. The key innovation to do this is called multidimensional RoPE (mRoPE) embeddings. mRoPE encodes the time dimension of the video into a separate dimension <span class="citation" data-cites="wang2024qwen2vlenhancingvisionlanguagemodels">(Wang et al. 2024)</span>. Thus, Qwen2.5-VL understands the temporal relationship between individual video frames, unlike other multimodal models.</p>
+<p><strong>Audio:</strong> An important shortcoming of this model is that it does not process audio natively. To alleviate this, we transcribed the audio using Whisper <span class="citation" data-cites="pmlr-v202-radford23a">(Radford et al. 2023)</span> and included the transcript in the text input. Some models that are capable of processing audio natively have been released recently: Qwen2.5-Omni or Phi-4 <span class="citation" data-cites="xu2025qwen25omnitechnicalreport abdin2024phi4technicalreport">(Xu et al. 2025; Abdin et al. 2024)</span>. However, the support for vLLM was limited until recently, the models remain relatively small in terms of size, and often output speech, which is not something we needed. Nevertheless, they are a very promising direction to explore.</p>
+<p><strong>Video Input:</strong> Feeding a video to the model through vLLM requires a specific setup: Many examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload (e.g., OpenAI <a href="https://platform.openai.com/docs/guides/images-vision?api-mode=chat&amp;format=base64-encoded#analyze-images">docs</a>, Google <a href="https://ai.google.dev/gemini-api/docs/video-understanding">docs</a>, even vLLM <a href="https://docs.vllm.ai/en/stable/examples/online_serving/openai_chat_completion_client_for_multimodal.html">examples</a>). However, I found that this was not scalable for videos, because it blocked the server while it processed the payloads, and left the GPU idle. Instead, we only send the local file path <em>referencing</em> the video in the payload. vLLM reads the file from disk, processes it, and feeds it to the model. This removes the serialization and deserialization overhead. For this to work, we must give the vLLM server explicit permission to read from a specific directory (and subdirectories) using <a href="https://docs.vllm.ai/en/latest/configuration/engine_args.html#-allowed-local-media-path">this option</a>:</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1">vllm serve ... --allowed-local-media-path=/path/to/your/files/</span></code></pre></div>
+<p>The way to include a video file path in the payload is shown below. Note that the prefix <code>file://</code> is important. Both this file path and the path passed to <code>allowed-local-media-path</code> must be absolute paths. A full example can be found in their documentation: <a href="https://github.com/QwenLM/Qwen3-VL/blob/6e98a0a62bce167c5802ae6f5f95fcd97d2634cf/README.md?plain=1#L286">link</a>.</p>
+<div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb2-1">filepath <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/your/files/my-video.mp4"</span></span>
+<span id="cb2-2">messages <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb2-3">  {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: [</span>
+<span id="cb2-4">    {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"type"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"text"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"text"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"What is in the video?"</span>},</span>
+<span id="cb2-5">    {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"type"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"video_url"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"video_url"</span>: {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"url"</span>: <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"file://</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>filepath<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>}}</span>
+<span id="cb2-6">  ]}</span>
+<span id="cb2-7">]</span></code></pre></div>
+</section>
+<section id="gpu-cluster" class="level1">
+<h1>GPU Cluster</h1>
+<p>For our workload, we needed to run multiple instances of this large 72B model in parallel to process the dataset quickly (i.e.&nbsp;within a few hours). To this end, we used the <a href="https://doku.lrz.de/lrz-ai-systems-11484278.html">LRZ AI Systems cluster</a>. We used the BayernKI partition, which has 30 nodes, each with 4 Hopper H100 GPUs (94 GB VRAM per GPU) connected over NVLink. These are beefy GPUs, but nevertheless, the 72B model would not fit on a single GPU, even in bfloat16 precision, since only the model weights require around 144 GB VRAM. The model would fit on a single Blackwell B200 GPU (180 GB VRAM), but those are not available on our cluster. Beyond the model weights, the model also requires space for the KV cache, model activations, etc. Therefore, we allocated 4 GPUs, totaling 376 GB VRAM, per model instance. To launch jobs, the cluster uses the SLURM job scheduler <span class="citation" data-cites="yoo2003slurm">(Yoo, Jette, and Grondona 2003)</span>.</p>
+<p><strong>Containers:</strong> On the LRZ AI Systems, one cannot install and customize a Python environment on the worker nodes directly. Instead, one has to use NVIDIA <a href="https://github.com/NVIDIA/enroot">enroot containers</a>. These are conceptually similar to Docker containers, and the LRZ has introductory documentation about enroot <a href="https://doku.lrz.de/4-1-enroot-introduction-1895502566.html">here</a>. There are a couple of useful commands to create and start containers including <code>enroot import</code>, <code>enroot create</code> and <code>enroot start</code>. The code in Section&nbsp;12 shows how we used these commands in our SLURM file.</p>
+<p><strong>Data Transfer:</strong> To move your data into the LRZ AI System, they integrated a tool called <a href="https://doku.lrz.de/dss-how-globus-data-transfer-and-globus-sharing-for-dss-works-11484489.html">Globus Data Transfer</a>. This is special software to transfer large amounts of data between different servers. It is preinstalled on the LRZ AI Systems, and we installed it on our server as well. Then we used the <a href="https://app.globus.org/">web interface</a> to transfer our dataset to the GPU cluster. The transfer is asynchronous and will email you when it’s done. It also works the other way around, to transfer data back from the LRZ to your server.</p>
+</section>
+<section id="parallelism-strategies" class="level1">
+<h1>Parallelism Strategies</h1>
+<p>vLLM supports distributing the model on multiple GPUs, a strategy called <strong>Tensor Parallelism</strong>. In essence, this means that each model tensor is split up across multiple GPUs so that no single GPU must hold the entire model in memory. The drawback of this is that the GPUs must communicate with each other to generate the model outputs. Nevertheless, with the high-bandwidth NVLink, this overhead is acceptable for the ability to run larger models. The option to use multiple GPUs in vLLM is very simple: <code>vllm serve ... --tensor-parallel-size=4</code>.</p>
+<p>In our workload, each model instance processed only a portion of the full dataset, a strategy called <strong>Data Parallelism</strong>. I implemented data parallelism on the client side, outside vLLM, which means that the client decides what data to send to the vLLM server based on its own <em>rank</em> within the full workload. SLURM supports a feature called <a href="https://slurm.schedmd.com/job_array.html">Job Arrays</a>, which allow you to submit a collection of similar jobs. Each job in the collection gets a unique serial ID (e.g., 0, 1, …, 100), which SLURM sets in the environment variable <code>SLURM_ARRAY_TASK_ID</code>. The model instance can read this ID (its <em>rank</em>) and understand which partition of the dataset it is assigned to process. I found the descriptions of these parallelism strategies on the <a href="https://huggingface.co/docs/transformers/main/perf_train_gpu_many">Hugging Face Parallelism Methods page</a> useful, for starters. The code in Section&nbsp;12 shows how we used <code>SLURM_ARRAY_TASK_ID</code> in our SLURM file.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="imgs/parallelism-strategies.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Different Parallelism Strategies: Data Parallelism partitions the dataset so that N different model instances process different parts of the dataset. Tensor Parallelism distributes a model instance across K separate GPUs. In our workload N=10 and K=4."><img src="https://tomasruizt.github.io/posts/mm-inference-on-vllm/imgs/parallelism-strategies.png" class="img-fluid figure-img" style="width:40.0%" data-text-align="left" alt="Different Parallelism Strategies"></a></p>
+<figcaption>Different Parallelism Strategies: Data Parallelism partitions the dataset so that <img src="https://latex.codecogs.com/png.latex?N"> different model instances process different parts of the dataset. Tensor Parallelism distributes a model instance across <img src="https://latex.codecogs.com/png.latex?K"> separate GPUs. In our workload <img src="https://latex.codecogs.com/png.latex?N=10"> and <img src="https://latex.codecogs.com/png.latex?K=4">.</figcaption>
+</figure>
+</div>
+</section>
+<section id="fault-tolerance" class="level1">
+<h1>Fault Tolerance</h1>
+<p>The vLLM library supports different inference modes: It is possible to use <em>batch processing</em>, which takes a batch of requests at once, processes them and returns the results. Alternatively, it’s possible to spin up an inference server behind an OpenAI-compatible API, which takes requests <em>asynchronously</em>, and returns the results individually as they become available. For our large workload, we expected the batch processing to be more efficient, but at the time of writing, the batch processing code <strong>blocked</strong> until all requests were completed before returning. If any error occurred during processing, the entire batch would fail, and failures were more common than one would expect: e.g., an exception was raised mid-workload because a long video did not fit in the context window.</p>
+<p>Therefore, I opted for the asynchronous inference mode, which offered better <strong>fault tolerance</strong>. As soon as a request completed, we dumped its result to a file with JSON-lines format. If the workload failed halfway, we still had all previous results on disk. If a single request failed (e.g.&nbsp;video too long), it was also logged to the results file. This approach made it possible to restart a failed workload later, by determining which requests were still missing from the results file. The JSON-lines file format allows for efficient append-only incremental writes, but is not a very efficient data format for downstream use, because it takes up a lot of disk space and is slow to read. Therefore, once result files were complete, we converted them to the <a href="https://github.com/apache/parquet-format">Parquet format</a>, which has great lossless compression and is super fast to read.</p>
+<p>Sending thousands of multimodal requests to the server <strong>concurrently</strong> choked it, because the server accepted all requests and started processing all videos (e.g., loading from disk), but neglected to generate tokens. On top of this, processing too many concurrent requests filled up the KV cache very quickly. You could observe this in the vLLM logs: the KV cache utilization spiked to 100% and stayed there for most of the workload. To cope with this, the server evicted blocks from the KV cache, and put most requests back in the queue, where they effectively sat idle. To prevent this situation, I implemented a client-side throttling mechanism, which limited the number of requests sent to the server at the same time. We set 16 concurrent requests for Qwen2.5-VL-72B. Getting this to work properly with Python’s <code>asyncio</code> library and correct timeouts was tricky, but now you can just <a href="https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174">copy the code from my repo</a> or use the Python code from Section&nbsp;13 directly.</p>
+<section id="preventing-clashes" class="level2">
+<h2 class="anchored" data-anchor-id="preventing-clashes">Preventing Clashes</h2>
+<p>Multiple model instances might be co-located on the same node, e.g., an 8 GPU node can host 2×4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (<code>SLURM_ARRAY_TASK_ID</code>). We also gave each model instance a unique enroot container name based on the <code>SLURM_ARRAY_TASK_ID</code>, to prevent co-located jobs from clashing over the same container name. Also, we deleted the created enroot container after the job finished. To diagnose the failure of an individual job task within a job array, it’s useful to pipe <code>stderr</code> and <code>stdout</code> of each job task to different files, as shown in lines 5 and 6 of our SLURM file in Section&nbsp;12. It’s possible to restart individual job tasks within a job array with SLURM: <code>sbatch &lt;slurm-file&gt; --array=&lt;failed-task-id&gt;</code>.</p>
+</section>
+</section>
+<section id="prefill-decode-ratio" class="level1">
+<h1>Prefill-Decode Ratio</h1>
+<p>We processed over 552 million input tokens, and generated over 9 million output tokens. Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average. The ratio of input tokens to output tokens is very skewed (61 to 1). It means that most compute in our workload was not spent decoding long answers, but rather processing the many input tokens. The workload is therefore called “prefill-heavy”. This contrasts to “decode-heavy” workloads, like those involved in solving mathematical problems that generate a long answer including reasoning. The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs. Figure&nbsp;1 and Figure&nbsp;2 show the distribution of input and output tokens for the entire workload.</p>
+<div id="fig-input-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of input tokens" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-input-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/input_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: Distribution of Input Tokens. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens."><img src="https://tomasruizt.github.io/posts/mm-inference-on-vllm/imgs/input_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of input tokens"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-input-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: <strong>Distribution of Input Tokens</strong>. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.
+</figcaption>
+</figure>
+</div>
+<div id="fig-output-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of output tokens" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-output-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/output_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure&nbsp;2: Distribution of Output Tokens. It’s important to note that the x-scale is 100 times smaller than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases."><img src="https://tomasruizt.github.io/posts/mm-inference-on-vllm/imgs/output_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of output tokens"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-output-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: <strong>Distribution of Output Tokens</strong>. It’s important to note that the x-scale is <em>100 times smaller</em> than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="throughput-stats" class="level1">
+<h1>Throughput Stats</h1>
+<p>I estimated from the logs that the <strong>throughput</strong> per model instance was ~2.95 seconds per request (~3 for simplicity). Dividing the ~15k input tokens and ~250 output tokens per request gives a throughput of ~5k input tokens and ~83 output tokens per second per model instance (≈5,080 tokens/s total throughput).</p>
+<p>This is a high throughput compared to other benchmarks: The vLLM documentation reports a <a href="https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen2.5-VL.html#qwen25vl-72b-benchmark-on-random-synthetic-dataset">synthetic benchmark</a> with a ratio of ~9:1 input tokens per output token, which achieves a lower throughput of 1461 tokens/s. The higher throughput of our workload might be just because we use a better GPU (H100 vs A100). NVIDIA has also reported <a href="https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results">performance benchmarks</a> for the similarly sized Llama-3.3-70b-instruct running on 4 H100 GPUs and their <a href="https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html">NIM</a> inference framework. However, the peak throughputs reported by NVIDIA vary <em>a lot</em> depending not only on the ratio of input to output tokens, but also the total number of tokens per request, with throughput peaks ranging from 349 to 6085 tokens/s (I report their best results in Table&nbsp;1). The throughput we achieved is competitive without being “too good to be true” 🚀.</p>
+<div id="tbl-throughput-stats" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-throughput-stats-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: <strong>Throughput Comparison.</strong> All benchmarks use instruct models. Input and output tokens are per request. The token ratio tells if the workload is prefill- or decode-heavy. The NVIDIA numbers are the most optimistic from their benchmarks.
+</figcaption>
+<div aria-describedby="tbl-throughput-stats-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Benchmark</th>
+<th>Model</th>
+<th>In. Toks</th>
+<th>Out. Toks</th>
+<th>Tok. Ratio</th>
+<th>GPUs</th>
+<th>Throughput <img src="https://latex.codecogs.com/png.latex?%5Cuparrow"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>NVIDIA NIM</td>
+<td>Llama-3.3-70b</td>
+<td>1000</td>
+<td>1000</td>
+<td>1:1</td>
+<td>4 H100 80GB</td>
+<td><strong>6085 tok/s</strong></td>
+</tr>
+<tr class="even">
+<td>Ours (Videos)</td>
+<td>Qwen2.5-VL-72B</td>
+<td>15000</td>
+<td>250</td>
+<td>61:1</td>
+<td>4 H100 96GB</td>
+<td>5020 tok/s</td>
+</tr>
+<tr class="odd">
+<td>vLLM (Synthetic)</td>
+<td>Qwen2.5-VL-72B</td>
+<td>8000</td>
+<td>900</td>
+<td>9:1</td>
+<td>4 A100 80GB</td>
+<td>1461 tok/s</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found <a href="https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/">this comparison</a> which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3.9 vs 3.35 TB/s), so it’s not clear if they offer clear advantages to either side.</p>
+</section>
+<section id="costs" class="level1">
+<h1>Costs</h1>
+<p>In terms of total runtime, the workload required 3s/post * 35k posts = 105k s <img src="https://latex.codecogs.com/png.latex?%5Capprox"> 29hr. The cost of renting an equivalent H100 GPU on <a href="https://www.runpod.io/">Runpod.io</a> is $3.07/hr per GPU (as of 2025-09-24). The total cost of the workload would be $3.07 * 4 GPUs * 29hr = $356.12 (not a very expensive workload). Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance (~$12/hr).</p>
+<div id="fig-h100-nvl-cost-per-hour" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="H100 NVL Renting Costs">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-h100-nvl-cost-per-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/h100-nvl-cost-per-hour.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="Figure&nbsp;3: H100 NVL Rent Cost. The cost shown is per GPU per hour. The workload required 4 GPUs per model instance for 29 hours."><img src="https://tomasruizt.github.io/posts/mm-inference-on-vllm/imgs/h100-nvl-cost-per-hour.png" class="img-fluid figure-img" style="width:60.0%" alt="H100 NVL Renting Costs"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-h100-nvl-cost-per-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: <strong>H100 NVL Rent Cost.</strong> The cost shown is per GPU per hour. The workload required 4 GPUs per model instance for 29 hours.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="results" class="level1">
+<h1>Results</h1>
+<p>In terms of social science, we found interesting results, e.g., that a lot of posts promoted a product (42%), and that the most common product sold was dietary supplements (16%). For quality control, we compared the Qwen labels with human labels in a random subset of ~150 posts on a specific product detection question:</p>
+<blockquote class="blockquote">
+<p><em>“Does the post mention a product or service that is being offered, promoted, or recommended? Answer with ‘yes’ or ‘no’.”</em></p>
+</blockquote>
+<p>On this subset, we also used Gemini-2.5-Pro for classification, intended as an upper performance reference. We compared both models in terms of precision, recall, and F1 scores in Table&nbsp;2. In plain words, the table shows that Qwen was too strict about what constitutes a product mention, while Gemini was too lax, but achieved a better balance.</p>
+<div id="tbl-model-comparison" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-model-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;2: <strong>Model Comparison.</strong> Gemini outperformed Qwen in recall, and in F1, but Qwen had higher precision.
+</figcaption>
+<div aria-describedby="tbl-model-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Precision</th>
+<th>Recall</th>
+<th>F1 Score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Qwen2.5-VL-72B</td>
+<td><strong>0.90</strong></td>
+<td>0.69</td>
+<td>0.78</td>
+</tr>
+<tr class="even">
+<td>Gemini-2.5-Pro</td>
+<td>0.81</td>
+<td><strong>0.98</strong></td>
+<td><strong>0.89</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p><strong>Correcting for AI Bias:</strong> The numbers showed that both models had a bias in a specific direction that needed correction when estimating what fraction of the 35k posts <em>really</em> mentioned a product. I.e., <em>if humans were to label all 35k posts</em>, what fraction would they label as mentioning a product? It’s possible to combine the few human labels with the thousands of structurally biased AI labels to make this estimate. We followed a method described in <em>Confidence-Driven Inference</em> by <span class="citation" data-cites="gligoric-etal-2025-unconfident">Gligoric et al. (2025)</span> (also <a href="https://sites.google.com/view/ic2s2-bridging-human/home">presented</a> in IC2S2). When computing an average using the combined human and AI labels, the method weights the AI labels with a weight <img src="https://latex.codecogs.com/png.latex?%5Clambda%20%5Cin%20%5B0,1%5D">. The weight is 0 when the AI labels are completely uncorrelated to the human labels, and 1 when they are completely correlated. This method allowed us to correct for AI biases in our estimates, and also to make statements about confidence intervals like the following:</p>
+<blockquote class="blockquote">
+<p><em>“The percentage of the 35k posts mentioning a product is ~53%, with the 95% confidence interval being 47% to 59%.”</em></p>
+</blockquote>
+<p>The confidence intervals are useful for hypothesis testing, and for making statements about statistical significance. More details in our <a href="./other-files/poster_ic2s2_25.pdf">IC2S2 poster</a>.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>I showed a practical recipe to classify a dataset of 35,000 videos with a 72B parameter model. We went over the infrastructure needed in terms of GPUs, tensor- and data-parallelism strategies, SLURM commands, concrete precautions for fault tolerance, and tips on video inference with vLLM. Our workload was a prefill-heavy workload, and I showed how the throughput we achieved is competitive with existing benchmarks by NVIDIA and vLLM. Finally, I explained how to use thousands of potentially biased AI labels to make statistically valid arguments. I hope this guide is useful to other researchers aiming to analyze large video datasets with multimodal LLMs that require multiple GPUs.</p>
+<p><strong>Outlook:</strong> In the future, I hope to scale this pipeline to 1M videos and push the throughput limits with quantization methods and speculative decoding. Testing audio-capable models is also high on my agenda. If you are interested in collaborating on large-scale inference, reach out to me! 🚀</p>
+</section>
+<section id="sec-slurm-file" class="level1">
+<h1>SLURM File</h1>
+<p>Below is a GitHub Gist of the SLURM file to submit our workload on the LRZ AI Systems. It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, and set up and tear down the enroot container, etc. Unlike the Python code, this will not run without the dataset, but it shows the general workflow.</p>
+<script src="https://gist.github.com/tomasruizt/6b48b51c343b48ee2f1a3ebb9a6ea129.js"></script>
+</section>
+<section id="sec-python-code" class="level1">
+<h1>Python Code</h1>
+<p>The code below shows how to use Python to (1) start up the vLLM server, and (2) send concurrent requests to the server. It uses a library I wrote for this purpose: <a href="https://github.com/tomasruizt/llm_app">GitHub/tomasruizt/llm_app</a>. The snippet below is in the repo’s <code>examples/</code> directory.</p>
+<script src="https://emgithub.com/embed-v2.js?target=https%3A%2F%2Fgithub.com%2Ftomasruizt%2Fllm_app%2Fblob%2Fmain%2Fexamples%2Fvllm-video-inference.py&amp;style=github&amp;type=code&amp;showBorder=on&amp;showLineNumbers=on&amp;showFileMeta=on&amp;showFullPath=on&amp;showCopy=on"></script>
+</section>
+<section id="references" class="level1">
+
+<!-- 
+What to write about
+✅ The model, how many GPUs are needed (Tensor Parallelism)
+✅ that we transcribe using whisper
+✅ How I split the dataset (Data Parallelism)
+✅ The LRZ, what GPUs and nodes are available
+   ✅ how these are connected to each other
+✅ SLURM, how array jobs work
+  ✅ preventing port clashes
+✅ The posts are multimodal: videos, imgs, text
+✅ Incremental progress by splitting requests from backend server
+✅ Client-side throttling, since different models have different reqs
+
+✅ How much storage is 35k videos in TB
+✅ Write about enroot containers
+✅ make a picture display tensor parallelism & data parallelism
+✅ Include a snippet about how to use your llm_app library.
+Results: 
+  ✅ How many tokens did we process?
+  ✅How many posts actually promote a product?
+  ✅How long did it take to process the dataset?
+-->
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-abdin2024phi4technicalreport" class="csl-entry">
+Abdin, Marah, Jyoti Aneja, Harkirat Behl, Sébastien Bubeck, Ronen Eldan, Suriya Gunasekar, Michael Harrison, et al. 2024. <span>“Phi-4 Technical Report.”</span> <a href="https://arxiv.org/abs/2412.08905">https://arxiv.org/abs/2412.08905</a>.
+</div>
+<div id="ref-bai2025qwen25vltechnicalreport" class="csl-entry">
+Bai, Shuai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, et al. 2025. <span>“Qwen2.5-VL Technical Report.”</span> <a href="https://arxiv.org/abs/2502.13923">https://arxiv.org/abs/2502.13923</a>.
+</div>
+<div id="ref-gligoric-etal-2025-unconfident" class="csl-entry">
+Gligoric, Kristina, Tijana Zrnic, Cinoo Lee, Emmanuel Candes, and Dan Jurafsky. 2025. <span>“Can Unconfident <span>LLM</span> Annotations Be Used for Confident Conclusions?”</span> In <em>Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers)</em>, edited by Luis Chiruzzo, Alan Ritter, and Lu Wang, 3514–33. Albuquerque, New Mexico: Association for Computational Linguistics. <a href="https://doi.org/10.18653/v1/2025.naacl-long.179">https://doi.org/10.18653/v1/2025.naacl-long.179</a>.
+</div>
+<div id="ref-DBLP:conf/sosp/KwonLZ0ZY0ZS23" class="csl-entry">
+Kwon, Woosuk, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph Gonzalez, Hao Zhang, and Ion Stoica. 2023. <span>“Efficient Memory Management for Large Language Model Serving with PagedAttention.”</span> In <em>SOSP</em>, 611–26. <a href="https://doi.org/10.1145/3600006.3613165">https://doi.org/10.1145/3600006.3613165</a>.
+</div>
+<div id="ref-pmlr-v202-radford23a" class="csl-entry">
+Radford, Alec, Jong Wook Kim, Tao Xu, Greg Brockman, Christine Mcleavey, and Ilya Sutskever. 2023. <span>“Robust Speech Recognition via Large-Scale Weak Supervision.”</span> In <em>Proceedings of the 40th International Conference on Machine Learning</em>, edited by Andreas Krause, Emma Brunskill, Kyunghyun Cho, Barbara Engelhardt, Sivan Sabato, and Jonathan Scarlett, 202:28492–518. Proceedings of Machine Learning Research. PMLR. <a href="https://proceedings.mlr.press/v202/radford23a.html">https://proceedings.mlr.press/v202/radford23a.html</a>.
+</div>
+<div id="ref-wang2024qwen2vlenhancingvisionlanguagemodels" class="csl-entry">
+Wang, Peng, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan, Jinze Bai, Keqin Chen, et al. 2024. <span>“Qwen2-VL: Enhancing Vision-Language Model’s Perception of the World at Any Resolution.”</span> <a href="https://arxiv.org/abs/2409.12191">https://arxiv.org/abs/2409.12191</a>.
+</div>
+<div id="ref-xu2025qwen25omnitechnicalreport" class="csl-entry">
+Xu, Jin, Zhifang Guo, Jinzheng He, Hangrui Hu, Ting He, Shuai Bai, Keqin Chen, et al. 2025. <span>“Qwen2.5-Omni Technical Report.”</span> <a href="https://arxiv.org/abs/2503.20215">https://arxiv.org/abs/2503.20215</a>.
+</div>
+<div id="ref-yoo2003slurm" class="csl-entry">
+Yoo, Andy B, Morris A Jette, and Mark Grondona. 2003. <span>“Slurm: Simple Linux Utility for Resource Management.”</span> In <em>Workshop on Job Scheduling Strategies for Parallel Processing</em>, 44–60. Springer.
+</div>
+<div id="ref-zheng2024sglang" class="csl-entry">
+Zheng, Lianmin, Liangsheng Yin, Zhiqiang Xie, Chuyue Sun, Jeff Huang, Cody Hao Yu, Shiyi Cao, et al. 2024. <span>“<span>SGL</span>ang: Efficient Execution of Structured Language Model Programs.”</span> In <em>The Thirty-Eighth Annual Conference on Neural Information Processing Systems</em>. <a href="https://openreview.net/forum?id=VqkAKQibpq">https://openreview.net/forum?id=VqkAKQibpq</a>.
+</div>
+</div></section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2025,
+  author = {Ruiz, Tomas},
+  title = {A {Guide} to {Classify} 35,000 {Videos} with a {72B}
+    {Multimodal} {LLM} on the {vLLM} {Engine}},
+  date = {2025-09-22},
+  url = {https://tomasruizt.github.io/posts/mm-inference-on-vllm/},
+  langid = {en}
+}
+</code></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2025" class="csl-entry quarto-appendix-citeas">
+Ruiz, Tomas. 2025. <span>“A Guide to Classify 35,000 Videos with a 72B
+Multimodal LLM on the vLLM Engine.”</span> September 22, 2025. <a href="https://tomasruizt.github.io/posts/mm-inference-on-vllm/">https://tomasruizt.github.io/posts/mm-inference-on-vllm/</a>.
+</div></div></section></div> ]]></description>
+  <category>GPUs</category>
+  <category>vLLM</category>
+  <category>Transformers</category>
+  <guid>https://tomasruizt.github.io/posts/mm-inference-on-vllm/</guid>
+  <pubDate>Sun, 21 Sep 2025 22:00:00 GMT</pubDate>
+  <media:content url="https://tomasruizt.github.io/posts/mm-inference-on-vllm/imgs/parallelism-strategies-square.png" medium="image" type="image/png" height="140" width="144"/>
+</item>
 <item>
   <title>Drilling Down into Multimodal Attention</title>
   <dc:creator>Tomas Ruiz</dc:creator>
@@ -29,7 +373,7 @@
 </div>
 <section id="summary" class="level1">
 <h1>Summary</h1>
-<p>This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created <a href="https://github.com/tomasruizt/CircuitsVis">on a fork</a> of the <code>circuitsviz</code> library. To interact with an example, <a href="https://storage.googleapis.com/tomas-ruiz-multimodal-attn/2025-02-03-visualization/PaliGemma2_layer_25_attention_heads.html">click here</a>. My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its <code>&lt;bos&gt;</code> token to be a “broker” token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable. All code to reproduce the analysis is <a href="https://github.com/tomasruizt/visualizing-multimodal-attn">on Github</a>.</p>
+<p>This post explains how to inspect the attention patterns of a vision-language models (VLMs) using a new module I created <a href="https://github.com/tomasruizt/CircuitsVis">on a fork</a> of the <code>circuitsviz</code> library. To interact with an example, <a href="https://storage.googleapis.com/tomas-ruiz-multimodal-attn/2025-02-03-visualization/PaliGemma2_layer_25_attention_heads.html">click here</a>. My analysis suggests that the PaliGemma2 model, which uses a prefix-attention mask, has trained its <code>&lt;bos&gt;</code> token to be a “broker” token for visual information. Finding key tokens like this has important implications for making VLMs more compute efficient and interpretable. All the code to reproduce the analysis is <a href="https://github.com/tomasruizt/visualizing-multimodal-attn">on Github</a>.</p>
 </section>
 <section id="mechanistic-interpretability" class="level1">
 <h1>Mechanistic Interpretability</h1>
@@ -802,11 +1146,11 @@ Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruiz
 <p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A0%20&amp;%5Cleq%20%20(x%20-%20y)%5E2%20%5C%5C%0A%5Cimplies%200%20&amp;%5Cleq%20x%5E2%20-2xy%20+y%5E2%20%5C%5C%0A%E2%9F%B9%20xy%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(x%5E2%20+%20y%5E2)%0A%5Cend%7Balign%7D%0A"></p>
 <p>The last inequality above is not intuitively obvious to me. I’m the kind of person that likes numerical proof to internalize these results, and this is where Python comes in handy. Change the variables <code>x</code> and <code>y</code> in the code below to see if the inequality holds.</p>
 <div>
-<div id="pyodide-1">
+<div id="pyodide-1" class="exercise-cell">
 
 </div>
 <script type="pyodide-1-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9LCJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSJ9
+eyJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSIsImF0dHIiOnsiZXZhbCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZSwiZWRpdCI6dHJ1ZX19
 </script>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -829,11 +1173,11 @@ Note
 <p>The inequality is asserting that the vector product <img src="https://latex.codecogs.com/png.latex?x%5ETy"> of <em>any</em> two vectors <img src="https://latex.codecogs.com/png.latex?x"> and <img src="https://latex.codecogs.com/png.latex?y"> has an upper bound given by the average of <img src="https://latex.codecogs.com/png.latex?x%5ETx"> and <img src="https://latex.codecogs.com/png.latex?y%5ETy">.</p>
 <p>Once again, I’m not intuitively convinced until I see code running. Notice how we import <code>numpy</code>, which calls compiled C routines under the hood (<em>but our runtime is the browser now</em>).</p>
 <div>
-<div id="pyodide-2">
+<div id="pyodide-2" class="exercise-cell">
 
 </div>
 <script type="pyodide-2-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSJ9
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSIsImF0dHIiOnsiZXZhbCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZSwiZWRpdCI6dHJ1ZX19
 </script>
 </div>
 </section>
@@ -844,24 +1188,24 @@ eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9LCJjb2RlIjoi
 <p><img src="https://latex.codecogs.com/png.latex?%E2%9F%A8%20f,%20g%20%E2%9F%A9%20=%20%5Cint%20f(x)%20g(x)%20dx"> Using this definition, the inequality holds for functions as well: <img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A%E2%9F%A8%20f,%20g%20%E2%9F%A9%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(%E2%9F%A8%20f,%20f%20%E2%9F%A9%20+%20%E2%9F%A8%20g,%20g%20%E2%9F%A9)%20%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Cint%20f(x)%5E2%20dx%20+%20%5Cint%20g(x)%5E2%20dx%20%5Cright)%0A%5Cend%7Balign%7D%0A"></p>
 <p>Let’s take two concrete functions <img src="https://latex.codecogs.com/png.latex?f(x)%20=%20%5Ccos(x)"> and <img src="https://latex.codecogs.com/png.latex?g(x)%20=%20%5Csin(4x)">. I choose these arbitrarily because plotting them looks nice. Feel free to use different functions <code>f</code> and <code>g</code> in the code.</p>
 <script type="exercise-setup-ex_funcs-contents">
-eyJhdHRyIjp7InNldHVwIjp0cnVlLCJldmFsIjp0cnVlLCJleGVyY2lzZSI6ImV4X2Z1bmNzIn0sImNvZGUiOiJpbXBvcnQgbWF0cGxvdGxpYi5weXBsb3QgYXMgcGx0XG5cbmRlZiBwbG90KHgsIGYsIGcpOlxuICAgIHBsdC5wbG90KHgsIGYqZywgbGFiZWw9XCIkZiBcXFxcY2RvdCBnJFwiLCBjb2xvcj1cImdyZWVuXCIpXG4gICAgcGx0LnBsb3QoeCwgZipmLCBsYWJlbD1cIiRmXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgZypnLCBsYWJlbD1cIiRnXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgMC41ICogKGYqZiArIGcqZyksIGxhYmVsPVwiJDAuNSAoZl4yICsgZ14yKSRcIiwgY29sb3I9XCJyZWRcIilcbiAgICBwbHQudGl0bGUoXCJVcHBlciBib3VuZCBmb3IgJFxcXFxsYW5nbGUgZiwgZyBcXFxccmFuZ2xlJFwiKVxuICAgIHBsdC5sZWdlbmQoKVxuICAgIHBsdC5ncmlkKClcbiAgICBwbHQuc2hvdygpIn0=
+eyJjb2RlIjoiaW1wb3J0IG1hdHBsb3RsaWIucHlwbG90IGFzIHBsdFxuXG5kZWYgcGxvdCh4LCBmLCBnKTpcbiAgICBwbHQucGxvdCh4LCBmKmcsIGxhYmVsPVwiJGYgXFxcXGNkb3QgZyRcIiwgY29sb3I9XCJncmVlblwiKVxuICAgIHBsdC5wbG90KHgsIGYqZiwgbGFiZWw9XCIkZl4yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIGcqZywgbGFiZWw9XCIkZ14yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIDAuNSAqIChmKmYgKyBnKmcpLCBsYWJlbD1cIiQwLjUgKGZeMiArIGdeMikkXCIsIGNvbG9yPVwicmVkXCIpXG4gICAgcGx0LnRpdGxlKFwiVXBwZXIgYm91bmQgZm9yICRcXFxcbGFuZ2xlIGYsIGcgXFxcXHJhbmdsZSRcIilcbiAgICBwbHQubGVnZW5kKClcbiAgICBwbHQuZ3JpZCgpXG4gICAgcGx0LnNob3coKSIsImF0dHIiOnsiZXZhbCI6dHJ1ZSwiZXhlcmNpc2UiOiJleF9mdW5jcyIsInNldHVwIjp0cnVlLCJlZGl0Ijp0cnVlfX0=
 </script>
 <div>
-<div id="pyodide-4">
+<div id="pyodide-4" class="exercise-cell">
 
 </div>
 <script type="pyodide-4-contents">
-eyJhdHRyIjp7ImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJhdXRvcnVuIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJydW5idXR0b24iOmZhbHNlfSwiY29kZSI6ImltcG9ydCBudW1weSBhcyBucFxuXG54ID0gbnAubGluc3BhY2UoMCwgMiwgMTAwKVxuZiA9IG5wLmNvcyh4KVxuZyA9IG5wLnNpbig0KngpXG5wbG90KHgsIGYsIGcpIn0=
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcbnBsb3QoeCwgZiwgZykiLCJhdHRyIjp7ImV2YWwiOnRydWUsImF1dG9ydW4iOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2UsImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJlZGl0Ijp0cnVlfX0=
 </script>
 </div>
 <p>In the plot above, the individual functions <img src="https://latex.codecogs.com/png.latex?f%5E2"> and <img src="https://latex.codecogs.com/png.latex?g%5E2"> are plotted with light-blue lines. Their average is the red line, and the product <img src="https://latex.codecogs.com/png.latex?f%20%E2%8B%85%20g"> is the green line. The red line is an upper bound for the green one. We see that the green line crosses over the two blue lines at different points but never crosses over the red line.</p>
 <p><strong>About the integral:</strong> Perhaps you noticed that I formulated the inequality on inner-products, but I’m plotting the functions pointwise. The missing step is the integral, which is evaluated in Python using the numpy function <code>np.trapz()</code>. As we can confirm below, the inequality holds:</p>
 <div>
-<div id="pyodide-5">
+<div id="pyodide-5" class="exercise-cell">
 
 </div>
 <script type="pyodide-5-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikifQ==
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikiLCJhdHRyIjp7ImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWV9fQ==
 </script>
 </div>
 </section>
@@ -887,11 +1231,11 @@ Warning
 <p><img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0Atr(A%5ET%20B)%0A&amp;=%20%5Csum_%7Bi,j%7D%20A_%7Bij%7D%20B_%7Bij%7D%20&amp;%20%5Ctext%7B(definition)%7D%5C%5C%0A&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Csum_%7Bi,j%7D%20A_%7Bij%7D%5E2%20+%20%5Csum_%7Bi,j%7D%20B_%7Bij%7D%5E2%20%5Cright)%20&amp;%5Ctext%7B(applied%20by%20scalar)%7D%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20(tr(A%5ET%20A)%20+%20tr(B%5ET%20B))%0A%5Cend%7Balign%7D%0A"></p>
 <p>Let’s check the inequality with random matrices. You can use the <code>"Start Over"</code> button to re-run the code with new matrices.</p>
 <div>
-<div id="pyodide-6">
+<div id="pyodide-6" class="exercise-cell">
 
 </div>
 <script type="pyodide-6-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIn0=
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIiwiYXR0ciI6eyJldmFsIjp0cnVlLCJydW5idXR0b24iOmZhbHNlLCJlZGl0Ijp0cnVlfX0=
 </script>
 </div>
 <p>The inequality holds, but I have no geometric intuition about the trace of a matrix, or how this inequality could be visualized for matrices. If you have an idea, please let me know! 🙏</p>
@@ -902,10 +1246,10 @@ eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9LCJjb2RlIjoi
 
 
 <script type="pyodide-data">
-eyJvcHRpb25zIjp7ImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjYuMS9mdWxsLyJ9LCJwYWNrYWdlcyI6eyJwa2dzIjpbInB5b2RpZGVfaHR0cCIsIm1pY3JvcGlwIiwiaXB5dGhvbiJdfX0=
+eyJwYWNrYWdlcyI6eyJwa2dzIjpbInB5b2RpZGVfaHR0cCIsIm1pY3JvcGlwIiwiaXB5dGhvbiJdfSwib3B0aW9ucyI6eyJlbnYiOnsiUExPVExZX1JFTkRFUkVSIjoicGxvdGx5X21pbWV0eXBlIn0sImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjguMS9mdWxsLyJ9fQ==
 </script>
 <script type="ojs-module-contents">
-eyJjb250ZW50cyI6W3siaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiIsImNlbGxOYW1lIjoicHlvZGlkZS02IiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiIsImNlbGxOYW1lIjoicHlvZGlkZS01IiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiaW5saW5lIjpmYWxzZSwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBhdXRvcnVuOiBmYWxzZSxcbiAgICAgIGNhcHRpb246ICdFeGVyY2lzZScsXG4gICAgfSxcbiAgICBibG9jay5hdHRyXG4gICk7XG5cbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLCBibG9jay5jb2RlLCBvcHRpb25zKTtcbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG52aWV3b2YgX3B5b2RpZGVfdmFsdWVfNCA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNCwge30pO1xuX3B5b2RpZGVfZmVlZGJhY2tfNCA9IHtcbiAgY29uc3QgeyBQeW9kaWRlR3JhZGVyIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuICBjb25zdCBlbXB0eUZlZWRiYWNrID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7XG5cbiAgY29uc3QgZ3JhZGVyID0gbmV3IFB5b2RpZGVHcmFkZXIoX3B5b2RpZGVfdmFsdWVfNC5ldmFsdWF0b3IpO1xuICBjb25zdCBmZWVkYmFjayA9IGF3YWl0IGdyYWRlci5ncmFkZUV4ZXJjaXNlKCk7XG4gIGlmICghZmVlZGJhY2spIHJldHVybiBlbXB0eUZlZWRiYWNrO1xuICByZXR1cm4gZmVlZGJhY2s7XG59XG4iLCJjZWxsTmFtZSI6InB5b2RpZGUtNCIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMiA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMi1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTItY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8yID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8yLCB7fSk7XG4iLCJjZWxsTmFtZSI6InB5b2RpZGUtMiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMSA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMS1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTEtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8xLCB7fSk7XG4iLCJjZWxsTmFtZSI6InB5b2RpZGUtMSIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQifSx7ImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InB5b2RpZGVPanMgPSB7XG4gIGNvbnN0IHtcbiAgICBQeW9kaWRlRXZhbHVhdG9yLFxuICAgIFB5b2RpZGVFbnZpcm9ubWVudE1hbmFnZXIsXG4gICAgc2V0dXBQeXRob24sXG4gICAgc3RhcnRQeW9kaWRlV29ya2VyLFxuICAgIGI2NERlY29kZSxcbiAgICBjb2xsYXBzZVBhdGgsXG4gIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHN0YXR1c0NvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1zdGF0dXNcIik7XG4gIGNvbnN0IGluZGljYXRvckNvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGluZGljYXRvckNvbnRhaW5lci5jbGFzc0xpc3QucmVtb3ZlKFwiZC1ub25lXCIpO1xuXG4gIGxldCBzdGF0dXNUZXh0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKVxuICBzdGF0dXNUZXh0LmNsYXNzTGlzdCA9IFwiZXhlcmNpc2UtbG9hZGluZy1kZXRhaWxzXCI7XG4gIHN0YXR1c1RleHQgPSBzdGF0dXNDb250YWluZXIuYXBwZW5kQ2hpbGQoc3RhdHVzVGV4dCk7XG4gIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgSW5pdGlhbGlzZWA7XG5cbiAgLy8gSG9pc3QgaW5kaWNhdG9yIG91dCBmcm9tIGZpbmFsIHNsaWRlIHdoZW4gcnVubmluZyB1bmRlciByZXZlYWxcbiAgY29uc3QgcmV2ZWFsU3RhdHVzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgLmV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpZiAocmV2ZWFsU3RhdHVzKSB7XG4gICAgcmV2ZWFsU3RhdHVzLnJlbW92ZSgpO1xuICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsID4gLnNsaWRlc1wiKS5hcHBlbmRDaGlsZChyZXZlYWxTdGF0dXMpO1xuICB9XG5cbiAgLy8gUHlvZGlkZSBzdXBwbGVtZW50YWwgZGF0YSBhbmQgb3B0aW9uc1xuICBjb25zdCBkYXRhQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLWRhdGFcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBkYXRhID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZGF0YUNvbnRlbnQpKTtcblxuICAvLyBHcmFiIGxpc3Qgb2YgcmVzb3VyY2VzIHRvIGJlIGRvd25sb2FkZWRcbiAgY29uc3QgZmlsZXNDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInZmcy1maWxlXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZmlsZXMgPSBKU09OLnBhcnNlKGI2NERlY29kZShmaWxlc0NvbnRlbnQpKTtcblxuICBsZXQgcHlvZGlkZVByb21pc2UgPSAoYXN5bmMgKCkgPT4ge1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgUHlvZGlkZWA7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHN0YXJ0UHlvZGlkZVdvcmtlcihkYXRhLm9wdGlvbnMpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiBtaWNyb3BpcGA7XG4gICAgYXdhaXQgcHlvZGlkZS5sb2FkUGFja2FnZShcIm1pY3JvcGlwXCIpO1xuICAgIGNvbnN0IG1pY3JvcGlwID0gYXdhaXQgcHlvZGlkZS5weWltcG9ydChcIm1pY3JvcGlwXCIpO1xuICAgIGF3YWl0IGRhdGEucGFja2FnZXMucGtncy5tYXAoKHBrZykgPT4gKCkgPT4ge1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiAke3BrZ31gO1xuICAgICAgcmV0dXJuIG1pY3JvcGlwLmluc3RhbGwocGtnKTtcbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcbiAgICBhd2FpdCBtaWNyb3BpcC5kZXN0cm95KCk7XG5cbiAgICAvLyBEb3dubG9hZCBhbmQgaW5zdGFsbCByZXNvdXJjZXNcbiAgICBhd2FpdCBmaWxlcy5tYXAoKGZpbGUpID0+IGFzeW5jICgpID0+IHtcbiAgICAgIGNvbnN0IG5hbWUgPSBmaWxlLnN1YnN0cmluZyhmaWxlLmxhc3RJbmRleE9mKCcvJykgKyAxKTtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcmVzb3VyY2U6ICR7bmFtZX1gO1xuICAgICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChmaWxlKTtcbiAgICAgIGlmICghcmVzcG9uc2Uub2spIHtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBDYW4ndCBkb3dubG9hZCBcXGAke2ZpbGV9XFxgLiBFcnJvciAke3Jlc3BvbnNlLnN0YXR1c306IFwiJHtyZXNwb25zZS5zdGF0dXNUZXh0fVwiLmApO1xuICAgICAgfVxuICAgICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmFycmF5QnVmZmVyKCk7XG5cbiAgICAgIC8vIFN0b3JlIFVSTHMgaW4gdGhlIGN3ZCB3aXRob3V0IGFueSBzdWJkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBpZiAoZmlsZS5pbmNsdWRlcyhcIjovL1wiKSkge1xuICAgICAgICBmaWxlID0gbmFtZTtcbiAgICAgIH1cblxuICAgICAgLy8gQ29sbGFwc2UgaGlnaGVyIGRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGZpbGUgPSBjb2xsYXBzZVBhdGgoZmlsZSk7XG5cbiAgICAgIC8vIENyZWF0ZSBkaXJlY3RvcnkgdHJlZSwgaWdub3JpbmcgXCJkaXJlY3RvcnkgZXhpc3RzXCIgVkZTIGVycm9yc1xuICAgICAgY29uc3QgcGFydHMgPSBmaWxlLnNwbGl0KCcvJykuc2xpY2UoMCwgLTEpO1xuICAgICAgbGV0IHBhdGggPSAnJztcbiAgICAgIHdoaWxlIChwYXJ0cy5sZW5ndGggPiAwKSB7XG4gICAgICAgIHBhdGggKz0gcGFydHMuc2hpZnQoKSArICcvJztcbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICBhd2FpdCBweW9kaWRlLkZTLm1rZGlyKHBhdGgpO1xuICAgICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgICAgaWYgKGUuZXJybm8gIT09IDIwKSB7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgLy8gV3JpdGUgdGhpcyBmaWxlIHRvIHRoZSBWRlNcbiAgICAgIHRyeSB7XG4gICAgICAgIHJldHVybiBhd2FpdCBweW9kaWRlLkZTLndyaXRlRmlsZShmaWxlLCBuZXcgVWludDhBcnJheShkYXRhKSk7XG4gICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICB9XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYFB5b2RpZGUgZW52aXJvbm1lbnQgc2V0dXBgO1xuICAgIGF3YWl0IHNldHVwUHl0aG9uKHB5b2RpZGUpO1xuXG4gICAgc3RhdHVzVGV4dC5yZW1vdmUoKTtcbiAgICBpZiAoc3RhdHVzQ29udGFpbmVyLmNoaWxkcmVuLmxlbmd0aCA9PSAwKSB7XG4gICAgICBzdGF0dXNDb250YWluZXIucGFyZW50Tm9kZS5yZW1vdmUoKTtcbiAgICB9XG4gICAgcmV0dXJuIHB5b2RpZGU7XG4gIH0pKCkuY2F0Y2goKGVycikgPT4ge1xuICAgIHN0YXR1c1RleHQuc3R5bGUuY29sb3IgPSBcInZhcigtLWV4ZXJjaXNlLWVkaXRvci1obC1lciwgI0FEMDAwMClcIjtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gZXJyLm1lc3NhZ2U7XG4gICAgLy9pbmRpY2F0b3JDb250YWluZXIucXVlcnlTZWxlY3RvcihcIi5zcGlubmVyLWdyb3dcIikuY2xhc3NMaXN0LmFkZChcImQtbm9uZVwiKTtcbiAgICB0aHJvdyBlcnI7XG4gIH0pO1xuXG4gIC8vIEtlZXAgdHJhY2sgb2YgaW5pdGlhbCBPSlMgYmxvY2sgcmVuZGVyXG4gIGNvbnN0IHJlbmRlcmVkT2pzID0ge307XG5cbiAgY29uc3QgcHJvY2VzcyA9IGFzeW5jIChjb250ZXh0LCBpbnB1dHMpID0+IHtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgcHlvZGlkZVByb21pc2U7XG4gICAgY29uc3QgZXZhbHVhdG9yID0gbmV3IFB5b2RpZGVFdmFsdWF0b3IocHlvZGlkZSwgY29udGV4dCk7XG4gICAgYXdhaXQgZXZhbHVhdG9yLnByb2Nlc3MoaW5wdXRzKTtcbiAgICByZXR1cm4gZXZhbHVhdG9yLmNvbnRhaW5lcjtcbiAgfVxuXG4gIHJldHVybiB7XG4gICAgcHlvZGlkZVByb21pc2UsXG4gICAgcmVuZGVyZWRPanMsXG4gICAgcHJvY2VzcyxcbiAgfTtcbn1cbiIsImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0In1dfQ==
+eyJjb250ZW50cyI6W3sic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiIsImlubGluZSI6ZmFsc2UsImNlbGxOYW1lIjoicHlvZGlkZS02IiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiIsImlubGluZSI6ZmFsc2UsImNlbGxOYW1lIjoicHlvZGlkZS01IiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBjYXB0aW9uOiAnRXhlcmNpc2UnLFxuICAgIH0sXG4gICAgYmxvY2suYXR0clxuICApO1xuXG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IocHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSwgYmxvY2suY29kZSwgb3B0aW9ucyk7XG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxudmlld29mIF9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbl9weW9kaWRlX2ZlZWRiYWNrXzQgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUdyYWRlciB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcbiAgY29uc3QgZW1wdHlGZWVkYmFjayA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO1xuXG4gIGNvbnN0IGdyYWRlciA9IG5ldyBQeW9kaWRlR3JhZGVyKF9weW9kaWRlX3ZhbHVlXzQuZXZhbHVhdG9yKTtcbiAgY29uc3QgZmVlZGJhY2sgPSBhd2FpdCBncmFkZXIuZ3JhZGVFeGVyY2lzZSgpO1xuICBpZiAoIWZlZWRiYWNrKSByZXR1cm4gZW1wdHlGZWVkYmFjaztcbiAgcmV0dXJuIGZlZWRiYWNrO1xufVxuIiwiaW5saW5lIjpmYWxzZSwiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0In0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzIgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTItY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0yLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMiwge30pO1xuIiwiaW5saW5lIjpmYWxzZSwiY2VsbE5hbWUiOiJweW9kaWRlLTIiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0In0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzEgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0xLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMSwge30pO1xuIiwiaW5saW5lIjpmYWxzZSwiY2VsbE5hbWUiOiJweW9kaWRlLTEiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0In0seyJzb3VyY2UiOiJweW9kaWRlT2pzID0ge1xuICBjb25zdCB7XG4gICAgUHlvZGlkZUV2YWx1YXRvcixcbiAgICBQeW9kaWRlRW52aXJvbm1lbnRNYW5hZ2VyLFxuICAgIHNldHVwUHl0aG9uLFxuICAgIHN0YXJ0UHlvZGlkZVdvcmtlcixcbiAgICBiNjREZWNvZGUsXG4gICAgY29sbGFwc2VQYXRoLFxuICB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzdGF0dXNDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctc3RhdHVzXCIpO1xuICBjb25zdCBpbmRpY2F0b3JDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpbmRpY2F0b3JDb250YWluZXIuY2xhc3NMaXN0LnJlbW92ZShcImQtbm9uZVwiKTtcblxuICBsZXQgc3RhdHVzVGV4dCA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIilcbiAgc3RhdHVzVGV4dC5jbGFzc0xpc3QgPSBcImV4ZXJjaXNlLWxvYWRpbmctZGV0YWlsc1wiO1xuICBzdGF0dXNUZXh0ID0gc3RhdHVzQ29udGFpbmVyLmFwcGVuZENoaWxkKHN0YXR1c1RleHQpO1xuICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYEluaXRpYWxpc2VgO1xuXG4gIC8vIEhvaXN0IGluZGljYXRvciBvdXQgZnJvbSBmaW5hbCBzbGlkZSB3aGVuIHJ1bm5pbmcgdW5kZXIgcmV2ZWFsXG4gIGNvbnN0IHJldmVhbFN0YXR1cyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsIC5leGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaWYgKHJldmVhbFN0YXR1cykge1xuICAgIHJldmVhbFN0YXR1cy5yZW1vdmUoKTtcbiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCA+IC5zbGlkZXNcIikuYXBwZW5kQ2hpbGQocmV2ZWFsU3RhdHVzKTtcbiAgfVxuXG4gIC8vIE1ha2UgYW55IHJldmVhbCBzbGlkZXMgd2l0aCBsaXZlIGNlbGxzIHNjcm9sbGFibGVcbiAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbChcIi5yZXZlYWwgLmV4ZXJjaXNlLWNlbGxcIikuZm9yRWFjaCgoZWwpID0+IHtcbiAgICBlbC5jbG9zZXN0KCdzZWN0aW9uLnNsaWRlJykuY2xhc3NMaXN0LmFkZChcInNjcm9sbGFibGVcIik7XG4gIH0pXG5cbiAgLy8gUHlvZGlkZSBzdXBwbGVtZW50YWwgZGF0YSBhbmQgb3B0aW9uc1xuICBjb25zdCBkYXRhQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLWRhdGFcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBkYXRhID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZGF0YUNvbnRlbnQpKTtcblxuICAvLyBHcmFiIGxpc3Qgb2YgcmVzb3VyY2VzIHRvIGJlIGRvd25sb2FkZWRcbiAgY29uc3QgZmlsZXNDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInZmcy1maWxlXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZmlsZXMgPSBKU09OLnBhcnNlKGI2NERlY29kZShmaWxlc0NvbnRlbnQpKTtcblxuICBsZXQgcHlvZGlkZVByb21pc2UgPSAoYXN5bmMgKCkgPT4ge1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgUHlvZGlkZWA7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHN0YXJ0UHlvZGlkZVdvcmtlcihkYXRhLm9wdGlvbnMpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiBtaWNyb3BpcGA7XG4gICAgYXdhaXQgcHlvZGlkZS5sb2FkUGFja2FnZShcIm1pY3JvcGlwXCIpO1xuICAgIGNvbnN0IG1pY3JvcGlwID0gYXdhaXQgcHlvZGlkZS5weWltcG9ydChcIm1pY3JvcGlwXCIpO1xuICAgIGF3YWl0IGRhdGEucGFja2FnZXMucGtncy5tYXAoKHBrZykgPT4gKCkgPT4ge1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiAke3BrZ31gO1xuICAgICAgcmV0dXJuIG1pY3JvcGlwLmluc3RhbGwocGtnKTtcbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcbiAgICBhd2FpdCBtaWNyb3BpcC5kZXN0cm95KCk7XG5cbiAgICAvLyBEb3dubG9hZCBhbmQgaW5zdGFsbCByZXNvdXJjZXNcbiAgICBhd2FpdCBmaWxlcy5tYXAoKGZpbGUpID0+IGFzeW5jICgpID0+IHtcbiAgICAgIGNvbnN0IG5hbWUgPSBmaWxlLnN1YnN0cmluZyhmaWxlLmxhc3RJbmRleE9mKCcvJykgKyAxKTtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcmVzb3VyY2U6ICR7bmFtZX1gO1xuICAgICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChmaWxlKTtcbiAgICAgIGlmICghcmVzcG9uc2Uub2spIHtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBDYW4ndCBkb3dubG9hZCBcXGAke2ZpbGV9XFxgLiBFcnJvciAke3Jlc3BvbnNlLnN0YXR1c306IFwiJHtyZXNwb25zZS5zdGF0dXNUZXh0fVwiLmApO1xuICAgICAgfVxuICAgICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmFycmF5QnVmZmVyKCk7XG5cbiAgICAgIC8vIFN0b3JlIFVSTHMgaW4gdGhlIGN3ZCB3aXRob3V0IGFueSBzdWJkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBpZiAoZmlsZS5pbmNsdWRlcyhcIjovL1wiKSkge1xuICAgICAgICBmaWxlID0gbmFtZTtcbiAgICAgIH1cblxuICAgICAgLy8gQ29sbGFwc2UgaGlnaGVyIGRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGZpbGUgPSBjb2xsYXBzZVBhdGgoZmlsZSk7XG5cbiAgICAgIC8vIENyZWF0ZSBkaXJlY3RvcnkgdHJlZSwgaWdub3JpbmcgXCJkaXJlY3RvcnkgZXhpc3RzXCIgVkZTIGVycm9yc1xuICAgICAgY29uc3QgcGFydHMgPSBmaWxlLnNwbGl0KCcvJykuc2xpY2UoMCwgLTEpO1xuICAgICAgbGV0IHBhdGggPSAnJztcbiAgICAgIHdoaWxlIChwYXJ0cy5sZW5ndGggPiAwKSB7XG4gICAgICAgIHBhdGggKz0gcGFydHMuc2hpZnQoKSArICcvJztcbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICBhd2FpdCBweW9kaWRlLkZTLm1rZGlyKHBhdGgpO1xuICAgICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgICAgaWYgKGUuZXJybm8gIT09IDIwKSB7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgLy8gV3JpdGUgdGhpcyBmaWxlIHRvIHRoZSBWRlNcbiAgICAgIHRyeSB7XG4gICAgICAgIHJldHVybiBhd2FpdCBweW9kaWRlLkZTLndyaXRlRmlsZShmaWxlLCBuZXcgVWludDhBcnJheShkYXRhKSk7XG4gICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICB9XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYFB5b2RpZGUgZW52aXJvbm1lbnQgc2V0dXBgO1xuICAgIGF3YWl0IHNldHVwUHl0aG9uKHB5b2RpZGUpO1xuXG4gICAgc3RhdHVzVGV4dC5yZW1vdmUoKTtcbiAgICBpZiAoc3RhdHVzQ29udGFpbmVyLmNoaWxkcmVuLmxlbmd0aCA9PSAwKSB7XG4gICAgICBzdGF0dXNDb250YWluZXIucGFyZW50Tm9kZS5yZW1vdmUoKTtcbiAgICB9XG4gICAgcmV0dXJuIHB5b2RpZGU7XG4gIH0pKCkuY2F0Y2goKGVycikgPT4ge1xuICAgIHN0YXR1c1RleHQuc3R5bGUuY29sb3IgPSBcInZhcigtLWV4ZXJjaXNlLWVkaXRvci1obC1lciwgI0FEMDAwMClcIjtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gZXJyLm1lc3NhZ2U7XG4gICAgLy9pbmRpY2F0b3JDb250YWluZXIucXVlcnlTZWxlY3RvcihcIi5zcGlubmVyLWdyb3dcIikuY2xhc3NMaXN0LmFkZChcImQtbm9uZVwiKTtcbiAgICB0aHJvdyBlcnI7XG4gIH0pO1xuXG4gIC8vIEtlZXAgdHJhY2sgb2YgaW5pdGlhbCBPSlMgYmxvY2sgcmVuZGVyXG4gIGNvbnN0IHJlbmRlcmVkT2pzID0ge307XG5cbiAgY29uc3QgcHJvY2VzcyA9IGFzeW5jIChjb250ZXh0LCBpbnB1dHMpID0+IHtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgcHlvZGlkZVByb21pc2U7XG4gICAgY29uc3QgZXZhbHVhdG9yID0gbmV3IFB5b2RpZGVFdmFsdWF0b3IocHlvZGlkZSwgY29udGV4dCk7XG4gICAgYXdhaXQgZXZhbHVhdG9yLnByb2Nlc3MoaW5wdXRzKTtcbiAgICByZXR1cm4gZXZhbHVhdG9yLmNvbnRhaW5lcjtcbiAgfVxuXG4gIHJldHVybiB7XG4gICAgcHlvZGlkZVByb21pc2UsXG4gICAgcmVuZGVyZWRPanMsXG4gICAgcHJvY2VzcyxcbiAgfTtcbn1cbiIsImlubGluZSI6ZmFsc2UsImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0In1dfQ==
 </script>
 <div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
 <div id="exercise-loading-status" class="d-flex gap-2">
@@ -946,7 +1290,7 @@ W10=
 <section id="summary" class="level1">
 <h1>Summary</h1>
 <p>In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation <img src="https://latex.codecogs.com/png.latex?W"> is shown in figure 1 (green).</p>
-<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Learned Linear Transformation" data-text-align="center">
+<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="center" alt="Learned Linear Transformation">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="linear-adaptation/linear-adaptation.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."><img src="https://tomasruizt.github.io/posts/linear-adaptation/linear-adaptation/linear-adaptation.png" class="img-fluid figure-img" style="width:75.0%" data-text-align="center" alt="Learned Linear Transformation"></a>

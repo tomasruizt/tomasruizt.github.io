@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Tomas Ruiz">
+<meta name="dcterms.date" content="2025-09-22">
+
+<title>A Guide to Classify 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine – All Posts</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">All Posts</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../subscribe.html"> 
+<span class="menu-text">Subscribe</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About Me</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/tomas-ruiz-649907b3/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/tomasruizt"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">A Guide to Classify 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine</h1>
+                                <div class="quarto-categories">
+                <div class="quarto-category">GPUs</div>
+                <div class="quarto-category">vLLM</div>
+                <div class="quarto-category">Transformers</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliation</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              Ludwig-Maximilians-Universität München
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">September 22, 2025</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#motivation" id="toc-motivation" class="nav-link" data-scroll-target="#motivation">Motivation</a></li>
+  <li><a href="#dataset-and-model" id="toc-dataset-and-model" class="nav-link" data-scroll-target="#dataset-and-model">Dataset and Model</a></li>
+  <li><a href="#gpu-cluster" id="toc-gpu-cluster" class="nav-link" data-scroll-target="#gpu-cluster">GPU Cluster</a></li>
+  <li><a href="#parallelism-strategies" id="toc-parallelism-strategies" class="nav-link" data-scroll-target="#parallelism-strategies">Parallelism Strategies</a></li>
+  <li><a href="#fault-tolerance" id="toc-fault-tolerance" class="nav-link" data-scroll-target="#fault-tolerance">Fault Tolerance</a>
+  <ul class="collapse">
+  <li><a href="#preventing-clashes" id="toc-preventing-clashes" class="nav-link" data-scroll-target="#preventing-clashes">Preventing Clashes</a></li>
+  </ul></li>
+  <li><a href="#prefill-decode-ratio" id="toc-prefill-decode-ratio" class="nav-link" data-scroll-target="#prefill-decode-ratio">Prefill-Decode Ratio</a></li>
+  <li><a href="#throughput-stats" id="toc-throughput-stats" class="nav-link" data-scroll-target="#throughput-stats">Throughput Stats</a></li>
+  <li><a href="#costs" id="toc-costs" class="nav-link" data-scroll-target="#costs">Costs</a></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">Results</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#sec-slurm-file" id="toc-sec-slurm-file" class="nav-link" data-scroll-target="#sec-slurm-file">SLURM File</a></li>
+  <li><a href="#sec-python-code" id="toc-sec-python-code" class="nav-link" data-scroll-target="#sec-python-code">Python Code</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="summary" class="level1">
+<h1>Summary</h1>
+<p>In this post, I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok for a research project. I share lessons learned about computing on SLURM, parallelism strategies (tensor- and data-parallelism), and practical tips for fault tolerance and video inference with vLLM. I also dive into concrete token throughput statistics of our workload, which is extremely prefill-heavy. Finally, I show how we corrected for the bias of the Qwen2.5-VL-72B model to make statistically valid statements about our dataset. As a bonus, I also share Python code for video classification using the vLLM library in <a href="#sec-python-code" class="quarto-xref">Section&nbsp;13</a>, as well as the SLURM file for our workload in <a href="#sec-slurm-file" class="quarto-xref">Section&nbsp;12</a>.</p>
+</section>
+<section id="motivation" class="level1">
+<h1>Motivation</h1>
+<p>For this research project, I collaborated with my colleague at LMU Munich, <a href="https://renatatopinkova.github.io/">Renata Topinkova</a>, a computational social scientist. Our goal was to detect subtle product sales by influencers on the platform. We presented a <a href="./other-files/poster_ic2s2_25.pdf">poster with our findings</a> at the IC2S2 conference in 2025.</p>
+<p>This post focuses mainly on our large <strong>inference workload</strong>, which required running a large multimodal LLM (72B parameters) on 35k videos as quickly as possible before the deadline. The only way to get this done in reasonable time was with an <em>inference engine</em>. I used vLLM <span class="citation" data-cites="DBLP:conf/sosp/KwonLZ0ZY0ZS23">(<a href="#ref-DBLP:conf/sosp/KwonLZ0ZY0ZS23" role="doc-biblioref">Kwon et al. 2023</a>)</span>, because it’s the engine I am most familiar with. There are other alternative engines like <em>SGLang</em> <span class="citation" data-cites="zheng2024sglang">(<a href="#ref-zheng2024sglang" role="doc-biblioref">Zheng et al. 2024</a>)</span> or <a href="https://github.com/ai-dynamo/dynamo">NVIDIA Dynamo</a> that you can try.</p>
+</section>
+<section id="dataset-and-model" class="level1">
+<h1>Dataset and Model</h1>
+<p>Our dataset consists of 35,000 multimodal TikTok posts made up of videos, images, audio and text. The size of the dataset is around 180GB, the majority of which is from the videos. The dataset is a special subsample of a much bigger and more general dataset of ~1M posts we have.</p>
+<p>To analyze this dataset, we needed a multimodal model capable of consuming inputs with multiple modalities. On top of that, the cues we looked for in the videos were often subtle and implicit: E.g.,</p>
+<blockquote class="blockquote">
+<p><em>“Does the post suggest a follow-up transaction or sales interaction?”</em></p>
+</blockquote>
+<p>So we also needed the model to grasp subtle communication cues in the videos. Larger models, typically in the range of 70B+ parameters, are much more competent at this than the widely used 8B models.</p>
+<p>We decided to use the <code>Qwen2.5-VL-72B-Instruct</code> model by the Qwen team <span class="citation" data-cites="bai2025qwen25vltechnicalreport">(<a href="#ref-bai2025qwen25vltechnicalreport" role="doc-biblioref">Bai et al. 2025</a>)</span> <a href="https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct">(Hugging Face link)</a>. Other multimodal models require you to cut up videos into individual frames and pass a video as a “stack of images”, but the Qwen2.5-VL model instead natively consumes the videos directly. The key innovation to do this is called multidimensional RoPE (mRoPE) embeddings. mRoPE encodes the time dimension of the video into a separate dimension <span class="citation" data-cites="wang2024qwen2vlenhancingvisionlanguagemodels">(<a href="#ref-wang2024qwen2vlenhancingvisionlanguagemodels" role="doc-biblioref">Wang et al. 2024</a>)</span>. Thus, Qwen2.5-VL understands the temporal relationship between individual video frames, unlike other multimodal models.</p>
+<p><strong>Audio:</strong> An important shortcoming of this model is that it does not process audio natively. To alleviate this, we transcribed the audio using Whisper <span class="citation" data-cites="pmlr-v202-radford23a">(<a href="#ref-pmlr-v202-radford23a" role="doc-biblioref">Radford et al. 2023</a>)</span> and included the transcript in the text input. Some models that are capable of processing audio natively have been released recently: Qwen2.5-Omni or Phi-4 <span class="citation" data-cites="xu2025qwen25omnitechnicalreport abdin2024phi4technicalreport">(<a href="#ref-xu2025qwen25omnitechnicalreport" role="doc-biblioref">Xu et al. 2025</a>; <a href="#ref-abdin2024phi4technicalreport" role="doc-biblioref">Abdin et al. 2024</a>)</span>. However, the support for vLLM was limited until recently, the models remain relatively small in terms of size, and often output speech, which is not something we needed. Nevertheless, they are a very promising direction to explore.</p>
+<p><strong>Video Input:</strong> Feeding a video to the model through vLLM requires a specific setup: Many examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload (e.g., OpenAI <a href="https://platform.openai.com/docs/guides/images-vision?api-mode=chat&amp;format=base64-encoded#analyze-images">docs</a>, Google <a href="https://ai.google.dev/gemini-api/docs/video-understanding">docs</a>, even vLLM <a href="https://docs.vllm.ai/en/stable/examples/online_serving/openai_chat_completion_client_for_multimodal.html">examples</a>). However, I found that this was not scalable for videos, because it blocked the server while it processed the payloads, and left the GPU idle. Instead, we only send the local file path <em>referencing</em> the video in the payload. vLLM reads the file from disk, processes it, and feeds it to the model. This removes the serialization and deserialization overhead. For this to work, we must give the vLLM server explicit permission to read from a specific directory (and subdirectories) using <a href="https://docs.vllm.ai/en/latest/configuration/engine_args.html#-allowed-local-media-path">this option</a>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1"><a href="#cb1-1"></a>vllm serve ... --allowed-local-media-path=/path/to/your/files/</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The way to include a video file path in the payload is shown below. Note that the prefix <code>file://</code> is important. Both this file path and the path passed to <code>allowed-local-media-path</code> must be absolute paths. A full example can be found in their documentation: <a href="https://github.com/QwenLM/Qwen3-VL/blob/6e98a0a62bce167c5802ae6f5f95fcd97d2634cf/README.md?plain=1#L286">link</a>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1"></a>filepath <span class="op">=</span> <span class="st">"/path/to/your/files/my-video.mp4"</span></span>
+<span id="cb2-2"><a href="#cb2-2"></a>messages <span class="op">=</span> [</span>
+<span id="cb2-3"><a href="#cb2-3"></a>  {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: [</span>
+<span id="cb2-4"><a href="#cb2-4"></a>    {<span class="st">"type"</span>: <span class="st">"text"</span>, <span class="st">"text"</span>: <span class="st">"What is in the video?"</span>},</span>
+<span id="cb2-5"><a href="#cb2-5"></a>    {<span class="st">"type"</span>: <span class="st">"video_url"</span>, <span class="st">"video_url"</span>: {<span class="st">"url"</span>: <span class="ss">f"file://</span><span class="sc">{</span>filepath<span class="sc">}</span><span class="ss">"</span>}}</span>
+<span id="cb2-6"><a href="#cb2-6"></a>  ]}</span>
+<span id="cb2-7"><a href="#cb2-7"></a>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="gpu-cluster" class="level1">
+<h1>GPU Cluster</h1>
+<p>For our workload, we needed to run multiple instances of this large 72B model in parallel to process the dataset quickly (i.e.&nbsp;within a few hours). To this end, we used the <a href="https://doku.lrz.de/lrz-ai-systems-11484278.html">LRZ AI Systems cluster</a>. We used the BayernKI partition, which has 30 nodes, each with 4 Hopper H100 GPUs (94 GB VRAM per GPU) connected over NVLink. These are beefy GPUs, but nevertheless, the 72B model would not fit on a single GPU, even in bfloat16 precision, since only the model weights require around 144 GB VRAM. The model would fit on a single Blackwell B200 GPU (180 GB VRAM), but those are not available on our cluster. Beyond the model weights, the model also requires space for the KV cache, model activations, etc. Therefore, we allocated 4 GPUs, totaling 376 GB VRAM, per model instance. To launch jobs, the cluster uses the SLURM job scheduler <span class="citation" data-cites="yoo2003slurm">(<a href="#ref-yoo2003slurm" role="doc-biblioref">Yoo, Jette, and Grondona 2003</a>)</span>.</p>
+<p><strong>Containers:</strong> On the LRZ AI Systems, one cannot install and customize a Python environment on the worker nodes directly. Instead, one has to use NVIDIA <a href="https://github.com/NVIDIA/enroot">enroot containers</a>. These are conceptually similar to Docker containers, and the LRZ has introductory documentation about enroot <a href="https://doku.lrz.de/4-1-enroot-introduction-1895502566.html">here</a>. There are a couple of useful commands to create and start containers including <code>enroot import</code>, <code>enroot create</code> and <code>enroot start</code>. The code in <a href="#sec-slurm-file" class="quarto-xref">Section&nbsp;12</a> shows how we used these commands in our SLURM file.</p>
+<p><strong>Data Transfer:</strong> To move your data into the LRZ AI System, they integrated a tool called <a href="https://doku.lrz.de/dss-how-globus-data-transfer-and-globus-sharing-for-dss-works-11484489.html">Globus Data Transfer</a>. This is special software to transfer large amounts of data between different servers. It is preinstalled on the LRZ AI Systems, and we installed it on our server as well. Then we used the <a href="https://app.globus.org/">web interface</a> to transfer our dataset to the GPU cluster. The transfer is asynchronous and will email you when it’s done. It also works the other way around, to transfer data back from the LRZ to your server.</p>
+</section>
+<section id="parallelism-strategies" class="level1">
+<h1>Parallelism Strategies</h1>
+<p>vLLM supports distributing the model on multiple GPUs, a strategy called <strong>Tensor Parallelism</strong>. In essence, this means that each model tensor is split up across multiple GPUs so that no single GPU must hold the entire model in memory. The drawback of this is that the GPUs must communicate with each other to generate the model outputs. Nevertheless, with the high-bandwidth NVLink, this overhead is acceptable for the ability to run larger models. The option to use multiple GPUs in vLLM is very simple: <code>vllm serve ... --tensor-parallel-size=4</code>.</p>
+<p>In our workload, each model instance processed only a portion of the full dataset, a strategy called <strong>Data Parallelism</strong>. I implemented data parallelism on the client side, outside vLLM, which means that the client decides what data to send to the vLLM server based on its own <em>rank</em> within the full workload. SLURM supports a feature called <a href="https://slurm.schedmd.com/job_array.html">Job Arrays</a>, which allow you to submit a collection of similar jobs. Each job in the collection gets a unique serial ID (e.g., 0, 1, …, 100), which SLURM sets in the environment variable <code>SLURM_ARRAY_TASK_ID</code>. The model instance can read this ID (its <em>rank</em>) and understand which partition of the dataset it is assigned to process. I found the descriptions of these parallelism strategies on the <a href="https://huggingface.co/docs/transformers/main/perf_train_gpu_many">Hugging Face Parallelism Methods page</a> useful, for starters. The code in <a href="#sec-slurm-file" class="quarto-xref">Section&nbsp;12</a> shows how we used <code>SLURM_ARRAY_TASK_ID</code> in our SLURM file.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="imgs/parallelism-strategies.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Different Parallelism Strategies: Data Parallelism partitions the dataset so that N different model instances process different parts of the dataset. Tensor Parallelism distributes a model instance across K separate GPUs. In our workload N=10 and K=4."><img src="imgs/parallelism-strategies.png" class="img-fluid figure-img" style="width:40.0%" data-text-align="left" alt="Different Parallelism Strategies"></a></p>
+<figcaption>Different Parallelism Strategies: Data Parallelism partitions the dataset so that <span class="math inline">\(N\)</span> different model instances process different parts of the dataset. Tensor Parallelism distributes a model instance across <span class="math inline">\(K\)</span> separate GPUs. In our workload <span class="math inline">\(N=10\)</span> and <span class="math inline">\(K=4\)</span>.</figcaption>
+</figure>
+</div>
+</section>
+<section id="fault-tolerance" class="level1">
+<h1>Fault Tolerance</h1>
+<p>The vLLM library supports different inference modes: It is possible to use <em>batch processing</em>, which takes a batch of requests at once, processes them and returns the results. Alternatively, it’s possible to spin up an inference server behind an OpenAI-compatible API, which takes requests <em>asynchronously</em>, and returns the results individually as they become available. For our large workload, we expected the batch processing to be more efficient, but at the time of writing, the batch processing code <strong>blocked</strong> until all requests were completed before returning. If any error occurred during processing, the entire batch would fail, and failures were more common than one would expect: e.g., an exception was raised mid-workload because a long video did not fit in the context window.</p>
+<p>Therefore, I opted for the asynchronous inference mode, which offered better <strong>fault tolerance</strong>. As soon as a request completed, we dumped its result to a file with JSON-lines format. If the workload failed halfway, we still had all previous results on disk. If a single request failed (e.g.&nbsp;video too long), it was also logged to the results file. This approach made it possible to restart a failed workload later, by determining which requests were still missing from the results file. The JSON-lines file format allows for efficient append-only incremental writes, but is not a very efficient data format for downstream use, because it takes up a lot of disk space and is slow to read. Therefore, once result files were complete, we converted them to the <a href="https://github.com/apache/parquet-format">Parquet format</a>, which has great lossless compression and is super fast to read.</p>
+<p>Sending thousands of multimodal requests to the server <strong>concurrently</strong> choked it, because the server accepted all requests and started processing all videos (e.g., loading from disk), but neglected to generate tokens. On top of this, processing too many concurrent requests filled up the KV cache very quickly. You could observe this in the vLLM logs: the KV cache utilization spiked to 100% and stayed there for most of the workload. To cope with this, the server evicted blocks from the KV cache, and put most requests back in the queue, where they effectively sat idle. To prevent this situation, I implemented a client-side throttling mechanism, which limited the number of requests sent to the server at the same time. We set 16 concurrent requests for Qwen2.5-VL-72B. Getting this to work properly with Python’s <code>asyncio</code> library and correct timeouts was tricky, but now you can just <a href="https://github.com/tomasruizt/llm_app/blob/8e122aed8f81880c4299416ffacc562c4b5f150f/llmlib/llmlib/openai/openai_completion.py#L174">copy the code from my repo</a> or use the Python code from <a href="#sec-python-code" class="quarto-xref">Section&nbsp;13</a> directly.</p>
+<section id="preventing-clashes" class="level2">
+<h2 class="anchored" data-anchor-id="preventing-clashes">Preventing Clashes</h2>
+<p>Multiple model instances might be co-located on the same node, e.g., an 8 GPU node can host 2×4 GPU jobs. To prevent the jobs from clashing over the same vLLM port, we set different ports for each model instance based on its rank (<code>SLURM_ARRAY_TASK_ID</code>). We also gave each model instance a unique enroot container name based on the <code>SLURM_ARRAY_TASK_ID</code>, to prevent co-located jobs from clashing over the same container name. Also, we deleted the created enroot container after the job finished. To diagnose the failure of an individual job task within a job array, it’s useful to pipe <code>stderr</code> and <code>stdout</code> of each job task to different files, as shown in lines 5 and 6 of our SLURM file in <a href="#sec-slurm-file" class="quarto-xref">Section&nbsp;12</a>. It’s possible to restart individual job tasks within a job array with SLURM: <code>sbatch &lt;slurm-file&gt; --array=&lt;failed-task-id&gt;</code>.</p>
+</section>
+</section>
+<section id="prefill-decode-ratio" class="level1">
+<h1>Prefill-Decode Ratio</h1>
+<p>We processed over 552 million input tokens, and generated over 9 million output tokens. Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average. The ratio of input tokens to output tokens is very skewed (61 to 1). It means that most compute in our workload was not spent decoding long answers, but rather processing the many input tokens. The workload is therefore called “prefill-heavy”. This contrasts to “decode-heavy” workloads, like those involved in solving mathematical problems that generate a long answer including reasoning. The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs. <a href="#fig-input-tokens" class="quarto-xref">Figure&nbsp;1</a> and <a href="#fig-output-tokens" class="quarto-xref">Figure&nbsp;2</a> show the distribution of input and output tokens for the entire workload.</p>
+<div id="fig-input-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of input tokens" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-input-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/input_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: Distribution of Input Tokens. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens."><img src="imgs/input_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of input tokens"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-input-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: <strong>Distribution of Input Tokens</strong>. The distribution is skewed to the left, and most requests created between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens.
+</figcaption>
+</figure>
+</div>
+<div id="fig-output-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of output tokens" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-output-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/output_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure&nbsp;2: Distribution of Output Tokens. It’s important to note that the x-scale is 100 times smaller than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases."><img src="imgs/output_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of output tokens"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-output-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: <strong>Distribution of Output Tokens</strong>. It’s important to note that the x-scale is <em>100 times smaller</em> than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="throughput-stats" class="level1">
+<h1>Throughput Stats</h1>
+<p>I estimated from the logs that the <strong>throughput</strong> per model instance was ~2.95 seconds per request (~3 for simplicity). Dividing the ~15k input tokens and ~250 output tokens per request gives a throughput of ~5k input tokens and ~83 output tokens per second per model instance (≈5,080 tokens/s total throughput).</p>
+<p>This is a high throughput compared to other benchmarks: The vLLM documentation reports a <a href="https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen2.5-VL.html#qwen25vl-72b-benchmark-on-random-synthetic-dataset">synthetic benchmark</a> with a ratio of ~9:1 input tokens per output token, which achieves a lower throughput of 1461 tokens/s. The higher throughput of our workload might be just because we use a better GPU (H100 vs A100). NVIDIA has also reported <a href="https://docs.nvidia.com/nim/benchmarking/llm/latest/performance.html#llama-3-3-70b-instruct-results">performance benchmarks</a> for the similarly sized Llama-3.3-70b-instruct running on 4 H100 GPUs and their <a href="https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html">NIM</a> inference framework. However, the peak throughputs reported by NVIDIA vary <em>a lot</em> depending not only on the ratio of input to output tokens, but also the total number of tokens per request, with throughput peaks ranging from 349 to 6085 tokens/s (I report their best results in <a href="#tbl-throughput-stats" class="quarto-xref">Table&nbsp;1</a>). The throughput we achieved is competitive without being “too good to be true” 🚀.</p>
+<div id="tbl-throughput-stats" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-throughput-stats-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: <strong>Throughput Comparison.</strong> All benchmarks use instruct models. Input and output tokens are per request. The token ratio tells if the workload is prefill- or decode-heavy. The NVIDIA numbers are the most optimistic from their benchmarks.
+</figcaption>
+<div aria-describedby="tbl-throughput-stats-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Benchmark</th>
+<th>Model</th>
+<th>In. Toks</th>
+<th>Out. Toks</th>
+<th>Tok. Ratio</th>
+<th>GPUs</th>
+<th>Throughput <span class="math inline">\(\uparrow\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>NVIDIA NIM</td>
+<td>Llama-3.3-70b</td>
+<td>1000</td>
+<td>1000</td>
+<td>1:1</td>
+<td>4 H100 80GB</td>
+<td><strong>6085 tok/s</strong></td>
+</tr>
+<tr class="even">
+<td>Ours (Videos)</td>
+<td>Qwen2.5-VL-72B</td>
+<td>15000</td>
+<td>250</td>
+<td>61:1</td>
+<td>4 H100 96GB</td>
+<td>5020 tok/s</td>
+</tr>
+<tr class="odd">
+<td>vLLM (Synthetic)</td>
+<td>Qwen2.5-VL-72B</td>
+<td>8000</td>
+<td>900</td>
+<td>9:1</td>
+<td>4 A100 80GB</td>
+<td>1461 tok/s</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>All benchmarks used different GPUs. I searched for the difference between the H100 80GB and the H100 96GB GPUs, and found <a href="https://www.ionos.com/digitalguide/server/know-how/nvidia-h100/">this comparison</a> which says the former card has more bfloat16 compute power (1979 vs 1671 TFLOPS), while the latter has higher memory bandwidth (3.9 vs 3.35 TB/s), so it’s not clear if they offer clear advantages to either side.</p>
+</section>
+<section id="costs" class="level1">
+<h1>Costs</h1>
+<p>In terms of total runtime, the workload required 3s/post * 35k posts = 105k s <span class="math inline">\(\approx\)</span> 29hr. The cost of renting an equivalent H100 GPU on <a href="https://www.runpod.io/">Runpod.io</a> is $3.07/hr per GPU (as of 2025-09-24). The total cost of the workload would be $3.07 * 4 GPUs * 29hr = $356.12 (not a very expensive workload). Nevertheless, this does not include the time spent setting up the workload, debugging failures, and tweaking parameters, which required running at least one model instance (~$12/hr).</p>
+<div id="fig-h100-nvl-cost-per-hour" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="H100 NVL Renting Costs">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-h100-nvl-cost-per-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/h100-nvl-cost-per-hour.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="Figure&nbsp;3: H100 NVL Rent Cost. The cost shown is per GPU per hour. The workload required 4 GPUs per model instance for 29 hours."><img src="imgs/h100-nvl-cost-per-hour.png" class="img-fluid figure-img" style="width:60.0%" alt="H100 NVL Renting Costs"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-h100-nvl-cost-per-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: <strong>H100 NVL Rent Cost.</strong> The cost shown is per GPU per hour. The workload required 4 GPUs per model instance for 29 hours.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="results" class="level1">
+<h1>Results</h1>
+<p>In terms of social science, we found interesting results, e.g., that a lot of posts promoted a product (42%), and that the most common product sold was dietary supplements (16%). For quality control, we compared the Qwen labels with human labels in a random subset of ~150 posts on a specific product detection question:</p>
+<blockquote class="blockquote">
+<p><em>“Does the post mention a product or service that is being offered, promoted, or recommended? Answer with ‘yes’ or ‘no’.”</em></p>
+</blockquote>
+<p>On this subset, we also used Gemini-2.5-Pro for classification, intended as an upper performance reference. We compared both models in terms of precision, recall, and F1 scores in <a href="#tbl-model-comparison" class="quarto-xref">Table&nbsp;2</a>. In plain words, the table shows that Qwen was too strict about what constitutes a product mention, while Gemini was too lax, but achieved a better balance.</p>
+<div id="tbl-model-comparison" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-model-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;2: <strong>Model Comparison.</strong> Gemini outperformed Qwen in recall, and in F1, but Qwen had higher precision.
+</figcaption>
+<div aria-describedby="tbl-model-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Precision</th>
+<th>Recall</th>
+<th>F1 Score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Qwen2.5-VL-72B</td>
+<td><strong>0.90</strong></td>
+<td>0.69</td>
+<td>0.78</td>
+</tr>
+<tr class="even">
+<td>Gemini-2.5-Pro</td>
+<td>0.81</td>
+<td><strong>0.98</strong></td>
+<td><strong>0.89</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p><strong>Correcting for AI Bias:</strong> The numbers showed that both models had a bias in a specific direction that needed correction when estimating what fraction of the 35k posts <em>really</em> mentioned a product. I.e., <em>if humans were to label all 35k posts</em>, what fraction would they label as mentioning a product? It’s possible to combine the few human labels with the thousands of structurally biased AI labels to make this estimate. We followed a method described in <em>Confidence-Driven Inference</em> by <span class="citation" data-cites="gligoric-etal-2025-unconfident">Gligoric et al. (<a href="#ref-gligoric-etal-2025-unconfident" role="doc-biblioref">2025</a>)</span> (also <a href="https://sites.google.com/view/ic2s2-bridging-human/home">presented</a> in IC2S2). When computing an average using the combined human and AI labels, the method weights the AI labels with a weight <span class="math inline">\(\lambda \in [0,1]\)</span>. The weight is 0 when the AI labels are completely uncorrelated to the human labels, and 1 when they are completely correlated. This method allowed us to correct for AI biases in our estimates, and also to make statements about confidence intervals like the following:</p>
+<blockquote class="blockquote">
+<p><em>“The percentage of the 35k posts mentioning a product is ~53%, with the 95% confidence interval being 47% to 59%.”</em></p>
+</blockquote>
+<p>The confidence intervals are useful for hypothesis testing, and for making statements about statistical significance. More details in our <a href="./other-files/poster_ic2s2_25.pdf">IC2S2 poster</a>.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>I showed a practical recipe to classify a dataset of 35,000 videos with a 72B parameter model. We went over the infrastructure needed in terms of GPUs, tensor- and data-parallelism strategies, SLURM commands, concrete precautions for fault tolerance, and tips on video inference with vLLM. Our workload was a prefill-heavy workload, and I showed how the throughput we achieved is competitive with existing benchmarks by NVIDIA and vLLM. Finally, I explained how to use thousands of potentially biased AI labels to make statistically valid arguments. I hope this guide is useful to other researchers aiming to analyze large video datasets with multimodal LLMs that require multiple GPUs.</p>
+<p><strong>Outlook:</strong> In the future, I hope to scale this pipeline to 1M videos and push the throughput limits with quantization methods and speculative decoding. Testing audio-capable models is also high on my agenda. If you are interested in collaborating on large-scale inference, reach out to me! 🚀</p>
+</section>
+<section id="sec-slurm-file" class="level1">
+<h1>SLURM File</h1>
+<p>Below is a GitHub Gist of the SLURM file to submit our workload on the LRZ AI Systems. It shows how to request multiple GPUs, configure SLURM job arrays, set vLLM ports, and set up and tear down the enroot container, etc. Unlike the Python code, this will not run without the dataset, but it shows the general workflow.</p>
+<script src="https://gist.github.com/tomasruizt/6b48b51c343b48ee2f1a3ebb9a6ea129.js"></script>
+</section>
+<section id="sec-python-code" class="level1">
+<h1>Python Code</h1>
+<p>The code below shows how to use Python to (1) start up the vLLM server, and (2) send concurrent requests to the server. It uses a library I wrote for this purpose: <a href="https://github.com/tomasruizt/llm_app">GitHub/tomasruizt/llm_app</a>. The snippet below is in the repo’s <code>examples/</code> directory.</p>
+<script src="https://emgithub.com/embed-v2.js?target=https%3A%2F%2Fgithub.com%2Ftomasruizt%2Fllm_app%2Fblob%2Fmain%2Fexamples%2Fvllm-video-inference.py&amp;style=github&amp;type=code&amp;showBorder=on&amp;showLineNumbers=on&amp;showFileMeta=on&amp;showFullPath=on&amp;showCopy=on"></script>
+</section>
+<section id="references" class="level1">
+
+<!-- 
+What to write about
+✅ The model, how many GPUs are needed (Tensor Parallelism)
+✅ that we transcribe using whisper
+✅ How I split the dataset (Data Parallelism)
+✅ The LRZ, what GPUs and nodes are available
+   ✅ how these are connected to each other
+✅ SLURM, how array jobs work
+  ✅ preventing port clashes
+✅ The posts are multimodal: videos, imgs, text
+✅ Incremental progress by splitting requests from backend server
+✅ Client-side throttling, since different models have different reqs
+
+✅ How much storage is 35k videos in TB
+✅ Write about enroot containers
+✅ make a picture display tensor parallelism & data parallelism
+✅ Include a snippet about how to use your llm_app library.
+Results: 
+  ✅ How many tokens did we process?
+  ✅How many posts actually promote a product?
+  ✅How long did it take to process the dataset?
+-->
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-abdin2024phi4technicalreport" class="csl-entry" role="listitem">
+Abdin, Marah, Jyoti Aneja, Harkirat Behl, Sébastien Bubeck, Ronen Eldan, Suriya Gunasekar, Michael Harrison, et al. 2024. <span>“Phi-4 Technical Report.”</span> <a href="https://arxiv.org/abs/2412.08905">https://arxiv.org/abs/2412.08905</a>.
+</div>
+<div id="ref-bai2025qwen25vltechnicalreport" class="csl-entry" role="listitem">
+Bai, Shuai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, et al. 2025. <span>“Qwen2.5-VL Technical Report.”</span> <a href="https://arxiv.org/abs/2502.13923">https://arxiv.org/abs/2502.13923</a>.
+</div>
+<div id="ref-gligoric-etal-2025-unconfident" class="csl-entry" role="listitem">
+Gligoric, Kristina, Tijana Zrnic, Cinoo Lee, Emmanuel Candes, and Dan Jurafsky. 2025. <span>“Can Unconfident <span>LLM</span> Annotations Be Used for Confident Conclusions?”</span> In <em>Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers)</em>, edited by Luis Chiruzzo, Alan Ritter, and Lu Wang, 3514–33. Albuquerque, New Mexico: Association for Computational Linguistics. <a href="https://doi.org/10.18653/v1/2025.naacl-long.179">https://doi.org/10.18653/v1/2025.naacl-long.179</a>.
+</div>
+<div id="ref-DBLP:conf/sosp/KwonLZ0ZY0ZS23" class="csl-entry" role="listitem">
+Kwon, Woosuk, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph Gonzalez, Hao Zhang, and Ion Stoica. 2023. <span>“Efficient Memory Management for Large Language Model Serving with PagedAttention.”</span> In <em>SOSP</em>, 611–26. <a href="https://doi.org/10.1145/3600006.3613165">https://doi.org/10.1145/3600006.3613165</a>.
+</div>
+<div id="ref-pmlr-v202-radford23a" class="csl-entry" role="listitem">
+Radford, Alec, Jong Wook Kim, Tao Xu, Greg Brockman, Christine Mcleavey, and Ilya Sutskever. 2023. <span>“Robust Speech Recognition via Large-Scale Weak Supervision.”</span> In <em>Proceedings of the 40th International Conference on Machine Learning</em>, edited by Andreas Krause, Emma Brunskill, Kyunghyun Cho, Barbara Engelhardt, Sivan Sabato, and Jonathan Scarlett, 202:28492–518. Proceedings of Machine Learning Research. PMLR. <a href="https://proceedings.mlr.press/v202/radford23a.html">https://proceedings.mlr.press/v202/radford23a.html</a>.
+</div>
+<div id="ref-wang2024qwen2vlenhancingvisionlanguagemodels" class="csl-entry" role="listitem">
+Wang, Peng, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan, Jinze Bai, Keqin Chen, et al. 2024. <span>“Qwen2-VL: Enhancing Vision-Language Model’s Perception of the World at Any Resolution.”</span> <a href="https://arxiv.org/abs/2409.12191">https://arxiv.org/abs/2409.12191</a>.
+</div>
+<div id="ref-xu2025qwen25omnitechnicalreport" class="csl-entry" role="listitem">
+Xu, Jin, Zhifang Guo, Jinzheng He, Hangrui Hu, Ting He, Shuai Bai, Keqin Chen, et al. 2025. <span>“Qwen2.5-Omni Technical Report.”</span> <a href="https://arxiv.org/abs/2503.20215">https://arxiv.org/abs/2503.20215</a>.
+</div>
+<div id="ref-yoo2003slurm" class="csl-entry" role="listitem">
+Yoo, Andy B, Morris A Jette, and Mark Grondona. 2003. <span>“Slurm: Simple Linux Utility for Resource Management.”</span> In <em>Workshop on Job Scheduling Strategies for Parallel Processing</em>, 44–60. Springer.
+</div>
+<div id="ref-zheng2024sglang" class="csl-entry" role="listitem">
+Zheng, Lianmin, Liangsheng Yin, Zhiqiang Xie, Chuyue Sun, Jeff Huang, Cody Hao Yu, Shiyi Cao, et al. 2024. <span>“<span>SGL</span>ang: Efficient Execution of Structured Language Model Programs.”</span> In <em>The Thirty-Eighth Annual Conference on Neural Information Processing Systems</em>. <a href="https://openreview.net/forum?id=VqkAKQibpq">https://openreview.net/forum?id=VqkAKQibpq</a>.
+</div>
+</div></section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2025,
+  author = {Ruiz, Tomas},
+  title = {A {Guide} to {Classify} 35,000 {Videos} with a {72B}
+    {Multimodal} {LLM} on the {vLLM} {Engine}},
+  date = {2025-09-22},
+  url = {https://tomasruizt.github.io/posts/mm-inference-on-vllm/},
+  langid = {en}
+}
+</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2025" class="csl-entry quarto-appendix-citeas" role="listitem">
+Ruiz, Tomas. 2025. <span>“A Guide to Classify 35,000 Videos with a 72B
+Multimodal LLM on the vLLM Engine.”</span> September 22, 2025. <a href="https://tomasruizt.github.io/posts/mm-inference-on-vllm/">https://tomasruizt.github.io/posts/mm-inference-on-vllm/</a>.
+</div></div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/tomasruizt\.github\.io\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+</script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="light">
+</div> <!-- /content -->
+<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","closeEffect":"zoom","selector":".lightbox","loop":false,"descPosition":"bottom"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>
