@@ -19,8 +19,12 @@ code-annotations: below
 citation: true
 ---
 
-**TL;DR:** In this post I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok for a research project.
-I share lessons learned about computing on SLURM, on parallelism strategies, and vLLM fault tolerance.
+# Summary
+
+In this post I describe how we used the vLLM inference engine to classify 35k videos collected from TikTok for a research project.
+I share lessons learned about computing on SLURM, about parallelism strategies (tensor- and data-parallelism), and share practical tips for fault tolerance and for video inference with vLLM.
+I also dive into concrete token throughput statistics of our workload, which is extremely prefill-heavy.
+Finally, I show how we corrected for the bias of the Qwen2.5-VL-72B model to make statistically valid statements about our dataset.
 As a goodie, I also share Python code for video classification using the vLLM library in @sec-python-code, 
 as well as the SLURM file for our workload in @sec-slurm-file.
 
@@ -237,10 +241,11 @@ The confidence intervals are useful for hypothesis testing, and for making state
 More details in our [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
 
 # Conclusion
-
-Successfully processing 35,000 multimodal TikTok videos with a 72B parameter model required combining vLLM's tensor parallelism across 4 H100 GPUs with data parallelism via SLURM job arrays.
-Key lessons learned include using asynchronous processing for better fault tolerance, client-side throttling to prevent vLLM server overload, and proper job isolation to avoid conflicts between tasks colocated on the same node.
-I hope this post is useful to other researchers aiming to analyze large multimodal/video datasets with LLMs that require multiple GPUs.
+I showed a practical recipe to classify a dataset of 35,000 videos with a 72B parameter model.
+We went over the infrastructure needed in terms of GPUs, tensor- and data-parallelism strategies, SLURM commands, concrete precautions for fault tolerance, and tips on video inference with vLLM.
+Our workload was a prefill-heavy workload, and I showed how our achieved throughput is competitive with existing benchmarks by NVIDIA and vLLM.
+Finally, I explained how to use thousands of potentially biased AI labels to make statitically valid arguments.
+I hope this post is useful to other researchers aiming to analyze large video datasets with multimodal LLMs that require multiple GPUs.
 
 **Outlook:** In the future I hope to scale this pipeline to 1M videos, and push the throughput limits with quantization methods and speculative decoding.
 Testing audio-capable models is also high on my agenda.
