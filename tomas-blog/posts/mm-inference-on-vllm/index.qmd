@@ -36,6 +36,8 @@ There are other alternative engines like _SGLang_ [@zheng2024sglang] or [NVIDIA 
 # Dataset and Model
 Our dataset consists of 35,000 multimodal TikTok posts made up of videos, images, audio and text.
 The size of the dataset is around 180GB, the majority of which is from the videos.
+The dataset is a special subsample of a much bigger and more general dataset of ~1M posts we have.
+
 To analyze this dataset, we needed a multimodal model capable of consuming inputs with multiple modalities.
 On top of that, the cues we looked for in the videos were often subtle and implicit: E.g.,
 
@@ -72,6 +74,13 @@ Instead, one has to use NVIDIA [enroot containers](https://github.com/NVIDIA/enr
 These are conceptually similar to Docker containers, and the LRZ has introductory documentation about enroot [here](https://doku.lrz.de/4-1-enroot-introduction-1895502566.html).
 There are a couple of useful commands to create and start containers including `enroot import`, `enroot create` and `enroot start`.
 The code in @sec-slurm-file shows how we used these commands in our SLURM file.
+
+To move your data into the LRZ AI System, they integrated a tool called [Globus Data Transfer](https://doku.lrz.de/dss-how-globus-data-transfer-and-globus-sharing-for-dss-works-11484489.html)).
+This is special software to transfer large amounts of data between different servers.
+It is preinstalled on the LRZ AI Systems, and we installed it in on our server as well.
+Then we used the [web interface](https://app.globus.org/) to transfer our dataset to the GPU cluster.
+The transfer is asynchronous and will email you when its done.
+Its works also the other way around, to transfer data back from the LRZ back to your server.
 
 # Parallelism Strategies
 vLLM supports distributing the model on multiple GPUs, a strategy called **Tensor Parallelism**.
