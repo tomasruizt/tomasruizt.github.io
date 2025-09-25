@@ -206,8 +206,35 @@ Nevertheless, this does not include the time spent setting up the workload, debu
 
 # Results
 
-In terms of social science, we found interesting results, e.g. that a lot of posts promoted a product (42%), and the most common product was dietary supplements (16%).
-More details in the [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
+In terms of social science, we found interesting results, e.g. that a lot of posts promoted a product (42%), and that the most common product sold were dietary supplements (16%).
+For quality control, we compared the Qwen labels with human labels in a random subset of ~150 posts on a specific product detection question:
+
+> _"Does the post mention a product or service that is being offered, promoted, or recommended? Answer with 'yes' or 'no'."_
+
+On this subset, we also used Gemini-2.5-Pro for classification, intended as upper performance reference.
+We compare both models in terms of precision, recall, and F1 scores in @tbl-model-comparison. 
+In plain words, the table shows that Qwen was too strict about what constitutes a product mention, while Gemini was too lax, but achieved a better balance.
+
+| Model | Precision | Recall | F1 Score |
+|----|----|----|----|
+| Qwen2.5-VL-72B | **0.90** | 0.69 | 0.78 |
+| Gemini-2.5-Pro | 0.81 | **0.98** | **0.89** |
+
+: **Model Comparison.** Gemini outperformed Qwen in recall, and in F1, but Qwen had higher precision. {#tbl-model-comparison}
+
+**Correcting for AI Bias:** 
+The numbers showed that both models had a bias in a specific direction that needed correction when estimating what fraction of the 35k posts _really_ mentioned a product.
+I.e. _if humans were to label all 35k posts_, what fraction would they label as mentioning a product?
+Its possible to combine the few human labels with the thousands of structurally biased AI labels to make this estimate.
+We followed a method described in _Confidence-Driven Inference_ by @gligoric-etal-2025-unconfident (also [presented](https://sites.google.com/view/ic2s2-bridging-human/home) in IC2S2).
+When computing an average using the combined human and AI labels, the method weights the AI labels with a weight $\lambda \in [0,1]$.
+The weight is 0 when the AI labels are completely uncorrelated to the human labels, and 1 when they are completely correlated.
+This method allowed us to correct for AI biases in our estimates, and also to make statements about confidence intervals like the following:
+
+> _"The percentage of the 35k posts mentioning a product is ~53%, with the 95% confidence interval being 47% to 59%._
+
+The confidence intervals are useful for hypothesis testing, and for making statements about statistical significance.
+More details in our [IC2S2 poster](./other-files/poster_ic2s2_25.pdf).
 
 # Conclusion
 
