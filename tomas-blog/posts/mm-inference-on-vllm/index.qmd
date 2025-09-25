@@ -58,6 +58,28 @@ Some models that are capable of processing audio natively have been released rec
 However, the support for vLLM was limited until recently, the models remain relatively small in terms of size, and often output speech, which is not something we needed.
 Neverthelss, they are a very promising direction to explore.
 
+Feeding a video to model through vLLM requires a specific set up:
+Some examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload.
+However, I found that this was not scalable for videos, because it blocked the server while it processed the payload, and left the GPU idle.
+Instead, we only send the local file path _referencing_ the video in the payload.
+vLLM reads the file from disk, processes it, and feeds it to the model.
+This gets rid of the serialization and de-serialization overhead.
+For this to work, we must give the vLLM server explicit permission to read from a specific directory (and subdirectories) using [this option](https://docs.vllm.ai/en/latest/configuration/engine_args.html#-allowed-local-media-path): 
+
+```shell
+vllm serve ... --allowed-local-media-path=/path/to/your/files/
+``` 
+The way to include a video file path in the payload is shwon below. Note that the prefix `file://` is important. Both this file path and the path passed to `allowed-local-media-path` must be absolute paths. A full example can be found [their documentation](https://github.com/QwenLM/Qwen3-VL/blob/6e98a0a62bce167c5802ae6f5f95fcd97d2634cf/README.md?plain=1#L286).
+```python
+filepath = "/path/to/your/files/my-video.mp4"
+messages = [
+  {"role": "user", "content": [
+    {"type": "text", "text": "What is in the video?"},
+    {"type": "video_url", "video_url": {"url": f"file://{filepath}"}}
+  ]}
+]
+```
+
 # GPU Cluster
 
 For our workload, we needed to run multiple instances of this large 72B model in parallel to process the dataset quickly (i.e. within a few hours).
