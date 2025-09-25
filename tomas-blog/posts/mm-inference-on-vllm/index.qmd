@@ -58,12 +58,12 @@ Some models that are capable of processing audio natively have been released rec
 However, the support for vLLM was limited until recently, the models remain relatively small in terms of size, and often output speech, which is not something we needed.
 Neverthelss, they are a very promising direction to explore.
 
-Feeding a video to model through vLLM requires a specific set up:
-Some examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload.
-However, I found that this was not scalable for videos, because it blocked the server while it processed the payload, and left the GPU idle.
+**Video Input:** Feeding a video to model through vLLM requires a specific set up:
+Many examples for image analysis with vLLM / OpenAI API serialize the image into base64 encoding and send it in the request payload (e.g. OpenAI [docs](https://platform.openai.com/docs/guides/images-vision?api-mode=chat&format=base64-encoded#analyze-images), Google [docs](https://ai.google.dev/gemini-api/docs/video-understanding), even vLLM [examples](https://docs.vllm.ai/en/stable/examples/online_serving/openai_chat_completion_client_for_multimodal.html)).
+However, I found that this was not scalable for videos, because it blocked the server while it processed the payloads, and left the GPU idle.
 Instead, we only send the local file path _referencing_ the video in the payload.
 vLLM reads the file from disk, processes it, and feeds it to the model.
-This gets rid of the serialization and de-serialization overhead.
+This removes the serialization and de-serialization overhead.
 For this to work, we must give the vLLM server explicit permission to read from a specific directory (and subdirectories) using [this option](https://docs.vllm.ai/en/latest/configuration/engine_args.html#-allowed-local-media-path): 
 
 ```shell
