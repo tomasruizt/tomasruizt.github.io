@@ -6,21 +6,22 @@ format:
 cvfooter:
   left: "tomasruizt.github.io"
   right: "tomas.ruiz.te@gmail.de"
-cvcolor: 58748F #without `#`
-cvfont: raleway #texlive fonts like raleway,fetamont,gillius,comfortaa
+cvcolor: 58748F
+cvfont: raleway
 cvmeta:
   - title: Status
     left: Research Assistant at LMU Munich
     right: Munich, Germany
   - title: Field
-    left: Machine Learning, Multi-modal AI
+    left: Machine Learning, Inference Optimization, Multi-modal AI
     right: +49 176 817 933 17
   - title: Techs
-    left: Python, R, C#, Java, AWS, Django, FastAPI, PostgreSQL, Hadoop, Spark
+    left: Python, R, C#, Java, AWS, Django, FastAPI, PostgreSQL, vLLM, CUDA
     right: tomas.ruiz.te@gmail.de
 execute:
   echo: false
 ---
+
 
 ```{r}
 #| label: cvevents
@@ -42,7 +43,24 @@ cvevents <- function(tbl, when, what, where, details) {
 
 # Summary
 
-Research assistant at the LMU Munich at the intersection of Machine Learning and Social Media, particularly on multi-modal ML. In previous jobs, I worked as a software engineer in different companies and start-ups.
+Research Assistant at LMU Munich at the intersection of Machine Learning and Multi-modal AI.
+My current work focuses on efficient and scalable inference for large language and vision-language models.
+I am the author of a paper on test-time scaling accepted at EMNLP 2025 and an active contributor to vLLM, where I implemented speculative decoding with significant throughput improvements. Previously, I worked as a software engineer building scalable systems in industry.
+
+# Research and Open Source Contributions
+
+```{r}
+#| label: research
+#| output: asis
+tibble::tribble(
+~role, ~institution, ~dates, ~details,
+"Paper: Test-Time Scaling for LLMs (EMNLP 2025)", "EMNLP Shared Task", "2025",
+"First-author paper on test-time scaling, a technique for inference optimization that trades compute for task performance. Shows strong performance on verifiable-reward problems (e.g., math), accepted at EMNLP 2025. [arXiv:2510.12516](https://arxiv.org/pdf/2510.12516)",
+"Contributor", "vLLM Open Source Project", "2025 - Present",
+"Implemented speculative decoding ([PR 24322](https://github.com/vllm-project/vllm/pull/24322)), achieving ~2x throughput improvements (mainly TPOT) and restoring a core feature lost in V1. Collaborate on large-scale inference benchmarking and performance tuning.",
+) |>
+cvevents(when = "dates", what = "role", where = "institution", details = "details")
+```
 
 # Experience
 
@@ -51,14 +69,17 @@ Research assistant at the LMU Munich at the intersection of Machine Learning and
 #| label: experience
 #| output: asis
 tibble::tribble(
-    ~role, ~institution, ~dates, ~details,
-    "Senior Software Engineer", "Allianz Global Investors - Munich, Germany", "03/2023 - 05/2024",
-    "[Python, C\\#]: I wrote C\\# core libraries to simulate the performance of trading strategies for options and derivatives, as well as Python packages to orchestrate scenario simulations, interact with diverse data systems over REST, with SQL Databases, etc. I collaborated closely with quantitative researchers and financial engineers to ship our product. I learned about financial mathematics, portfolio management and risk modeling.",
-    "Software Engineer", "Preisenergie GmbH - Munich, Germany", "03/2021 - 02/2023", "[Python, R, REST, PostgreSQL, Django, FastAPI, DDD, TDD]: Designed and built RESTful applications with Django and FastAPI to calculate contract prices for existing utility customers. Rearchitected and refactored a large untested legacy codebase towards a Domain-Driven-Design based on R packages with a clear separation of concerns. Designed, implemented and tested a price optimization algorithm using Quadratic Programming with ~100k variables. Improved expected CLV over the existing algorithm by 20\\% on average. Extended a web application to manage and analyze data on energy contracts. Translated the product roadmap into a system design, onboarded new developers, performed 1on1s, code reviews and retrospective meetings.",
-    "Software Engineering Intern - Core Machine Learning", "Amazon - Berlin, Germany", "09/2017 - 02/2018", "[Java, AWS]: Wrote a tool to benchmark cutting-edge Multiarmed-Bandits models for product recommendation. I released it on AWS, so that all internal development teams in Amazon and AWS could asses the potential revenue increases based on their own datasets.",
-    "Bachelor's Thesis", "BMW Group - Munich, Germany", "03/2017 - 08/2017", "[Python, Spark, Hadoop, Tableau]: Evaluated the query latency, throughput, and DB consistency of an application that monitored the engine manufacturing process."
+~role, ~institution, ~dates, ~details,
+"Senior Software Engineer", "Allianz Global Investors - Munich, Germany", "03/2023 - 05/2024",
+"[Python, C\\#]: Wrote core libraries to simulate trading strategies for options and derivatives, as well as Python orchestration packages. Collaborated closely with quantitative researchers and financial engineers. Learned about financial mathematics, portfolio management and risk modeling.",
+"Software Engineer", "Preisenergie GmbH - Munich, Germany", "03/2021 - 02/2023",
+"[Python, R, REST, PostgreSQL, Django, FastAPI, DDD, TDD]: Designed and built RESTful applications with Django and FastAPI. Refactored a large untested legacy codebase towards DDD. Designed, implemented and tested a quadratic programming–based price optimization algorithm with ~100k variables, improving expected CLV by 20\\%. Extended a web application to manage and analyze data on energy contracts. Led code reviews and developer onboarding.",
+"Software Engineering Intern - Core Machine Learning", "Amazon - Berlin, Germany", "09/2017 - 02/2018",
+"[Java, AWS]: Wrote a tool to benchmark cutting-edge Multiarmed-Bandits models for product recommendation. Released it on AWS for internal use across Amazon and AWS development teams.",
+"Bachelor's Thesis", "BMW Group - Munich, Germany", "03/2017 - 08/2017",
+"[Python, Spark, Hadoop, Tableau]: Evaluated the query latency, throughput, and DB consistency of an application that monitored the engine manufacturing process."
 ) |>
-    cvevents(when = "dates", what = "role", where = "institution", details = "details")
+cvevents(when = "dates", what = "role", where = "institution", details = "details")
 ```
 
 # Education
@@ -67,10 +88,13 @@ tibble::tribble(
 #| label: education
 #| output: asis
 tibble::tribble(
-    ~role, ~institution, ~dates, ~details,
-    "Research Assistant", "Ludwig Maximilian University of Munich", "06/2024 - Present", "Researching on the intersection of machine learning and computational social science. In my project, I apply large multi-modal models (VLM) to understand and classify content from social media (videos, images, audio, and text).",
-    "Master of Science - Computer Science", "Technical University of Munich", "04/2018 - 02/2021", "My thesis was on the topic of Reinforcement Learning applied to robotics, and learning useful skills with weak supervision. I took courses such as Machine Learning, Deep Learning, Convex Optimization, and more.",
-    "Bachelor of Science - Engineering Science", "Technical University of Munich", "09/2013 - 08/2017", "My thesis was with BMW Group, where I worked with a Hadoop cluster and evaluated its query throughput and latency on challenging database queries. I took courses in computer science such as Algorithms and Data Structures, Databases, etc. And also classic engineering courses such as Partial Differential Equations, Thermodynamics, etc."
+~role, ~institution, ~dates, ~details,
+"Research Assistant", "Ludwig Maximilian University of Munich", "06/2024 - Present",
+"Researching on the intersection of machine learning and computational social science. Current work focuses on efficient inference and multimodal content understanding using VLMs (videos, images, audio, text).",
+"Master of Science - Computer Science", "Technical University of Munich", "04/2018 - 02/2021",
+"Thesis on Reinforcement Learning applied to robotics, learning skills with weak supervision. Relevant courses: Machine Learning, Deep Learning, Convex Optimization.",
+"Bachelor of Science - Engineering Science", "Technical University of Munich", "09/2013 - 08/2017",
+"Thesis with BMW Group on evaluating Hadoop clusters for engine manufacturing monitoring. Courses in computer science (algorithms, databases) and engineering (PDEs, thermodynamics)."
 ) |>
-    cvevents(when = "dates", what = "role", where = "institution", details = "details")
+cvevents(when = "dates", what = "role", where = "institution", details = "details")
 ```
