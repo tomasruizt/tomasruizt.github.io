@@ -1,0 +1,130 @@
+---
+title: "Hello World"
+author:
+  - name: Tomas Ruiz
+    email: t.ruiz@lmu.de
+    affiliations: Ludwig-Maximilians-Universität München
+date: "2025-10-31"
+categories: [GPUs, Triton, Mathematics]
+format:
+  html:
+    toc: true
+    code-line-numbers: true
+editor:
+    render-on-save: true
+image: "imgs/Fused MM sample.png"
+engine: jupyter
+bibliography: refs.bib
+code-annotations: below
+citation: true
+---
+
+## Background
+
+The paper _Cut Your Losses in Large-Vocabulary Language Models_ by @wijmans2025cut presents a method to massively reduce the VRAM footprint of training LLMs.
+The key idea is to avoid materializing the full logits during the loss computation.
+Instead, they compute the loss incrementally on SRAM.
+They report reducing the memory footprint computing the cross-entropy loss for Gemma 2 (2B) from 24GB to 1MB on a batch of size 8,192.
+
+This made me wonder: 
+Can we use this technique to reduce the VRAM footprint of inference on LLMs?
+There is an important difference between training and inference.
+During training, we never sample from the distribution given by the logits.
+Instead, a method called teacher-forcing is used:
+The logits are compared to the ground truth and the loss is computed by the cross-entropy loss function.
+In constrast, during inference, the logits must be converted into a distribution, e.g. using the softmax function,
+and then sampled from.
+
+The kernels in [Liger Kernel](https://github.com/linkedin/Liger-Kernel) by @hsu2025ligerkernelefficienttriton are also aimed at training-time, and include no sampling primitives.
+The [FlashInfer](https://github.com/flashinfer-ai/flashinfer) library by @ye2025flashinfer is aimed at inference, but all the sampling kernels take `logits` or `probs` as input, which means that you still need to materialize full logits in VRAM before calling them. Below are two examples of the FlashInfer [sampling API](https://docs.flashinfer.ai/api/sampling.html) for reference.
+
+```python
+# Sampling method taking probs
+sampling_from_probs(probs: Tensor, ...) -> Tensor
+
+# Sampling method taking logits
+top_k_top_p_sampling_from_logits(logits: Tensor, ...) -> Tensor
+```
+
+While FlashInfer is the backbone of inference engines like vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23], or SGLang [@zheng2024sglang],
+it still assumed that logits must be materialized in VRAM.
+But I was looking for a method that incrementally computed the logits and sampled from them in a single pass.
+I knew that incrementally computing the softmax is possible, as described by @milakov2018onlinenormalizercalculationsoftmax (_online-softmax_).
+However, they still materialize the full probabilities in VRAM.
+The online-softmax method is also used in _FlashAttention_ [@dao2022flashattention], but they never sample from the probabilities,
+because they are used in attention, rather than in the language modeling (LM) head.
+All the building blocks exist (online-softmax, incremental logit computation), but have never been put together in a single method for efficient sampling. I set out to implement this myself.
+
+## Overview
+Let's restate the goals:
+
+* We want to sample from the probability determined by the logits of the LM head
+* We want to avoid materializing the full logits in VRAM
+
+This means that the inputs of the kernel are the hidden states $H$ of the last hidden layer and last position, and the weights $W$ of the LM head.
+Multiplying them yield the logits $L$, from which the probabilities $P$ are computed using the softmax. The sizes are as follows:
+
+* $W$ has shape $(V, d)$, where $V$ is the vocabulary size and $d$ is the hidden dimension
+* $H$ has shape $(d, N)$, where $N$ is the number of hidden states. E.g. during batched inference, $N$ is the batch size.
+* $L$ has shape $(V, N)$
+* $P$ has shape $(V, N)$
+
+Generally speaking, the largest among these is the vocabulary size $V$, which can range up to 256k, followed by the hidden dimension $d$, which be around 8k, and finally the batch size $N$, which can be 256 in batched inference.
+
+Below is a simple PyTorch function that implements the sampling by computing the logits and probabilities.
+This is just to get an idea of the steps involved, but we want to avoid computing the logits in full.
+For simplicity, I'm sampling a single sample, and not applying any temperature scaling.
+
+```python
+def sample(
+    weights: torch.Tensor,  # [V, d]
+    hidden_states: torch.Tensor,  # [d, N]
+):
+    logits = weights @ hidden_states  # [V, N]
+    probs = logits.softmax(dim=0)  # [V, N]
+    samples = torch.multinomial(probs.T, num_samples=1)
+    return samples # [N, 1]
+```
+
+## Tiling the Computation
+To break down the computation into an incremental fashion, I used Triton, which supports tiling the computation.
+The logits are the result of a matrix multiplication, which can be tiled in across the $V$, $d$, and $H$ dimensions as shown in @fig-tiled-mm.
+The tiles of $W$ have shape $(T_V, T_d)$ while the tiles of $H$ have shape $(T_d, T_N)$.
+The resulting tiles of the logits have shape $(T_V, T_N)$.
+
+![Tiling the computation of the logits.](imgs/Fused%20MM%20sample.png){width="80%" text-align="left" fig-alt="Tiling the computation of the logits" .lightbox #fig-tiled-mm}
+
+## Incremental Sampling
+
+The next part of the puzzle is how to incrementally sample based on a single tile of logits, rather than on the full vector of logits.
+The problem is not strictly the softmax normalization factor, which can be computed incrementally (online-softmax).
+Rather, the problem is that we don't know how likely each token is in comparison to the others until we have computed the last (bottom) tile of logits.
+
+To understand this, consider the logits case below, where the vocabulary size $V=8$, the tile size $T_V=2$ (so, 8/2 = 4 tiles).
+The horizontal lines separate the tiles.
+Notice how its impossible to know and sample from the highest probability logit (50.0) until the last tile is computed.
+
+$$
+\begin{aligned}
+L &= \begin{bmatrix}
+1.0 \\
+1.2 \\
+\hline
+2.0 \\
+1.4 \\
+\hline
+1.0 \\
+2.1 \\
+\hline
+1.1 \\
+50.0
+\end{bmatrix}
+\end{aligned}
+$$
+
+However, there is one statistical trick to circumvent this problem: The Gumbel-Max trick.
+
+## Gumbel-Max Trick
+This sampling method allows us to sample from a categorical distribution by only using logits, and avoiding the softmax function.
+
+# References
