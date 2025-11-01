@@ -127,4 +127,20 @@ However, there is one statistical trick to circumvent this problem: The Gumbel-M
 ## Gumbel-Max Trick
 This sampling method allows us to sample from a categorical distribution by only using logits, and avoiding the softmax function.
 
+## Profiling
+
+Nsight Compute can give you pointers about what to optimize.
+
+E.g. in the baseline it a lot of warp stalls and recommended looking for opportunities to improve memory access patterns.
+This lead me to transpose the hidden_states (but this had marginal effect)
+
+A much better improvement was to increase the computational intensity by increasing the tile size of H from 4 to 32, meaning at each tile of the weights would be reused 8x as often to compute logits.
+
+Using the grouped blocks as suggested by the Triton docs improved the performance a lot, increasing L2 cache throughput from 50% to 90%.
+
+Finally, the profiler shows bank conflicts that occur when saving to the shared memory.
+This is relatively easy to fix in CUDA by paddin the shared memory array with +1, since
+we directly control shared memory size.
+However, we don't have this control as easily in Triton, so I skipped this optimization.
+
 # References
