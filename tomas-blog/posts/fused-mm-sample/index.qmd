@@ -75,6 +75,7 @@ Below is a simple PyTorch function that implements the sampling by computing the
 This is just to get an idea of the steps involved, but we want to avoid computing the logits in full.
 For simplicity, I'm sampling a single sample, and not applying any temperature scaling.
 
+<!-- TODO: Update this code with the new transposed shapes -->
 ```python
 def sample(
     weights: torch.Tensor,  # [V, d]
@@ -136,11 +137,30 @@ This lead me to transpose the hidden_states (but this had marginal effect)
 
 A much better improvement was to increase the computational intensity by increasing the tile size of H from 4 to 32, meaning at each tile of the weights would be reused 8x as often to compute logits.
 
-Using the grouped blocks as suggested by the Triton docs improved the performance a lot, increasing L2 cache throughput from 50% to 90%.
-
 Finally, the profiler shows bank conflicts that occur when saving to the shared memory.
-This is relatively easy to fix in CUDA by paddin the shared memory array with +1, since
-we directly control shared memory size.
+This is relatively easy to fix in CUDA by padding the shared memory array with +1, since
+we directly control the shared memory size.
 However, we don't have this control as easily in Triton, so I skipped this optimization.
+
+## Swizzling Bug
+
+The Triton documentation for matrix multiplication suggests to swizzle the program ids to improve the data reuse. @fig-loading-blocks-in-grouped-order shows the difference between loading data blocks in row-major order vs loading them in a "grouped" order.
+The expected benefit of this optimization is a "more than 10%" speedup in the matmul performance. 
+The reason is that tiles of data are not loaded from VRAM but rather from the faster L2 cache.
+
+![Loading Blocks in Grouped Order. Source: [Triton Docs](https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#l2-cache-optimizations)](imgs/grouped_vs_row_major_ordering.png){width="80%" text-align="left" fig-alt="Loading Blocks in Grouped Order" .lightbox #fig-loading-blocks-in-grouped-order}
+
+I implemented this optimization with the existing Triton function `triton.language.swizzle_2d` ([docs](https://triton-lang.org/main/python-api/generated/triton.language.swizzle2d.html)), and saw speed increase massively. The Nsight Compute profiler showed that the L2 cache utilization increased from 50% to 90%, a steep jump.
+
+However, I had made a mistake and passed wrong arguments to `swizzle_2d`.
+This resulted in the same tiles being reloaded again and again, destroying the correctness of the computation, and explaning the excessive L2 cache utilization.
+This bug was nevertheless difficult to catch, because the output of the kernel is a stochastic sample, rather than a deterministic result.
+What made me suspicious was that my kernel, which includes a matmul, was 2x faster than the cuBLAS matmul, which should be close to optimal.
+The performance was _too good to be true_, so I dug deeper and found the bug.
+
+
+::: {.callout-note}
+If you don't understand why your algorithm is running faster than expected, something might be wrong with the code.
+:::
 
 # References
