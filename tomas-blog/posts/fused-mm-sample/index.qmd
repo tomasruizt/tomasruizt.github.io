@@ -1,5 +1,6 @@
 ---
-title: "Hello World"
+title: "FMS: A Fused Matmul-Sample Kernel"
+subtitle: "An Efficient and Exact LLM Sampling Algorithm"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -54,6 +55,13 @@ However, they still materialize the full probabilities in VRAM.
 The online-softmax method is also used in _FlashAttention_ [@dao2022flashattention], but they never sample from the probabilities,
 because they are used in attention, rather than in the language modeling (LM) head.
 All the building blocks exist (online-softmax, incremental logit computation), but have never been put together in a single method for efficient sampling. I set out to implement this myself.
+
+::: {.callout-note}
+# Note
+I later found the paper **FlashSample**, which presents a conceptually similar algorithm [@qin2025flashsampling].
+The paper was submitted to ICLR 25, but it was rejected due to a weak justification and experimental evidence.
+In this post I present comprehensive experimental results, compare the method against the best baselines for LLM sampling, and dive deep into the real bottlenecks of LLM sampling.
+:::
 
 ## Overview
 Let's restate the goals:
@@ -158,9 +166,21 @@ This bug was nevertheless difficult to catch, because the output of the kernel i
 What made me suspicious was that my kernel, which includes a matmul, was 2x faster than the cuBLAS matmul, which should be close to optimal.
 The performance was _too good to be true_, so I dug deeper and found the bug.
 
-
 ::: {.callout-note}
 If you don't understand why your algorithm is running faster than expected, something might be wrong with the code.
 :::
+
+## Performance
+
+I compare the performance of FMS against strong baselines in LLM sampling. These are: first, a PyTorch + torch.compile baseline. Second, two FlashInfer kernels that sample from the logits, rather than from normalized probabilities.
+
+Both FlashInfer kernels require the full logits, so I include in their runtime the time required by the matmul to compute the logits.
+This is a fair comparison because FMS must also perform a matmul to compute logits in SRAM. They are just not written back to VRAM.
+
+In summary, the baselines are:
+
+(1) Naive sampling implemented in PyTorch and compiled using `torch.compile`.
+(2) **`flashinfer:top_k_top_p_sampling_from_logits`**, which uses a dual-pivot algorithm that leverages rejection sampling to sample from the top-k and top-p tokens. This kernel is used for fast sampling in vLLM.
+(3) **`flashinfer:sample_from_logits`**. This kernel is the fastest FlashInfer kernel for sampling. It also uses Gumbel-Max trick to sample from the logits, but still materializes the full logits in VRAM.
 
 # References
