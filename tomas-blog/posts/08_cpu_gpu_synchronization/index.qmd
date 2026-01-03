@@ -1,0 +1,63 @@
+---
+title: "CPU-GPU Synchronizations"
+# subtitle: "An Efficient and Exact LLM Sampling Algorithm"
+author:
+  - name: Tomas Ruiz
+    email: t.ruiz@lmu.de
+    affiliations: Ludwig-Maximilians-Universität München
+date: "2026-01-03"
+categories: [GPUs, PyTorch, Triton]
+format:
+  html:
+    toc: true
+    code-line-numbers: true
+editor:
+    render-on-save: true
+image: "imgs/example-code-do-print-annotated.jpg"
+engine: jupyter
+bibliography: refs.bib
+code-annotations: below
+citation: true
+# draft: true
+---
+# Summary
+CPU-GPU synchronizations (also knowns as host-device synchronizations) are a subtle but important mechanism to understand to write fast and efficient PyTorch programs.
+The CPU-GPU synchronization is a blocking operation that prevents the CPU from scheduling new work for the CPU.
+The [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) of PyTorch makes some basic suggestions about how to avoid CPU-GPU synchronizations, e.g. by avoiding calls to `tensor.item()`, printing a device tensor, or calling `tensor.cpu()` / `tensor.cuda()`.
+However, there are other subtle ways to run into CPU-GPU synchronizations.
+In this post we dive deeper into synchronizations and explain how they slow down a PyTorch program.
+
+# Background
+To fully take advantage of the speed of a GPU, it must be kept busy (high GPU utilization).
+This depends on the CPU scheduling enough work to keep the GPU busy. 
+Typically, in a well-performing PyTorch program, the CPU schedules many instructions quickly, which are then executed on the GPU.
+The CPU is said to _run ahead_ of the GPU, because it issues instructions without waiting for the previous instructions to complete.
+This is why PyTorch is said to be _asynchronous_.
+If the CPU fails to schedule enough work, the GPU will sit idle waiting for work.
+This phenomenon becomes visible in NVIDIA nsight systems as gaps in GPU utilization (see below).
+
+![Profile showing synchronization issues. ](./imgs/example-code-do-print-annotated.jpg)
+
+# Synchronizations
+How do CPU-GPU synchronizations fit into this picture?
+We first need to understand that there is always a kernel-launch overhead when scheduling a kernel from the CPU, as well as a latency delay when moving data from the CPU to the GPU and back.
+To hide this overhead, it's best to schedule a lot of GPU work without moving any data back to the CPU.
+We can make a mistake writing the PyTorch code and introduce the so-called **CPU-GPU synchronization**.
+A CPU-GPU synchronization blocks the CPU while it waits for the GPU to return some result.
+This prevents the CPU from scheduling new work, and results in idle GPU time.
+Let's look at a concrete example.
+Below we have a PyTorch progam that executes a slow operation on the GPU, followed by a quick GPU operation counting the number of ones in the result.
+This is done in a loop, to simulate a long-running program like LLM inference, where the slow operation is the LLM forward, and the quick operation is bookkeeping with the sampled tokens.
+
+# Further References
+For a deep dive into kernel benchmarking in practice, I recommend this [YouTube lecture](https://www.youtube.com/watch?v=CtrqBmYtSEk) by NVIDIA engineering manager [Georgii Evtushenko](https://www.linkedin.com/in/g-evtushenko/).
+
+<!-- - I learned a lot about synchronizing operations while developing the vLLM TokenGroup abstraction in this Github gist: https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90
+    - We can use `torch.cuda.set_sync_debug_mode(2)` to raise Exceptions on syncs
+    - This can be used like a context manager, and like a function decorator in a nested fashion
+    - nsight will show the syncs. `nvtx.annotate()` gives a good overview how long a function runs on CPU and on GPU.
+    - `torch.tensor([1, 2, 3], device=”cuda”)` syncs, while `torch.tensor([1, 2, 3]).to(”cuda”, non_blocking=True)` does not.
+    - Dynamic shapes sync. E.g. boolean indexing `t[bool_mask]` or `t[:gpu_index]` because torch needs to know how large the tensor is to issue the mem-alloc.
+    - Scalar ops can be very easy to write in Triton, not only vectorized programs. In particular, multiple torch ops can be fused into a single Triton op. -->
+
+# References
