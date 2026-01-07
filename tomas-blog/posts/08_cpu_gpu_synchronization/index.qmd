@@ -26,7 +26,9 @@ The CPU-GPU synchronization is a blocking operation that prevents the CPU from s
 The [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) makes some basic suggestions about how to avoid CPU-GPU synchronizations, e.g. by avoiding calls to `tensor.item()`, printing a device tensor, or calling `tensor.cpu()` / `tensor.cuda()`, but doesn't explain in depth what is happening under the hood.
 Furthermore, there are other subtle ways to run into CPU-GPU synchronizations.
 In this post I dive deeper into synchronizations and explain precisely how they slow down a PyTorch program.
-I also show how to use the NVIDIA **Nsight Systems** profiler, to identify and diagnose CPU-GPU synchronization issues.
+I show how to use the NVIDIA **Nsight Systems** profiler, to identify and diagnose CPU-GPU synchronization issues.
+Finally, I also show how to use the experimental PyTorch API `torch.cuda.set_sync_debug_mode` in **unit tests** to verify the absence of CPU-GPU synchronizations in production code.
+
 
 ![Profile showing CPU-GPU synchronization issues. A deep dive into the profile details is in @sec-profiling-analysis.](./imgs/example-code-do-print.png){#fig-profile-no-print}
 
@@ -92,15 +94,74 @@ The resulting profiles are shown below and annotated:
 - In the GPU ops timeline, the slow operation is slower than the quick operation.
 - The full region `interleaved-code` runs faster than without the CPU-GPU synchronization (4.434 ms vs 4.827 ms).
 
-# Problematic Code
-Other code that triggers CPU-GPU synchronizations are:
+# More Synchronization Triggers
+Besides the code mentioned in the [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) there is another common pattern that triggers CPU-GPU synchronizations, namely **dynamic shapes**.
+One example of dynamic shapes is boolean indexing `x = t[bool_mask]`, where `bool_mask` is a boolean tensor on GPU.
+The size of the tensor `x` cannot be determined by the CPU alone, because it depends on the number of true values in `bool_mask`.
+Therefore, the CPU needs to fetch data from the GPU to determine the amount of memory to allocate for `x`.
+This creates a CPU-GPU synchronization.
 
-Using dynamic shapes. E.g. boolean indexing `t[bool_mask]` or `t[:gpu_index]`.
+Another example of this same problem is slicing `x = t[:gpu_index]`, where `gpu_index` is an scalar integer tensor on GPU.
+Once again, the size of the tensor `x` cannot be determined by the CPU alone, because it depends on the value of `gpu_index`.
 
 # Unit Testing for CPU-GPU Synchronizations
 
-- We can use `torch.cuda.set_sync_debug_mode(2)` to raise Exceptions on syncs
-- This can be used like a context manager, and like a function decorator in a nested fashion
+So we need to prevent syncrhonization in our code.
+How can we do this without running a profiler on each code section we are interested in?
+PyTorch provides an experimental feature that can raise warnings or errors when CPU-GPU synchronizations occur: The `torch.cuda.set_sync_debug_mode()` function [(link)](https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html).
+Since it raises errors immediately, it can be used in unit tests to verify that the code is free of CPU-GPU synchronizations. For example it can be used in a context manager:
+
+```python
+@contextmanager
+def fail_if_gpu_cpu_synchronization(fail: bool):
+    """Within this context, GPU-CPU synchronization raises an error if `fail` is True."""
+
+    new_mode = 2 if fail else 0
+    old_mode = torch.cuda.get_sync_debug_mode()
+    torch.cuda.set_sync_debug_mode(new_mode)
+    try:
+        yield
+    finally:
+        torch.cuda.set_sync_debug_mode(old_mode)
+
+
+x = torch.arange(10, device="cuda")
+with fail_if_gpu_cpu_synchronization(fail=True):
+    print(x)  # Raises an error
+```
+
+The context manager can be used to in a decorator as well, to decorate functions that should fail if they contain CPU-GPU synchronizations.
+```python
+def on_gpu_cpu_synchronization(fail: bool):
+    """
+    Wrap a function to raise an error on GPU-CPU synchronization if `fail` is True.
+    """
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with fail_if_gpu_cpu_synchronization(fail):
+                return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+@on_gpu_cpu_synchronization(fail=True)
+def test_should_not_sync():
+    x = torch.arange(10, device="cuda")
+    y = x ** 2
+```
+
+Note that the decorator is used on test functions, meaning that the PyTorch API to raise synchronization errors is never applied to production code, but only to the test code.
+This keeps this experimental feature isolated from prod code while still providing quick and valuable feedback on CPU-GPU synchronizations in prod code. 
+I used this pattern to verify the absence of synchronizations in my Github Gist about [vLLM TokenGroup](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py).
+The mechanism itself of raising errors is also unit tested in the [test_helpers.py file](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_helpers-py) in the Github Gist.
+
+::: {.callout-warning}
+This PyTorch API is experimental as of today, and does not cover *all* CPU-GPU synchronizations. For example, it does not cover the `torch.distributed` and `torch.sparse` namespaces (see [docs](https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html)).
+:::
 
 # Further References
 For a deep dive into kernel benchmarking in practice, I recommend this [YouTube lecture](https://www.youtube.com/watch?v=CtrqBmYtSEk) by NVIDIA engineering manager [Georgii Evtushenko](https://www.linkedin.com/in/g-evtushenko/).
