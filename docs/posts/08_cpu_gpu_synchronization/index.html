@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Tomas Ruiz">
+<meta name="dcterms.date" content="2026-01-07">
+
+<title>PyTorch and CPU-GPU Synchronizations – All Posts</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">All Posts</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../subscribe.html"> 
+<span class="menu-text">Subscribe</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About Me</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/in/tomas-ruiz-649907b3/"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/tomasruizt"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">PyTorch and CPU-GPU Synchronizations</h1>
+            <p class="subtitle lead">Writing Fast PyTorch Code</p>
+                                <div class="quarto-categories">
+                <div class="quarto-category">GPUs</div>
+                <div class="quarto-category">PyTorch</div>
+                <div class="quarto-category">Triton</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliation</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              Ludwig-Maximilians-Universität München
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">January 7, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#what-is-a-cpu-gpu-synchronization" id="toc-what-is-a-cpu-gpu-synchronization" class="nav-link" data-scroll-target="#what-is-a-cpu-gpu-synchronization">What is a CPU-GPU Synchronization?</a></li>
+  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  <li><a href="#sec-profiling-analysis" id="toc-sec-profiling-analysis" class="nav-link" data-scroll-target="#sec-profiling-analysis">Profiling Analysis</a>
+  <ul class="collapse">
+  <li><a href="#run-with-cpu-gpu-synchronization" id="toc-run-with-cpu-gpu-synchronization" class="nav-link" data-scroll-target="#run-with-cpu-gpu-synchronization">Run With CPU-GPU Synchronization</a></li>
+  <li><a href="#healthy-run" id="toc-healthy-run" class="nav-link" data-scroll-target="#healthy-run">Healthy Run</a></li>
+  </ul></li>
+  <li><a href="#dynamic-shapes-can-trigger-synchronizations" id="toc-dynamic-shapes-can-trigger-synchronizations" class="nav-link" data-scroll-target="#dynamic-shapes-can-trigger-synchronizations">Dynamic Shapes Can Trigger Synchronizations</a></li>
+  <li><a href="#unit-testing-for-cpu-gpu-synchronizations" id="toc-unit-testing-for-cpu-gpu-synchronizations" class="nav-link" data-scroll-target="#unit-testing-for-cpu-gpu-synchronizations">Unit Testing for CPU-GPU Synchronizations</a></li>
+  <li><a href="#sec-in-practice" id="toc-sec-in-practice" class="nav-link" data-scroll-target="#sec-in-practice">In Practice: vLLM</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#further-references" id="toc-further-references" class="nav-link" data-scroll-target="#further-references">Further References</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<p><strong>TL;DR:</strong> This post is a guide to understand and prevent CPU-GPU synchronizations, which will help you write fast and efficient PyTorch programs 🚀. I explain the concept with concrete PyTorch examples from <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90">this Github Gist</a>, and profiles from NVIDIA Nsight Systems.</p>
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>CPU-GPU synchronizations (also known as <em>host-device</em> synchronizations) are a subtle but important mechanism to write fast and efficient PyTorch programs. The CPU-GPU synchronization is a blocking operation that prevents the CPU from scheduling new work (PyTorch ops) on the GPU. The <a href="https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization">PyTorch Tuning Guide</a> makes some basic suggestions about how to avoid CPU-GPU synchronizations, e.g.&nbsp;by avoiding calls to <code>tensor.item()</code>, printing a device tensor, or calling <code>tensor.cpu()</code> / <code>tensor.cuda()</code>, but doesn’t explain in depth what is happening under the hood. Furthermore, there are other subtle ways to run into CPU-GPU synchronizations. In this post I dive deeper into synchronizations and explain how they slow down a PyTorch program. I show how to use the NVIDIA <strong>Nsight Systems</strong> profiler to identify and diagnose CPU-GPU synchronization issues. Finally, I also show how to use the experimental PyTorch API <code>torch.cuda.set_sync_debug_mode</code> in <strong>unit tests</strong> to verify the absence of CPU-GPU synchronizations in production code.</p>
+<div id="fig-profile-do-print-overview" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-profile-do-print-overview-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./imgs/example-code-do-print.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-profile-do-print-overview-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Profile showing CPU-GPU synchronization issues (here triggered by printing a CUDA tensor). A deep dive into the profile details is in <a href="#sec-profiling-analysis" class="quarto-xref">Section&nbsp;4</a>.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="what-is-a-cpu-gpu-synchronization" class="level1">
+<h1>What is a CPU-GPU Synchronization?</h1>
+<p>To fully take advantage of the speed of a GPU, it must be kept busy (high GPU utilization). This depends on the CPU scheduling enough work to keep the GPU busy. Typically, in a well-performing PyTorch program, the CPU schedules many instructions quickly, which are executed by the GPU. The CPU is said to <em>run ahead</em> of the GPU, because it issues instructions without waiting for the previous ones to complete. This is why PyTorch is said to be <em>asynchronous</em>. If the CPU fails to schedule enough work, the GPU will sit idle waiting for work.</p>
+<p><strong>The intuition:</strong> As an analogy to understand CPU-GPU synchronizations, think of a restaurant where a chef (CPU) schedules all the steps (PyTorch ops) for a big dinner party in advance. A CPU-GPU synchronization would be like the chef waiting to observe how a specific step in a specific dish turned out <em>during the dinner</em>, before scheduling the rest of the dishes and telling the cooks what to do. Obviously, this latency in communication will lead to the cooks being idle, waiting for the chef to schedule the dishes. Instead, the chef should schedule the entire dinner plan in advance (<em>run ahead</em>).</p>
+</section>
+<section id="example" class="level1">
+<h1>Example</h1>
+<p>Let’s look at a concrete example. Below we have a PyTorch program that executes a <code>slow_operation()</code> on the GPU, followed by a <code>quick_operation()</code> on the GPU. The quick operation just counts the number of 1s in the result tensor. The result of the quick operation is gathered in <code>results</code> tensor. Both functions are executed in a loop, to simulate a long-running program like LLM inference, where the slow operation could be the LLM forward pass, and the quick operation could be bookkeeping with the sampled tokens (a real vLLM example is explained in <a href="#sec-in-practice" class="quarto-xref">Section&nbsp;7</a>). To warm up the torch code, I run both the <code>slow_operation()</code> and <code>quick_operation()</code> once before the hot loop. I annotated regions of code with <code>nvtx.annotate()</code>, to keep track of GPU and CPU runtime during profiling.</p>
+<script src="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90.js?file=cpu_gpu_sync_example.py"></script>
+</section>
+<section id="sec-profiling-analysis" class="level1">
+<h1>Profiling Analysis</h1>
+<p>We can run the NVIDIA Nsight Systems profiler with the command below to produce the timelines shown in <a href="#fig-profile-do-print" class="quarto-xref">Figure&nbsp;2</a> and <a href="#fig-profile-no-print" class="quarto-xref">Figure&nbsp;3</a>. The script takes a flag <code>--do-print</code> to include a CPU-GPU synchronization in the quick operation: a <code>print</code> of a GPU tensor, which forces data back from the GPU to the CPU.</p>
+<p><strong>Without</strong> CPU-GPU synchronization:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1"><a href="#cb1-1"></a>nsys profile \</span>
+<span id="cb1-2"><a href="#cb1-2"></a>  -o profile-no-print.nsys-rep \</span>
+<span id="cb1-3"><a href="#cb1-3"></a>  python cpu_gpu_sync_example.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>With</strong> CPU-GPU synchronization:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb2-1"><a href="#cb2-1"></a>nsys profile \</span>
+<span id="cb2-2"><a href="#cb2-2"></a>  -o profile-do-print.nsys-rep \</span>
+<span id="cb2-3"><a href="#cb2-3"></a>  python cpu_gpu_sync_example.py --do-print</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The resulting profiles are shown below and annotated. I ran the code on an NVIDIA RTX3090 GPU and Nsight Systems 2025.3.1.90.</p>
+<p>To inspect the report:</p>
+<ul>
+<li>Open the <code>.nsys-rep</code> in the Nsight Systems UI</li>
+<li>Zoom into the NVTX-annotated region.</li>
+<li>Look for long CPU-side CUDA API calls like <code>cudaStreamSynchronize</code> and correlate them with gaps in GPU utilization.</li>
+</ul>
+<section id="run-with-cpu-gpu-synchronization" class="level3">
+<h3 class="anchored" data-anchor-id="run-with-cpu-gpu-synchronization">Run With CPU-GPU Synchronization</h3>
+<div id="fig-profile-do-print" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-profile-do-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./imgs/example-code-do-print-annotated.jpg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-profile-do-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Profile with CPU-GPU synchronization.
+</figcaption>
+</figure>
+</div>
+<ul>
+<li>We see <strong>gaps</strong> in the GPU utilization (first blue bar from top to bottom). These gaps indicate that the GPU has idle times and waits for work.</li>
+<li>We observe that the runtimes of the GPU and CPU are similarly long, as seen both timelines being equal in length in the horizontal axis. In a well-performing program, the CPU runtime should be shorter than the GPU runtime (CPU <em>runs ahead</em> of the GPU).</li>
+<li>In the CPU ops timeline, we see long green bars (<code>cudaStreamSynchronize</code>), which mean that the CPU is <strong>blocked</strong> waiting for the GPU to return some data.</li>
+<li>On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, which just means that the quick operation is the one blocking the CPU.</li>
+</ul>
+</section>
+<section id="healthy-run" class="level3">
+<h3 class="anchored" data-anchor-id="healthy-run">Healthy Run</h3>
+<div id="fig-profile-no-print" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-profile-no-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./imgs/example-code-no-print-annotated.jpg" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-profile-no-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Profile without CPU-GPU synchronization.
+</figcaption>
+</figure>
+</div>
+<ul>
+<li>We observe that the CPU <strong>runs ahead</strong> of the GPU, so it dispatches all the work quickly and finishes way before the GPU.</li>
+<li>The GPU utilization does not have any gaps. The blue line showing utilization is continuous.</li>
+<li>In the GPU ops timeline, the slow operation is slower than the quick operation.</li>
+<li>The full region <code>interleaved-code</code> runs faster than with the CPU-GPU synchronization (4.434 ms vs 4.827 ms).</li>
+</ul>
+</section>
+</section>
+<section id="dynamic-shapes-can-trigger-synchronizations" class="level1">
+<h1>Dynamic Shapes Can Trigger Synchronizations</h1>
+<p>Besides the code mentioned in the <a href="https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization">PyTorch Tuning Guide</a> there is another common pattern that triggers CPU-GPU synchronizations, namely <strong>dynamic shapes</strong>. One example of dynamic shapes is boolean indexing <code>x = t[bool_mask]</code>, where <code>bool_mask</code> is a boolean tensor on GPU. The size of the tensor <code>x</code> cannot be determined by the CPU alone, because it depends on the number of true values in <code>bool_mask</code>. Therefore, PyTorch typically needs to fetch data from the GPU to determine the amount of memory to allocate for <code>x</code>. This creates a CPU-GPU synchronization.</p>
+<p>Another example of this same problem is slicing <code>x = t[:gpu_index]</code>, where <code>gpu_index</code> is a scalar integer tensor on GPU. Once again, the size of the tensor <code>x</code> cannot be determined by the CPU alone, because it depends on the value of <code>gpu_index</code>.</p>
+<p>There are other ways to slice a torch tensor, e.g.&nbsp;<code>x = t.narrow(dim=0, start, length)</code> (<a href="https://docs.pytorch.org/docs/stable/generated/torch.narrow.html">link</a>). However, this operation requires <code>length</code> to be a Python <code>int</code>. Passing a GPU tensor as <code>length</code> will typically trigger a cast to Python <code>int</code> on CPU, which introduces a CPU-GPU synchronization.</p>
+<p>What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU. This is why <strong>dynamic shapes</strong> are so problematic. Instead, if the length of the resulting tensor can be known <em>statically</em> on the CPU side, then we can find a way to avoid the CPU-GPU synchronization. PyTorch might not provide the precise API you need to avoid the synchronization. In that case, you might want to write a custom kernel in <strong>Triton</strong> to avoid the synchronization. The advantage of doing this is that you can fuse many sequential PyTorch operations into a single Triton kernel, which reduces the overhead of dispatching many small kernels on the CPU-side (around 2µs to 3µs per kernel). A concrete example is explained in <a href="#sec-in-practice" class="quarto-xref">Section&nbsp;7</a>. The accompanying Github Gist also uses <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py-L299">Triton kernels</a> to fuse together PyTorch ops, and prevent CPU-GPU synchronizations.</p>
+</section>
+<section id="unit-testing-for-cpu-gpu-synchronizations" class="level1">
+<h1>Unit Testing for CPU-GPU Synchronizations</h1>
+<p>So we need to prevent synchronization in our code. How can we do this without running a profiler on each code section we are interested in? PyTorch provides an experimental feature that can raise warnings or errors when CPU-GPU synchronizations occur: The <code>torch.cuda.set_sync_debug_mode()</code> function <a href="https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html">(link)</a>. Since it raises errors immediately, it can be used in unit tests to verify that the code is free of CPU-GPU synchronizations. For example it can be used in a context manager:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1"></a><span class="im">import</span> functools</span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="im">from</span> contextlib <span class="im">import</span> contextmanager</span>
+<span id="cb3-3"><a href="#cb3-3"></a></span>
+<span id="cb3-4"><a href="#cb3-4"></a><span class="im">import</span> torch</span>
+<span id="cb3-5"><a href="#cb3-5"></a></span>
+<span id="cb3-6"><a href="#cb3-6"></a><span class="at">@contextmanager</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a><span class="kw">def</span> fail_if_gpu_cpu_synchronization(fail: <span class="bu">bool</span>):</span>
+<span id="cb3-8"><a href="#cb3-8"></a>    <span class="co">"""Within this context, GPU-CPU synchronization raises an error if `fail` is True."""</span></span>
+<span id="cb3-9"><a href="#cb3-9"></a></span>
+<span id="cb3-10"><a href="#cb3-10"></a>    new_mode <span class="op">=</span> <span class="dv">2</span> <span class="cf">if</span> fail <span class="cf">else</span> <span class="dv">0</span></span>
+<span id="cb3-11"><a href="#cb3-11"></a>    old_mode <span class="op">=</span> torch.cuda.get_sync_debug_mode()</span>
+<span id="cb3-12"><a href="#cb3-12"></a>    torch.cuda.set_sync_debug_mode(new_mode)</span>
+<span id="cb3-13"><a href="#cb3-13"></a>    <span class="cf">try</span>:</span>
+<span id="cb3-14"><a href="#cb3-14"></a>        <span class="cf">yield</span></span>
+<span id="cb3-15"><a href="#cb3-15"></a>    <span class="cf">finally</span>:</span>
+<span id="cb3-16"><a href="#cb3-16"></a>        torch.cuda.set_sync_debug_mode(old_mode)</span>
+<span id="cb3-17"><a href="#cb3-17"></a></span>
+<span id="cb3-18"><a href="#cb3-18"></a></span>
+<span id="cb3-19"><a href="#cb3-19"></a>x <span class="op">=</span> torch.arange(<span class="dv">10</span>, device<span class="op">=</span><span class="st">"cuda"</span>)</span>
+<span id="cb3-20"><a href="#cb3-20"></a><span class="cf">with</span> fail_if_gpu_cpu_synchronization(fail<span class="op">=</span><span class="va">True</span>):</span>
+<span id="cb3-21"><a href="#cb3-21"></a>    <span class="bu">print</span>(x)  <span class="co"># Raises an error</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The context manager can be used in a decorator as well, to decorate functions that should fail if they contain CPU-GPU synchronizations.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">def</span> on_gpu_cpu_synchronization(fail: <span class="bu">bool</span>):</span>
+<span id="cb4-2"><a href="#cb4-2"></a>    <span class="co">"""</span></span>
+<span id="cb4-3"><a href="#cb4-3"></a><span class="co">    Wrap a function to raise an error on GPU-CPU synchronization if `fail` is True.</span></span>
+<span id="cb4-4"><a href="#cb4-4"></a><span class="co">    """</span></span>
+<span id="cb4-5"><a href="#cb4-5"></a></span>
+<span id="cb4-6"><a href="#cb4-6"></a>    <span class="kw">def</span> decorator(fn):</span>
+<span id="cb4-7"><a href="#cb4-7"></a>        <span class="at">@functools.wraps</span>(fn)</span>
+<span id="cb4-8"><a href="#cb4-8"></a>        <span class="kw">def</span> wrapper(<span class="op">*</span>args, <span class="op">**</span>kwargs):</span>
+<span id="cb4-9"><a href="#cb4-9"></a>            <span class="cf">with</span> fail_if_gpu_cpu_synchronization(fail):</span>
+<span id="cb4-10"><a href="#cb4-10"></a>                <span class="cf">return</span> fn(<span class="op">*</span>args, <span class="op">**</span>kwargs)</span>
+<span id="cb4-11"><a href="#cb4-11"></a></span>
+<span id="cb4-12"><a href="#cb4-12"></a>        <span class="cf">return</span> wrapper</span>
+<span id="cb4-13"><a href="#cb4-13"></a></span>
+<span id="cb4-14"><a href="#cb4-14"></a>    <span class="cf">return</span> decorator</span>
+<span id="cb4-15"><a href="#cb4-15"></a></span>
+<span id="cb4-16"><a href="#cb4-16"></a></span>
+<span id="cb4-17"><a href="#cb4-17"></a><span class="at">@on_gpu_cpu_synchronization</span>(fail<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-18"><a href="#cb4-18"></a><span class="kw">def</span> test_should_not_sync():</span>
+<span id="cb4-19"><a href="#cb4-19"></a>    x <span class="op">=</span> torch.arange(<span class="dv">10</span>, device<span class="op">=</span><span class="st">"cuda"</span>)</span>
+<span id="cb4-20"><a href="#cb4-20"></a>    y <span class="op">=</span> x <span class="op">**</span> <span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Note that the decorator is used <strong>only on test functions</strong>, meaning that the PyTorch API to raise synchronization errors is never applied to production code, but only to the test code. This keeps this experimental feature isolated from production code while still providing quick and valuable feedback on CPU-GPU synchronizations. I used this pattern to verify the absence of synchronizations in my Github Gist about <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py">vLLM TokenGroup</a>. The mechanism itself of raising errors is also unit tested in the <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_helpers-py">test_helpers.py file</a> in the Github Gist.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This PyTorch API is experimental as of today, and does not cover <em>all</em> CPU-GPU synchronizations. For example, it does not cover the <code>torch.distributed</code> and <code>torch.sparse</code> namespaces (see <a href="https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html">docs</a>).</p>
+</div>
+</div>
+</section>
+<section id="sec-in-practice" class="level1">
+<h1>In Practice: vLLM</h1>
+<p>I encountered CPU-GPU synchronizations in the context of contributing speculative decoding to vLLM (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>). In particular, the LLM forward passes are heavy operations, and preparing the input tokens for the forward pass requires lots of small PyTorch operations, which can introduce CPU-GPU synchronizations, if not carefully written. Senior NVIDIA engineer <a href="https://www.linkedin.com/in/benjamin-chislett-05502818a/">Benjamin Chislett</a> helped me understand what causes the synchronizations, in particular dynamic shapes, and the value of writing custom kernels in Triton to fuse together multiple sequential PyTorch operations (example: <a href="https://github.com/vllm-project/vllm/pull/28597">PR #28597</a>). I thank him for his support and feedback! 💪</p>
+</section>
+<section id="summary" class="level1">
+<h1>Summary</h1>
+<p>In this post, I explained what CPU-GPU synchronizations are, and how to identify and diagnose them with the NVIDIA Nsight Systems profiler. I discussed dynamic shapes as a common trigger for CPU-GPU synchronizations, and the value of writing custom kernels in Triton to fuse together multiple sequential PyTorch operations. I also showed how to use the experimental PyTorch API <code>torch.cuda.set_sync_debug_mode</code> in unit tests to verify the absence of CPU-GPU synchronizations in production code. This guide aims to help engineers prevent CPU-GPU synchronizations, which is key to write fast and efficient PyTorch programs.</p>
+</section>
+<section id="further-references" class="level1">
+<h1>Further References</h1>
+<p>For a deep dive into kernel benchmarking in practice, I recommend this <a href="https://www.youtube.com/watch?v=CtrqBmYtSEk">YouTube lecture</a> by NVIDIA engineering manager <a href="https://www.linkedin.com/in/g-evtushenko/">Georgii Evtushenko</a>.</p>
+<!-- 
+  - I learned a lot about synchronizing operations while developing the vLLM TokenGroup abstraction in this Github gist: https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90
+
+  - `torch.tensor([1, 2, 3], device=”cuda”)` syncs, while `torch.tensor([1, 2, 3]).to(”cuda”, non_blocking=True)` does not.
+  - Dynamic shapes sync. E.g. boolean indexing `t[bool_mask]` or `t[:gpu_index]` because torch needs to know how large the tensor is to issue the mem-alloc.
+
+  - Scalar ops can be very easy to write in Triton, not only vectorized programs. In particular, multiple torch ops can be fused into a single Triton op. This is useful to reduce the dispatching overhead on the CPU-side, and the kernel launch overhead on the GPU-side.
+-->
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
+  author = {Ruiz, Tomas},
+  title = {PyTorch and {CPU-GPU} {Synchronizations}},
+  date = {2026-01-07},
+  url = {https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/},
+  langid = {en}
+}
+</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2026" class="csl-entry quarto-appendix-citeas" role="listitem">
+Ruiz, Tomas. 2026. <span>“PyTorch and CPU-GPU Synchronizations.”</span>
+January 7, 2026. <a href="https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/">https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/</a>.
+</div></div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/tomasruizt\.github\.io\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+</script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="light">
+</div> <!-- /content -->
+
+
+
+
+</body></html>
