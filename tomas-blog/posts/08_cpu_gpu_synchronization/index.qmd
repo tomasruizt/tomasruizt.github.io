@@ -20,7 +20,10 @@ code-annotations: below
 citation: true
 # draft: true
 ---
-# Summary
+**TL;DR:** This post is a guide to understand and prevent CPU-GPU synchronizations, which will help you write fast and efficient PyTorch programs 🚀.
+I explain the concept with concrete PyTorch examples from [this Github Gist](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90), and profiles from NVIDIA Nsight Systems.
+
+# Introduction
 CPU-GPU synchronizations (also knowns as _host-device_ synchronizations) are a subtle but important mechanism to write fast and efficient PyTorch programs.
 The CPU-GPU synchronization is a blocking operation that prevents the CPU from scheduling new work (PyTorch ops) on the GPU.
 The [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) makes some basic suggestions about how to avoid CPU-GPU synchronizations, e.g. by avoiding calls to `tensor.item()`, printing a device tensor, or calling `tensor.cpu()` / `tensor.cuda()`, but doesn't explain in depth what is happening under the hood.
@@ -32,7 +35,7 @@ Finally, I also show how to use the experimental PyTorch API `torch.cuda.set_syn
 
 ![Profile showing CPU-GPU synchronization issues. A deep dive into the profile details is in @sec-profiling-analysis.](./imgs/example-code-do-print.png){#fig-profile-no-print}
 
-# Background
+# CPU-GPU Synchronizations
 To fully take advantage of the speed of a GPU, it must be kept busy (high GPU utilization).
 This depends on the CPU scheduling enough work to keep the GPU busy. 
 Typically, in a well-performing PyTorch program, the CPU schedules many instructions quickly, which are executed by the GPU.
@@ -49,7 +52,7 @@ Let's look at a concrete example.
 Below we have a PyTorch progam that executes a `slow_operation()` on the GPU, followed by a `quick_operation()` on the GPU. 
 The quick operation just counts the number of 1s in the result tensor.
 The result of the quick operation is gathered in `results` tensor.
-Both functions are executed in a loop, to simulate a long-running program like LLM inference, where the slow operation could be the LLM forward pass, and the quick operation could be bookkeeping with the sampled tokens^[This entire example is inspired by the vLLM inference loop].
+Both functions are executed in a loop, to simulate a long-running program like LLM inference, where the slow operation could be the LLM forward pass, and the quick operation could be bookkeeping with the sampled tokens (a real vLLM example is explained in @sec-in-practice).
 To warm up the torch code, I run both the `slow_operation()` and `quick_operation()` once before the hot loop.
 I annotated regions of code with `nvtx.annotate()`, to keep track of GPU and CPU runtime during profiling.
 
@@ -73,7 +76,8 @@ nsys profile \
   python cpu_gpu_sync_example.py --do-print
 ```
 
-The resulting profiles are shown below and annotated:
+The resulting profiles are shown below and annotated.
+I ran the code on an NVIDIA RTX3090 GPU.
 
 ### Run With CPU-GPU Synchronization
 
@@ -87,14 +91,14 @@ The resulting profiles are shown below and annotated:
 
 ### Healthy Run
 
-![Profile Without CPU-GPU Synchronization. ](./imgs/example-code-no-print.png){#fig-profile-do-print}
+![Profile Without CPU-GPU Synchronization. ](./imgs/example-code-no-print-annotated.jpg){#fig-profile-do-print}
 
 - We observe that the CPU **runs ahead** of the GPU, so it dispatches all the work quickly and finishes way before the GPU.
 - The GPU utilization does not have any gaps. The blue line showing utilization is continuous.
 - In the GPU ops timeline, the slow operation is slower than the quick operation.
 - The full region `interleaved-code` runs faster than without the CPU-GPU synchronization (4.434 ms vs 4.827 ms).
 
-# More Synchronization Triggers
+# Dynamic Shapes Can Trigger Synchronizations
 Besides the code mentioned in the [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) there is another common pattern that triggers CPU-GPU synchronizations, namely **dynamic shapes**.
 One example of dynamic shapes is boolean indexing `x = t[bool_mask]`, where `bool_mask` is a boolean tensor on GPU.
 The size of the tensor `x` cannot be determined by the CPU alone, because it depends on the number of true values in `bool_mask`.
@@ -103,6 +107,20 @@ This creates a CPU-GPU synchronization.
 
 Another example of this same problem is slicing `x = t[:gpu_index]`, where `gpu_index` is an scalar integer tensor on GPU.
 Once again, the size of the tensor `x` cannot be determined by the CPU alone, because it depends on the value of `gpu_index`.
+
+There are other ways to slice a torch tensor, e.g. `x = t.narrow(dim=0, start, length)` ([link](https://docs.pytorch.org/docs/stable/generated/torch.narrow.html)). 
+However, this operation requires `length` to be a Python `int`.
+Passing a GPU tensor as `length` will trigger a cast to Python `int` on CPU, which introduces a CPU-GPU synchronization.
+
+What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU.
+This is why **dynamic shapes** are so problematic. 
+Instead, if the length of the resulting tensor can be known *statically* on the CPU side, then we can find a way to avoid the CPU-GPU
+synchronization.
+PyTorch might not provide the precise API to you need avoid the synchronization.
+In that case, you might want to write a custom kernel in **Triton** to avoid the synchronization.
+The advantage of doing this is that you can fuse many sequential PyTorch operations into a single Triton kernel, which reduces the overhead of dispatching many small kernels on the CPU-side (around 2µs to 3µs per kernel).
+A concrete example is explained in @sec-in-practice.
+The accompanying Github Gist also uses [Triton kernels](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py-L299) to fuse together PyTorch ops, and prevent CPU-GPU synchronizations.
 
 # Unit Testing for CPU-GPU Synchronizations
 
@@ -154,14 +172,26 @@ def test_should_not_sync():
     y = x ** 2
 ```
 
-Note that the decorator is used on test functions, meaning that the PyTorch API to raise synchronization errors is never applied to production code, but only to the test code.
-This keeps this experimental feature isolated from prod code while still providing quick and valuable feedback on CPU-GPU synchronizations in prod code. 
+Note that the decorator is used **only on test functions**, meaning that the PyTorch API to raise synchronization errors is never applied to production code, but only to the test code.
+This keeps this experimental feature isolated from production code while still providing quick and valuable feedback on CPU-GPU synchronizations. 
 I used this pattern to verify the absence of synchronizations in my Github Gist about [vLLM TokenGroup](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py).
 The mechanism itself of raising errors is also unit tested in the [test_helpers.py file](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_helpers-py) in the Github Gist.
 
 ::: {.callout-warning}
 This PyTorch API is experimental as of today, and does not cover *all* CPU-GPU synchronizations. For example, it does not cover the `torch.distributed` and `torch.sparse` namespaces (see [docs](https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html)).
 :::
+
+# In Practice: vLLM {#sec-in-practice}
+I encountered CPU-GPU synchronizations in the context of contributing speculative decoding to vLLM ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)).
+In particular, the LLM forward passes are heavy operations, and preparing the input tokens for the forward pass requires lots of small PyTorch operations, which can introduce CPU-GPU synchronizations, if not carefully written.
+Senior NVIDIA engineer [Benjamin Chislett](https://www.linkedin.com/in/benjamin-chislett-05502818a/) helped me understand what causes the synchronizations, in particular dynamic shapes, and the value of writing custom kernels in Triton to fuse together multiple sequential PyTorch operations (example: [PR #28597](https://github.com/vllm-project/vllm/pull/28597)).
+I thank him for his support and feedback! 💪
+
+# Summary
+In this post, I explained what CPU-GPU synchronizations are, and how to identify and diagnose them with the NVIDIA Nsight Systems profiler.
+I discussed dynamic shapes as a common trigger for CPU-GPU synchronizations, and the value of writing custom kernels in Triton to fuse together multiple sequential PyTorch operations.
+I also showed how to use the experimental PyTorch API `torch.cuda.set_sync_debug_mode` in unit tests to verify the absence of CPU-GPU synchronizations in production code.
+This guide aims to help engineers prevent CPU-GPU synchronizations, which is key to write fast and efficient PyTorch programs.
 
 # Further References
 For a deep dive into kernel benchmarking in practice, I recommend this [YouTube lecture](https://www.youtube.com/watch?v=CtrqBmYtSEk) by NVIDIA engineering manager [Georgii Evtushenko](https://www.linkedin.com/in/g-evtushenko/).
@@ -174,5 +204,3 @@ For a deep dive into kernel benchmarking in practice, I recommend this [YouTube 
 
   - Scalar ops can be very easy to write in Triton, not only vectorized programs. In particular, multiple torch ops can be fused into a single Triton op. This is useful to reduce the dispatching overhead on the CPU-side, and the kernel launch overhead on the GPU-side.
 -->
-
-# References
