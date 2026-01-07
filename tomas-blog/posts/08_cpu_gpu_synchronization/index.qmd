@@ -24,18 +24,17 @@ citation: true
 I explain the concept with concrete PyTorch examples from [this Github Gist](https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90), and profiles from NVIDIA Nsight Systems.
 
 # Introduction
-CPU-GPU synchronizations (also knowns as _host-device_ synchronizations) are a subtle but important mechanism to write fast and efficient PyTorch programs.
+CPU-GPU synchronizations (also known as _host-device_ synchronizations) are a subtle but important mechanism to write fast and efficient PyTorch programs.
 The CPU-GPU synchronization is a blocking operation that prevents the CPU from scheduling new work (PyTorch ops) on the GPU.
 The [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) makes some basic suggestions about how to avoid CPU-GPU synchronizations, e.g. by avoiding calls to `tensor.item()`, printing a device tensor, or calling `tensor.cpu()` / `tensor.cuda()`, but doesn't explain in depth what is happening under the hood.
 Furthermore, there are other subtle ways to run into CPU-GPU synchronizations.
-In this post I dive deeper into synchronizations and explain precisely how they slow down a PyTorch program.
-I show how to use the NVIDIA **Nsight Systems** profiler, to identify and diagnose CPU-GPU synchronization issues.
+In this post I dive deeper into synchronizations and explain how they slow down a PyTorch program.
+I show how to use the NVIDIA **Nsight Systems** profiler to identify and diagnose CPU-GPU synchronization issues.
 Finally, I also show how to use the experimental PyTorch API `torch.cuda.set_sync_debug_mode` in **unit tests** to verify the absence of CPU-GPU synchronizations in production code.
 
+![Profile showing CPU-GPU synchronization issues (here triggered by printing a CUDA tensor). A deep dive into the profile details is in @sec-profiling-analysis.](./imgs/example-code-do-print.png){#fig-profile-do-print-overview}
 
-![Profile showing CPU-GPU synchronization issues. A deep dive into the profile details is in @sec-profiling-analysis.](./imgs/example-code-do-print.png){#fig-profile-no-print}
-
-# CPU-GPU Synchronizations
+# What is a CPU-GPU Synchronization?
 To fully take advantage of the speed of a GPU, it must be kept busy (high GPU utilization).
 This depends on the CPU scheduling enough work to keep the GPU busy. 
 Typically, in a well-performing PyTorch program, the CPU schedules many instructions quickly, which are executed by the GPU.
@@ -49,7 +48,7 @@ Obviously, this latency in communication will lead to the cooks being idle, wait
 
 # Example
 Let's look at a concrete example.
-Below we have a PyTorch progam that executes a `slow_operation()` on the GPU, followed by a `quick_operation()` on the GPU. 
+Below we have a PyTorch program that executes a `slow_operation()` on the GPU, followed by a `quick_operation()` on the GPU. 
 The quick operation just counts the number of 1s in the result tensor.
 The result of the quick operation is gathered in `results` tensor.
 Both functions are executed in a loop, to simulate a long-running program like LLM inference, where the slow operation could be the LLM forward pass, and the quick operation could be bookkeeping with the sampled tokens (a real vLLM example is explained in @sec-in-practice).
@@ -60,8 +59,8 @@ I annotated regions of code with `nvtx.annotate()`, to keep track of GPU and CPU
 
 # Profiling Analysis {#sec-profiling-analysis}
 
-We can run the NVIDIA Nsight Systems profiler with the command below to produce the timeline shown in @fig-profile-no-print.
-The script takes a flag `--do-print` to include a CPU-GPU synchronization in the quick operation: a `print`of a gpu tensor, which forces data back from the GPU to the CPU.
+We can run the NVIDIA Nsight Systems profiler with the command below to produce the timelines shown in @fig-profile-do-print and @fig-profile-no-print.
+The script takes a flag `--do-print` to include a CPU-GPU synchronization in the quick operation: a `print` of a GPU tensor, which forces data back from the GPU to the CPU.
 
 **Without** CPU-GPU synchronization:
 ```shell
@@ -77,46 +76,52 @@ nsys profile \
 ```
 
 The resulting profiles are shown below and annotated.
-I ran the code on an NVIDIA RTX3090 GPU.
+I ran the code on an NVIDIA RTX3090 GPU and Nsight Systems 2025.3.1.90.
+
+To inspect the report:
+
+- Open the `.nsys-rep` in the Nsight Systems UI
+- Zoom into the NVTX-annotated region.
+- Look for long CPU-side CUDA API calls like `cudaStreamSynchronize` and correlate them with gaps in GPU utilization.
 
 ### Run With CPU-GPU Synchronization
 
-![Profile With CPU-GPU Synchronization. ](./imgs/example-code-do-print-annotated.jpg){#fig-profile-no-print}
+![Profile with CPU-GPU synchronization.](./imgs/example-code-do-print-annotated.jpg){#fig-profile-do-print}
 
 - We see **gaps** in the GPU utilization (first blue bar from top to bottom). These gaps indicate that the GPU has idle times and waits for work.
 - We observe that the runtimes of the GPU and CPU are similarly long, as seen both timelines being equal in length in the horizontal axis. In a well-performing program, the CPU runtime should be shorter than the GPU runtime (CPU _runs ahead_ of the GPU).
-- In the CPU ops timeline, we see long green bars (`cudaStreamSyncrhonize`), which mean that the CPU is **blocked** waiting for the GPU to return some data.
-- On the GPU ops timeline we observe that the slow operations takes longer than the quick operation, which just means that the quick operation is the one blocking the CPU.
+- In the CPU ops timeline, we see long green bars (`cudaStreamSynchronize`), which mean that the CPU is **blocked** waiting for the GPU to return some data.
+- On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, which just means that the quick operation is the one blocking the CPU.
 
 
 ### Healthy Run
 
-![Profile Without CPU-GPU Synchronization. ](./imgs/example-code-no-print-annotated.jpg){#fig-profile-do-print}
+![Profile without CPU-GPU synchronization.](./imgs/example-code-no-print-annotated.jpg){#fig-profile-no-print}
 
 - We observe that the CPU **runs ahead** of the GPU, so it dispatches all the work quickly and finishes way before the GPU.
 - The GPU utilization does not have any gaps. The blue line showing utilization is continuous.
 - In the GPU ops timeline, the slow operation is slower than the quick operation.
-- The full region `interleaved-code` runs faster than without the CPU-GPU synchronization (4.434 ms vs 4.827 ms).
+- The full region `interleaved-code` runs faster than with the CPU-GPU synchronization (4.434 ms vs 4.827 ms).
 
 # Dynamic Shapes Can Trigger Synchronizations
 Besides the code mentioned in the [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization) there is another common pattern that triggers CPU-GPU synchronizations, namely **dynamic shapes**.
 One example of dynamic shapes is boolean indexing `x = t[bool_mask]`, where `bool_mask` is a boolean tensor on GPU.
 The size of the tensor `x` cannot be determined by the CPU alone, because it depends on the number of true values in `bool_mask`.
-Therefore, the CPU needs to fetch data from the GPU to determine the amount of memory to allocate for `x`.
+Therefore, PyTorch typically needs to fetch data from the GPU to determine the amount of memory to allocate for `x`.
 This creates a CPU-GPU synchronization.
 
-Another example of this same problem is slicing `x = t[:gpu_index]`, where `gpu_index` is an scalar integer tensor on GPU.
+Another example of this same problem is slicing `x = t[:gpu_index]`, where `gpu_index` is a scalar integer tensor on GPU.
 Once again, the size of the tensor `x` cannot be determined by the CPU alone, because it depends on the value of `gpu_index`.
 
 There are other ways to slice a torch tensor, e.g. `x = t.narrow(dim=0, start, length)` ([link](https://docs.pytorch.org/docs/stable/generated/torch.narrow.html)). 
 However, this operation requires `length` to be a Python `int`.
-Passing a GPU tensor as `length` will trigger a cast to Python `int` on CPU, which introduces a CPU-GPU synchronization.
+Passing a GPU tensor as `length` will typically trigger a cast to Python `int` on CPU, which introduces a CPU-GPU synchronization.
 
 What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU.
 This is why **dynamic shapes** are so problematic. 
 Instead, if the length of the resulting tensor can be known *statically* on the CPU side, then we can find a way to avoid the CPU-GPU
 synchronization.
-PyTorch might not provide the precise API to you need avoid the synchronization.
+PyTorch might not provide the precise API you need to avoid the synchronization.
 In that case, you might want to write a custom kernel in **Triton** to avoid the synchronization.
 The advantage of doing this is that you can fuse many sequential PyTorch operations into a single Triton kernel, which reduces the overhead of dispatching many small kernels on the CPU-side (around 2µs to 3µs per kernel).
 A concrete example is explained in @sec-in-practice.
@@ -124,12 +129,17 @@ The accompanying Github Gist also uses [Triton kernels](https://gist.github.com/
 
 # Unit Testing for CPU-GPU Synchronizations
 
-So we need to prevent syncrhonization in our code.
+So we need to prevent synchronization in our code.
 How can we do this without running a profiler on each code section we are interested in?
 PyTorch provides an experimental feature that can raise warnings or errors when CPU-GPU synchronizations occur: The `torch.cuda.set_sync_debug_mode()` function [(link)](https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html).
 Since it raises errors immediately, it can be used in unit tests to verify that the code is free of CPU-GPU synchronizations. For example it can be used in a context manager:
 
 ```python
+import functools
+from contextlib import contextmanager
+
+import torch
+
 @contextmanager
 def fail_if_gpu_cpu_synchronization(fail: bool):
     """Within this context, GPU-CPU synchronization raises an error if `fail` is True."""
@@ -148,7 +158,7 @@ with fail_if_gpu_cpu_synchronization(fail=True):
     print(x)  # Raises an error
 ```
 
-The context manager can be used to in a decorator as well, to decorate functions that should fail if they contain CPU-GPU synchronizations.
+The context manager can be used in a decorator as well, to decorate functions that should fail if they contain CPU-GPU synchronizations.
 ```python
 def on_gpu_cpu_synchronization(fail: bool):
     """
