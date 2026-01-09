@@ -192,6 +192,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       </div>
     </div>
     
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">January 8, 2026</p>
+      </div>
+    </div>
       
     </div>
     
@@ -286,7 +292,7 @@ Figure&nbsp;2: Profile with CPU-GPU synchronization.
 <li>We see <strong>gaps</strong> in the GPU utilization (first blue bar from top to bottom). These gaps indicate that the GPU has idle times and waits for work.</li>
 <li>We observe that the runtimes of the GPU and CPU are similarly long, as seen both timelines being equal in length in the horizontal axis. In a well-performing program, the CPU runtime should be shorter than the GPU runtime (CPU <em>runs ahead</em> of the GPU).</li>
 <li>In the CPU ops timeline, we see long green bars (<code>cudaStreamSynchronize</code>), which mean that the CPU is <strong>blocked</strong> waiting for the GPU to return some data.</li>
-<li>On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, which just means that the quick operation is the one blocking the CPU.</li>
+<li>On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, while in the CPU ops timeline we observe the reverse. This means that the quick operation is the one blocking the CPU.</li>
 </ul>
 </section>
 <section id="healthy-run" class="level3">
@@ -314,6 +320,7 @@ Figure&nbsp;3: Profile without CPU-GPU synchronization.
 <p>Besides the code mentioned in the <a href="https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization">PyTorch Tuning Guide</a> there is another common pattern that triggers CPU-GPU synchronizations, namely <strong>dynamic shapes</strong>. One example of dynamic shapes is boolean indexing <code>x = t[bool_mask]</code>, where <code>bool_mask</code> is a boolean tensor on GPU. The size of the tensor <code>x</code> cannot be determined by the CPU alone, because it depends on the number of true values in <code>bool_mask</code>. Therefore, PyTorch typically needs to fetch data from the GPU to determine the amount of memory to allocate for <code>x</code>. This creates a CPU-GPU synchronization.</p>
 <p>Another example of this same problem is slicing <code>x = t[:gpu_index]</code>, where <code>gpu_index</code> is a scalar integer tensor on GPU. Once again, the size of the tensor <code>x</code> cannot be determined by the CPU alone, because it depends on the value of <code>gpu_index</code>.</p>
 <p>There are other ways to slice a torch tensor, e.g.&nbsp;<code>x = t.narrow(dim=0, start, length)</code> (<a href="https://docs.pytorch.org/docs/stable/generated/torch.narrow.html">link</a>). However, this operation requires <code>length</code> to be a Python <code>int</code>. Passing a GPU tensor as <code>length</code> will typically trigger a cast to Python <code>int</code> on CPU, which introduces a CPU-GPU synchronization.</p>
+<p>A similar situation arises with <code>x = torch.repeat_interleave(y, repeats)</code>. But interestingly, this API exposes an optional argument <code>output_size</code> that can be used to prevent the synchronization (<a href="https://docs.pytorch.org/docs/stable/generated/torch.repeat_interleave.html">link</a>).</p>
 <p>What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU. This is why <strong>dynamic shapes</strong> are so problematic. Instead, if the length of the resulting tensor can be known <em>statically</em> on the CPU side, then we can find a way to avoid the CPU-GPU synchronization. PyTorch might not provide the precise API you need to avoid the synchronization. In that case, you might want to write a custom kernel in <strong>Triton</strong> to avoid the synchronization. The advantage of doing this is that you can fuse many sequential PyTorch operations into a single Triton kernel, which reduces the overhead of dispatching many small kernels on the CPU-side (around 2µs to 3µs per kernel). A concrete example is explained in <a href="#sec-in-practice" class="quarto-xref">Section&nbsp;7</a>. The accompanying Github Gist also uses <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py-L299">Triton kernels</a> to fuse together PyTorch ops, and prevent CPU-GPU synchronizations.</p>
 </section>
 <section id="unit-testing-for-cpu-gpu-synchronizations" class="level1">
