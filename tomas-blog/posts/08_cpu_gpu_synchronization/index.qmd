@@ -6,6 +6,7 @@ author:
     email: t.ruiz@lmu.de
     affiliations: Ludwig-Maximilians-Universität München
 date: "2026-01-07"
+date-modified: "2026-01-08"
 categories: [GPUs, PyTorch, Triton]
 format:
   html:
@@ -91,8 +92,8 @@ To inspect the report:
 - We see **gaps** in the GPU utilization (first blue bar from top to bottom). These gaps indicate that the GPU has idle times and waits for work.
 - We observe that the runtimes of the GPU and CPU are similarly long, as seen both timelines being equal in length in the horizontal axis. In a well-performing program, the CPU runtime should be shorter than the GPU runtime (CPU _runs ahead_ of the GPU).
 - In the CPU ops timeline, we see long green bars (`cudaStreamSynchronize`), which mean that the CPU is **blocked** waiting for the GPU to return some data.
-- On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, which just means that the quick operation is the one blocking the CPU.
-
+- On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, while in the CPU ops timeline we observe the reverse.
+This means that the quick operation is the one blocking the CPU.
 
 ### Healthy Run
 
@@ -116,6 +117,8 @@ Once again, the size of the tensor `x` cannot be determined by the CPU alone, be
 There are other ways to slice a torch tensor, e.g. `x = t.narrow(dim=0, start, length)` ([link](https://docs.pytorch.org/docs/stable/generated/torch.narrow.html)). 
 However, this operation requires `length` to be a Python `int`.
 Passing a GPU tensor as `length` will typically trigger a cast to Python `int` on CPU, which introduces a CPU-GPU synchronization.
+
+A similar situation arises with `x = torch.repeat_interleave(y, repeats)`. But interestingly, this API exposes an optional argument `output_size` that can be used to prevent the synchronization ([link](https://docs.pytorch.org/docs/stable/generated/torch.repeat_interleave.html)).
 
 What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU.
 This is why **dynamic shapes** are so problematic. 
