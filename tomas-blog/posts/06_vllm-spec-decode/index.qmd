@@ -17,8 +17,122 @@ engine: jupyter
 bibliography: refs.bib
 code-annotations: below
 citation: true
-draft: true
+# draft: true
 ---
+I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
+In this post I benchmark the performance of speculative decoding and compare it against vanilla decoding, and against EAGLE3, which is a modern method for speculative decoding that already existed in vLLM.
+
+First let's start with the basics.
+How would you run speculative decoding with vLLM?
+Simply pass some extra arguments to the `vllm serve` command.
+
+<details>
+<summary>Serve Command</summary>
+```shell
+vllm serve Qwen/Qwen3-32B \
+    --speculative_config.method=draft_model \
+    --speculative_config.model=Qwen/Qwen3-1.7B \
+    --speculative_config.num_speculative_tokens=4 \
+    --speculative_config.max_model_len=5000 \
+    --max-model-len 5000
+```
+</details>
+
+## Performance Benchmarks
+Let's compare the performance of the draft_model implementation first against vanilla decoding.
+We can run a benchmark using `vllm bench serve` to get the token throughput metrics.
+I use the `likaixin/InstructCoder` dataset for this benchmark ([Hf link](https://huggingface.co/datasets/likaixin/InstructCoder)), which contains 108k prompts about programming task.
+I also set the temperature to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0 (that feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459)).
+
+<details>
+<summary>Benchmarking Command</summary>
+```shell
+vllm bench serve \
+  --model Qwen/Qwen3-32B \
+  --dataset-name hf \
+  --dataset-path likaixin/InstructCoder \
+  --max-concurrency 32 \
+  --num-prompts 320 \
+  --temperature 0.0 \
+  --top-p 1.0 \
+  --ready-check-timeout-sec 600
+```
+For `--num-prompts`, I use 10 times `--max-concurrency` or at least 50.
+</details>
+
+<details>
+<summary>Benchmarking Output</summary>
+```shell
+============ Serving Benchmark Result ============
+Successful requests:                     320       
+Failed requests:                         0         
+Maximum request concurrency:             32        
+Benchmark duration (s):                  47.20     
+Total input tokens:                      48266     
+Total generated tokens:                  63991     
+Request throughput (req/s):              6.78      
+Output token throughput (tok/s):         1355.72   
+Peak output token throughput (tok/s):    576.00    
+Peak concurrent requests:                56.00     
+Total token throughput (tok/s):          2378.30   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          192.97    
+Median TTFT (ms):                        140.48    
+P99 TTFT (ms):                           629.06    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          21.75     
+Median TPOT (ms):                        21.67     
+P99 TPOT (ms):                           26.55     
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           61.50     
+Median ITL (ms):                         58.23     
+P99 ITL (ms):                            114.37    
+---------------Speculative Decoding---------------
+Acceptance rate (%):                     46.13     
+Acceptance length:                       2.85      
+Drafts:                                  22519     
+Draft tokens:                            90076     
+Accepted tokens:                         41554     
+Per-position acceptance (%):
+  Position 0:                            71.44     
+  Position 1:                            49.82     
+  Position 2:                            36.32     
+  Position 3:                            26.96     
+==================================================
+```
+</details>
+
+I run the benchmark over different concurrency levels ranging from 1 to 64.
+The resulting throughput metrics are shown in @fig-total-token-throughput-short below.
+The x-axis is the number of concurrent requests sent to the server (`--max-concurrency`).
+We observe that using SD greatly increases the token throughput by a factor of 1.5x to 2x.
+Later we will see that further increasing the concurrency beyond 64 leads to a breakdown in throughput.
+
+![Token Throughput Metrics. Experiment run on an NVIDIA H100 96GB GPU.](imgs/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
+
+## Optimal Number of Speculative Tokens $K$
+For @fig-total-token-throughput-short, I set the number of speculative tokens $K=4$.
+But what is the optimal number of speculative tokens $K$?
+If we set it too high, the model will waste a lot of time predicting draft tokens that will be rejected.
+If we set it too low, we miss potential speedup.
+The optimal $K$ depends on the acceptance rate of draft tokens, which depends on the data.
+But to get sense of the dynamics, I run a benchmark over different values of $K$ and plot the throughput metrics.
+@fig-draft-model-ratios show the results evaluating both the 1.7B and the 4B models as draft models.
+
+The y-axis is the "Speedup Ratio" or **speedup** in short, which measures how much faster using speculative decoding is compared to vanilla decoding.
+If the speedup is 2, then using speculative decoding finishes the workload in half the time needed by vanilla decoding.
+We observe that the speedups of the 1.7B model are generally higher than the speedups of the 4B model.
+This shows that while the 4B model generates better draft tokens, its slower runtime compared to the 1.7B model slows down the overall speedup.
+
+![Throughput as a function of $K$ for the dataset `likaixin/InstructCoder`, evaluating both the 1.7 and the 4B models as draft models.](imgs/draft_model_ratios.png){#fig-draft-model-ratios}
+
+## SpecDecode on vLLM
+Speculative decoding is a feature that used to exist in vLLM V0.
+There is an amazing [GPU Mode lecture](https://www.youtube.com/watch?v=9wNAgpX6z_4) on YouTube by [Daniel Cade](https://www.linkedin.com/in/cade-daniel/) from June 2024 where he outlines the speculative decoding implementation on vLLM.
+However, during the rearchiteuring towards V1, the code for the feature was removed.
+Since then, nobody had implemented it in V1.
+
+**Lessons Learned**:
 
 * Unit tests are great, but often don't capture the full picture
 * You need quick access to your sanity-check evaluation suite
