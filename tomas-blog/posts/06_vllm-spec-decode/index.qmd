@@ -20,14 +20,24 @@ citation: true
 # draft: true
 ---
 I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
-In this post I benchmark the performance of speculative decoding and compare it against vanilla decoding, and against EAGLE-3, which is a modern method for speculative decoding that already existed in vLLM.
+In this post, I benchmark the performance of this implementation and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding method already supported by vLLM.
+The results show that draft_model achieves 1.5x to 2x speedups, matching EAGLE-3's performance while offering the advantage of requiring no specialized training.
 
-First let's start with the basics.
-How would you run speculative decoding with vLLM?
-Simply pass some extra arguments to the `vllm serve` command.
+## Background
 
-<details>
-<summary>Serve Command</summary>
+Speculative decoding is a technique that accelerates LLM inference by using a smaller "draft" model to predict multiple tokens ahead, which are then verified in parallel by the larger target model.
+This approach can significantly improve throughput, especially in memory-bound regimes with small batch sizes.
+
+**A bit of history:** Speculative decoding with draft models was previously available in vLLM V0.
+There's an excellent [GPU Mode lecture](https://www.youtube.com/watch?v=9wNAgpX6z_4) by [Daniel Cade](https://www.linkedin.com/in/cade-daniel/) from June 2024 that outlines the original implementation.
+However, during the rearchitecting to V1, this feature was removed and hadn't been reimplemented until now.
+
+## Using Speculative Decoding
+
+To use speculative decoding with vLLM, simply pass additional arguments to the `vllm serve` command.
+You'll need to specify the draft model and the number of speculative tokens to generate.
+I like passing the `--max-model-len` as well, to leave more memory for the KV cache.
+
 ```shell
 vllm serve Qwen/Qwen3-32B \
     --speculative_config.method=draft_model \
@@ -36,18 +46,24 @@ vllm serve Qwen/Qwen3-32B \
     --speculative_config.max_model_len=5000 \
     --max-model-len 5000
 ```
-</details>
 
-## Datasets
-In terms of datasets, I use multiple ones:
+## Experimental Setup
 
-- `philschmid/mt-dataset`: 80 multi-turn questions. Used to benchmark speedups in the EAGLE-3 paper. It is too small to test batch sizes larger than 80 without repeating prompts.
-- `likaixin/InstructCoder`: 114k prompts about programming tasks. It is useful to run larger batch sizes. Also, programming is thought to contain lots of repetition between input and output tokens, which is potentially beneficial for SD.
+### Datasets
 
-## Performance Benchmarks
-Let's compare the performance of the draft_model implementation first against vanilla decoding.
-We can run a benchmark using `vllm bench serve` to get the token throughput metrics.
-I also set the temperature to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0 (that feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459)).
+I evaluated performance on two datasets:
+
+- **`philschmid/mt-dataset`**: A dataset of 80 multi-turn questions used to benchmark speedups in the EAGLE-3 paper.
+  This dataset is too small to test batch sizes larger than 80 without repeating prompts.
+
+- **`likaixin/InstructCoder`**: A dataset of 114k prompts about programming tasks.
+  This larger dataset enables testing at higher batch sizes.
+  Programming tasks are thought to contain substantial repetition between input and output tokens, which may be beneficial for speculative decoding.
+
+### Benchmarking Methodology
+
+I benchmarked performance using `vllm bench serve` to measure token throughput metrics.
+All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0 (this feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459)).
 
 <details>
 <summary>Benchmarking Command</summary>
@@ -107,11 +123,15 @@ Per-position acceptance (%):
 ```
 </details>
 
-I run the benchmark over different concurrency levels ranging from 1 to 64.
-The resulting throughput metrics are shown in @fig-total-token-throughput-short below.
-The x-axis is the number of concurrent requests sent to the server (`--max-concurrency`).
-We observe that using SD greatly increases the token throughput by a factor of 1.5x to 2x.
-Later we will see that further increasing the concurrency beyond 64 leads to a breakdown in throughput.
+## Results
+
+### Performance vs. Vanilla Decoding
+
+I ran benchmarks across different concurrency levels ranging from 1 to 64.
+The resulting throughput metrics are shown in @fig-total-token-throughput-short.
+The x-axis represents the number of concurrent requests sent to the server (`--max-concurrency`).
+We observe that using speculative decoding increases token throughput by a factor of 1.5x to 2x compared to vanilla decoding.
+As we'll see later, increasing concurrency beyond 64 leads to a breakdown in throughput for speculative decoding.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -121,17 +141,17 @@ Later we will see that further increasing the concurrency beyond 64 leads to a b
 ![Token Throughput Metrics. Experiment run on an NVIDIA H100 96GB GPU.](imgs/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
 :::
 
-## Optimal Number of Speculative Tokens $K$
-For @fig-total-token-throughput-short, I set the number of speculative tokens $K=4$.
-But what is the optimal number of speculative tokens $K$?
-If we set it too high, the model will waste a lot of time predicting draft tokens that will be rejected.
-If we set it too low, we miss potential speedup.
-The optimal $K$ depends on the acceptance rate of draft tokens, which depends on the data.
-But to get sense of the dynamics, I run a benchmark over different values of $K$ and plot the throughput metrics.
-@fig-draft-model-ratios show the results evaluating both the 1.7B and the 4B models as draft models.
+### Optimal Number of Speculative Tokens $K$
 
-The y-axis is the "Speedup Ratio" or **speedup** in short, which measures how much faster using speculative decoding is compared to vanilla decoding.
-If the speedup is 2, then using speculative decoding finishes the workload in half the time needed by vanilla decoding.
+For the benchmarks shown in @fig-total-token-throughput-short, I set the number of speculative tokens $K=4$.
+However, the optimal value of $K$ depends on the acceptance rate of draft tokens, which varies with the data distribution.
+If $K$ is set too high, the model wastes time predicting draft tokens that will be rejected.
+If $K$ is set too low, we miss potential speedup.
+
+To understand these dynamics, I ran benchmarks across different values of $K$ and evaluated both the 1.7B and 4B models as draft models.
+The results are shown in @fig-draft-model-ratios.
+The y-axis shows the **speedup ratio** (or simply **speedup**), which measures how much faster speculative decoding is compared to vanilla decoding.
+A speedup of 2 means speculative decoding finishes the workload in half the time of vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -141,20 +161,26 @@ If the speedup is 2, then using speculative decoding finishes the workload in ha
 ![Throughput as a function of $K$ for the dataset `likaixin/InstructCoder`, evaluating both the 1.7 and the 4B models as draft models.](imgs/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
 :::
 
-We observe that the speedups of the 1.7B model are generally higher than the speedups of the 4B model.
-This shows that while the 4B model generates better draft tokens, the slower runtime compared to the 1.7B model slows down the overall speedup.
-The speedup is maximal for small batch sizes (concurrency) ranging from 1 to 4, and decays for larger batch sizes.
-At around batch size 128 or larger, SD becomes slower than vanilla decoding.
-This is in line with research results from the SD literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which show that SD is most effective in the **memory-bound regime** (small batches and thin matmuls),
-while in the compute-bound regime (large batches and squarish matmuls) SD is only adding extra compute work to an already saturated compute system.
-Interestingly, the speedup for low $K$ values (e.g. 1) are lower in small batch sizes, but the performance degradation in larger batch sizes is less pronounced.
-We also observe a **saturation** effect, where increasing $K$ beyond 4 does not lead to consistent speedups.
+The results show several key patterns:
 
-## Comparison against EAGLE-3
-Let's now compare SD with the draft_model implementation against EAGLE-3, which is a modern SD method supported by vLLM.
-The EAGLE-3 paper by @li2025eagle shows speedup ratios on SGLang^[https://github.com/sgl-project/sglang] of between 1.38x and 1.82x, at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
-My results on @fig-eagle3-ratios show an even **greater speedup on vLLM**: 2.0x speedup at batch size 1, and 1.43x at batch size 64.
-In summary: EAGLE-3 works very well on vLLM, and is a strong baseline to compare the draft_model implementation against.
+1. **Draft model size trade-off**: The 1.7B model achieves generally higher speedups than the 4B model.
+   While the 4B model generates better draft tokens (higher acceptance rate), its slower runtime outweighs this benefit.
+
+2. **Batch size dependency**: Speedup is maximal for small batch sizes (concurrency 1-4) and decays for larger batch sizes.
+   At batch size 128 or larger, speculative decoding becomes slower than vanilla decoding.
+   This aligns with research from the speculative decoding literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which shows that speculative decoding is most effective in the **memory-bound regime** (small batches and thin matrix multiplications).
+   In the **compute-bound regime** (large batches and squarish matrix multiplications), speculative decoding adds extra compute work to an already saturated system.
+
+3. **Low $K$ behavior**: For low $K$ values (e.g., $K=1$), speedups are lower at small batch sizes, but performance degradation at larger batch sizes is less pronounced.
+
+4. **Saturation effect**: Increasing $K$ beyond 4 does not consistently improve speedups, indicating a saturation point.
+
+### Comparison with EAGLE-3
+
+EAGLE-3 is a modern speculative decoding method already supported by vLLM that uses lightweight draft models trained specifically for speculative decoding.
+The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[https://github.com/sgl-project/sglang] between 1.38x and 1.82x at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
+My results shown in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: 2.0x at batch size 1 and 1.43x at batch size 64.
+This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline for comparison.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -164,10 +190,8 @@ In summary: EAGLE-3 works very well on vLLM, and is a strong baseline to compare
 ![Speedup ratios of EAGLE-3](imgs/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
 :::
 
-Now let's compare the speedups of the draft_model implementation against EAGLE-3. 
-@fig-draft-model-vs-eagle3-ratios shows the speedups.
-The speedups of draft models are also between 1.39x and 2.0x for batch sizes up to 64, matching those of EAGLE-3 up until batch size 16.
-For larger batch sizes, the speedups of draft models are slightly lower than those of EAGLE-3.
+Comparing the draft_model implementation against EAGLE-3, @fig-draft-model-vs-eagle3-ratios shows that draft models achieve speedups between 1.39x and 2.0x for batch sizes up to 64, matching EAGLE-3 up to batch size 16.
+For larger batch sizes, draft models show slightly lower speedups than EAGLE-3.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -177,29 +201,29 @@ For larger batch sizes, the speedups of draft models are slightly lower than tho
 ![Comparison of Speedups of Draft Model and EAGLE-3](imgs/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
 :::
 
-Both methods performing similarly is remarkable, given that both methods have very **different acceptance lengths** (AL).
+The similar performance of both methods is remarkable given their very different **acceptance lengths** (AL).
 @fig-acceptance-lengths-vs-num-spec-toks shows the AL for both methods.
-We observe that the AL starts at different levels for draft_model and for EAGLE-3, with draft_model having better AL.
-The reason is that the models used for draft_model SD generate tokens more likely to be accepted by the target model.
-We also observe a saturation effect for EAGLE-3, meaning that predicting more tokens leads to diminishing returns.
-In contrast, the AL for draft_model continues to improve.
+Draft models start with better AL than EAGLE-3 because the smaller models used for draft_model speculative decoding generate tokens that are more likely to be accepted by the target model.
+We observe a saturation effect for EAGLE-3, where predicting more tokens leads to diminishing returns.
+In contrast, the AL for draft models continues to improve with more speculative tokens.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lenghts of the 4B model are higher than for the 1.7B model.](imgs/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
 
 # MT-Bench
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lenghts of the 4B model are higher than for the 1.7B model.](imgs/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
 :::
 
-The fact that EAGLE-3 achieves the same speedups despite having lower AL shows that the draft models used by EAGLE-3 are very lightweight, and add very little overhead to the computation.
-In @fig-draft-model-ratios, we saw that using the 4B model in draft_model SD lead to lower speedups than using the 1.7B model, despite having better AL. 
-This means that the improved AL of the 4B model is not enough to compensate for its slower runtime.
+The fact that EAGLE-3 achieves similar speedups despite having lower AL demonstrates that its draft models are very lightweight and add minimal computational overhead.
+This aligns with our earlier observation in @fig-draft-model-ratios: using the 4B model in draft_model speculative decoding led to lower speedups than the 1.7B model, despite having better AL.
+The improved AL of the 4B model is not sufficient to compensate for its slower runtime.
 
-In terms of total token throughput, going for higher batch sizes is still beneficial.
-@fig-total-token-throughput-full shows the total token throughput for both SD methods and vanilla decoding (SD=None).
-Using a SD method outperforms vanilla decoding up to batch size 64.
-Afterward, the throughput of SD methods plateaus, while the throughput of vanilla decoding continues to increase.
+### Total Token Throughput
+
+@fig-total-token-throughput-full shows the total token throughput for both speculative decoding methods and vanilla decoding (SD=None).
+Using a speculative decoding method outperforms vanilla decoding up to batch size 64.
+Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -209,15 +233,16 @@ Afterward, the throughput of SD methods plateaus, while the throughput of vanill
 ![Token Throughputs of all Methods](imgs/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
 :::
 
-## Inference Metrics
-Common metrics reported by `vllm bench serve` below. Lower is better for all of them.
+### Inference Metrics
+
+The `vllm bench serve` command reports several inference metrics (lower is better for all):
 
 - **TPOT**: Time per output token (excluding the first token)
 - **ITL**: Inter-token latency
 - **TTFT**: Time to first token
 
-The benchmark reports their means, medians, and 99th percentiles.
-@fig-ttft-itl-tpot shows the 99th percentile of these metrics for both SD methods and vanilla decoding.
+The benchmark reports means, medians, and 99th percentiles for these metrics.
+@fig-ttft-itl-tpot shows the 99th percentile values for both speculative decoding methods and vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -227,23 +252,38 @@ The benchmark reports their means, medians, and 99th percentiles.
 ![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
 :::
 
-We observe a general trend of all metrics going up as the batch size increases.
-In terms of the TPOT metric, both SD methods cut the time per output token significantly.
-The inter-token latency differs from the TPOT in a subtle way: It measure the time between batches of tokens as seen by the client. 
-During SD, the client receives batches of multiple tokens, which means that the ITL will be higher than the TPOT, while in vanilla decoding both ITL and TPOT should be equal or very similar.
-We see this effect in the center plot, where vanilla decoding has the lowest ITL.
-The TTFT is higher for SD methods than for vanilla decoding, because the server must prefill with both the draft and the target model, rather than just with the target model.
+All metrics generally increase with batch size.
+Both speculative decoding methods significantly reduce TPOT compared to vanilla decoding.
+The inter-token latency (ITL) differs from TPOT in a subtle way: it measures the time between batches of tokens as seen by the client.
+During speculative decoding, the client receives batches of multiple tokens, so ITL will be higher than TPOT.
+In vanilla decoding, ITL and TPOT should be equal or very similar.
+This effect is visible in the center plot, where vanilla decoding has the lowest ITL.
+The TTFT is higher for speculative decoding methods because the server must prefill with both the draft and target models, rather than just the target model.
 
-**Why use draft_model over EAGLE-3?**
-The first advantage of draft_model is that you don't need to train a separate draft model.
-Instead, you can pick a smaller model from the same family.
+## Discussion
+
+### When to Use Draft Models vs. EAGLE-3
+
+Both draft_model and EAGLE-3 achieve similar speedups, but they have different trade-offs:
+
+Advantages of draft_model:
+
+- **No training required**: You can use a smaller model from the same family without training a specialized draft model.
+- **Better acceptance rates**: Draft models from the same family tend to have higher acceptance lengths, as shown in @fig-acceptance-lengths-vs-num-spec-toks.
+
+Advantages of EAGLE-3:
+
+- **Lower computational overhead**: EAGLE-3's lightweight draft models add minimal overhead, allowing it to maintain speedups at larger batch sizes.
+- **Better scaling**: EAGLE-3 shows slightly better performance at batch sizes above 16.
+
+**Recommendation**: Use draft_model when you have access to a smaller model from the same family and want to get started quickly without training.
+Use EAGLE-3 when you need optimal performance at larger batch sizes or are willing to train specialized draft models.
 
 
-## History of SD With Draft Models on vLLM
-SD with draft models is a feature that used to exist in vLLM V0.
-There is an amazing [GPU Mode lecture](https://www.youtube.com/watch?v=9wNAgpX6z_4) on YouTube by [Daniel Cade](https://www.linkedin.com/in/cade-daniel/) from June 2024 where he outlines the speculative decoding implementation on vLLM.
-However, during the rearchiteuring towards V1, the code for the feature was removed.
-Since then, nobody had implemented it in V1.
+<!-- 
+# TODO: 
+Report MT-Bench first since they are great.
+Make sure the numbers in the text don't refer to InstructCoder only.
 
 **Lessons Learned**:
 
@@ -253,6 +293,6 @@ Since then, nobody had implemented it in V1.
 * These scripts should live outside the git repository to avoid being wiped.
 * Long lived branches can experience a lot of merge conflicts.
 * Show example of `Eagle.propose()` method.
-* Its not always clear whom to ask for a review and who can actually accept your PR.
+* Its not always clear whom to ask for a review and who can actually accept your PR. -->
 
 # References
