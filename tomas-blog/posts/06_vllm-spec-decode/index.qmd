@@ -20,7 +20,7 @@ citation: true
 # draft: true
 ---
 I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
-In this post I benchmark the performance of speculative decoding and compare it against vanilla decoding, and against EAGLE3, which is a modern method for speculative decoding that already existed in vLLM.
+In this post I benchmark the performance of speculative decoding and compare it against vanilla decoding, and against EAGLE-3, which is a modern method for speculative decoding that already existed in vLLM.
 
 First let's start with the basics.
 How would you run speculative decoding with vLLM?
@@ -133,14 +133,34 @@ while in the compute-bound regime (large batches and squarish matmuls) SD is onl
 Interestingly, the speedup for low $K$ values (e.g. 1) are lower in small batch sizes, but the performance degradation in larger batch sizes is less pronounced.
 We also observe a **saturation** effect, where increasing $K$ beyond 4 does not lead to consistent speedups.
 
-## Comparison against EAGLE3
-Let's now compare SD with the draft_model implementation against EAGLE3, which is a modern SD method supported by vLLM.
-The Eagle3 paper by @li2025eagle shows speedup ratios on SGLang^[https://github.com/sgl-project/sglang] of between 1.38x and 1.82x, at batch sizes ranging from 2 to 64 (table 3, MT-Bench dataset, GPU=H100).
+## Comparison against EAGLE-3
+Let's now compare SD with the draft_model implementation against EAGLE-3, which is a modern SD method supported by vLLM.
+The EAGLE-3 paper by @li2025eagle shows speedup ratios on SGLang^[https://github.com/sgl-project/sglang] of between 1.38x and 1.82x, at batch sizes ranging from 2 to 64 (table 3, MT-Bench dataset, GPU=H100).
 My results on @fig-eagle3-ratios show an even **greater speedup on vLLM**: 2.0x speedup at batch size 1, and 1.43x at batch size 64.
 I use the same dataset and GPU.
-In summary: EAGLE3 works very well on vLLM, and is a strong baseline to compare the draft_model implementation against.
+In summary: EAGLE-3 works very well on vLLM, and is a strong baseline to compare the draft_model implementation against.
 
-![Speedup ratios of EAGLE3](imgs/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE3" #fig-eagle3-ratios}
+![Speedup ratios of EAGLE-3](imgs/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
+
+Now let's compare the speedups of the draft_model implementation against EAGLE-3. 
+@fig-draft-model-vs-eagle3-ratios shows the speedups on the MT-Bench dataset.
+The speedups of draft models are also between 1.39x and 2.0x for batch sizes up to 64, matching those of EAGLE-3 up until batch size 16.
+For larger batch sizes, the speedups of draft models are slightly lower than those of EAGLE-3.
+
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
+
+Both methods performing similarly is remarkable, given that both methods have very **different acceptance lengths** (AL).
+@fig-acceptance-lengths-vs-num-spec-toks shows the AL for both methods.
+We observe that the AL starts at different levels for draft_model and for EAGLE-3, with draft_model having better AL.
+The reason is that the models used for draft_model SD generate tokens more likely to be accepted by the target model.
+We also observe a saturation effect for EAGLE-3, meaning that predicting more tokens leads to diminishing returns.
+In contrast, the AL for draft_model continues to improve.
+
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lenghts of the 4B model are higher than for the 1.7B model.](imgs/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
+
+The fact that EAGLE-3 achieves the same speedups despite having lower AL shows that the draft models used by EAGLE-3 are very lightweight, and add very little overhead to the computation.
+In @fig-draft-model-ratios, we saw that using the 4B model in draft_model SD lead to lower speedups than using the 1.7B model, despite having better AL. 
+This means that the improved AL of the 4B model is not enough to compensate for its slower runtime.
 
 The first advantage of draft_model is that you don't need to train a separate draft model.
 Instead, you can pick a smaller model from the same family.
