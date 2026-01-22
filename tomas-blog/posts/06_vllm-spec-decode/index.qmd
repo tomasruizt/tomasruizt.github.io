@@ -38,10 +38,15 @@ vllm serve Qwen/Qwen3-32B \
 ```
 </details>
 
+## Datasets
+In terms of datasets, I use multiple ones:
+
+- `philschmid/mt-dataset`: 80 multi-turn questions. Used to benchmark speedups in the EAGLE-3 paper. It is too small to test batch sizes larger than 80 without repeating prompts.
+- `likaixin/InstructCoder`: 114k prompts about programming tasks. It is useful to run larger batch sizes. Also, programming is thought to contain lots of repetition between input and output tokens, which is potentially beneficial for SD.
+
 ## Performance Benchmarks
 Let's compare the performance of the draft_model implementation first against vanilla decoding.
 We can run a benchmark using `vllm bench serve` to get the token throughput metrics.
-I use the `likaixin/InstructCoder` dataset for this benchmark ([Hf link](https://huggingface.co/datasets/likaixin/InstructCoder)), which contains 108k prompts about programming task.
 I also set the temperature to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0 (that feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459)).
 
 <details>
@@ -147,9 +152,8 @@ We also observe a **saturation** effect, where increasing $K$ beyond 4 does not 
 
 ## Comparison against EAGLE-3
 Let's now compare SD with the draft_model implementation against EAGLE-3, which is a modern SD method supported by vLLM.
-The EAGLE-3 paper by @li2025eagle shows speedup ratios on SGLang^[https://github.com/sgl-project/sglang] of between 1.38x and 1.82x, at batch sizes ranging from 2 to 64 (table 3, MT-Bench dataset, GPU=H100).
+The EAGLE-3 paper by @li2025eagle shows speedup ratios on SGLang^[https://github.com/sgl-project/sglang] of between 1.38x and 1.82x, at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
 My results on @fig-eagle3-ratios show an even **greater speedup on vLLM**: 2.0x speedup at batch size 1, and 1.43x at batch size 64.
-I use the same dataset and GPU.
 In summary: EAGLE-3 works very well on vLLM, and is a strong baseline to compare the draft_model implementation against.
 
 ::: {.panel-tabset group="dataset"}
@@ -161,7 +165,7 @@ In summary: EAGLE-3 works very well on vLLM, and is a strong baseline to compare
 :::
 
 Now let's compare the speedups of the draft_model implementation against EAGLE-3. 
-@fig-draft-model-vs-eagle3-ratios shows the speedups on the `likaixin/InstructCoder` dataset.
+@fig-draft-model-vs-eagle3-ratios shows the speedups.
 The speedups of draft models are also between 1.39x and 2.0x for batch sizes up to 64, matching those of EAGLE-3 up until batch size 16.
 For larger batch sizes, the speedups of draft models are slightly lower than those of EAGLE-3.
 
@@ -213,14 +217,7 @@ Common metrics reported by `vllm bench serve` below. Lower is better for all of 
 - **TTFT**: Time to first token
 
 The benchmark reports their means, medians, and 99th percentiles.
-@fig-ttft-itl-tpot shows the 99th percentile of these metrics for both SD methods and vanilla decoding on the `likaixin/InstructCoder` dataset.
-We observe a general trend of all metrics going up as the batch size increases.
-In terms of the TPOT metric, both SD methods cut the time per output token significantly.
-The inter-token latency differs from the TPOT in a subtle way: It measure the time between batches of tokens as seen by the client. 
-During SD, the client receives batches of multiple tokens, which means that the ITL will be higher than the TPOT, while in vanilla decoding both ITL and TPOT should be equal or very similar.
-We see this effect in the center plot, where vanilla decoding has the lowest ITL.
-The TTFT is higher for SD methods than for vanilla decoding, because the server must prefill with both the draft and the target model, rather than just with the target model.
-
+@fig-ttft-itl-tpot shows the 99th percentile of these metrics for both SD methods and vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
 # InstructCoder
@@ -229,6 +226,13 @@ The TTFT is higher for SD methods than for vanilla decoding, because the server 
 # MT-Bench
 ![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
 :::
+
+We observe a general trend of all metrics going up as the batch size increases.
+In terms of the TPOT metric, both SD methods cut the time per output token significantly.
+The inter-token latency differs from the TPOT in a subtle way: It measure the time between batches of tokens as seen by the client. 
+During SD, the client receives batches of multiple tokens, which means that the ITL will be higher than the TPOT, while in vanilla decoding both ITL and TPOT should be equal or very similar.
+We see this effect in the center plot, where vanilla decoding has the lowest ITL.
+The TTFT is higher for SD methods than for vanilla decoding, because the server must prefill with both the draft and the target model, rather than just with the target model.
 
 **Why use draft_model over EAGLE-3?**
 The first advantage of draft_model is that you don't need to train a separate draft model.
