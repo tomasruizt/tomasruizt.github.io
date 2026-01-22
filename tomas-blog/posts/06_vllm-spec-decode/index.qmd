@@ -121,10 +121,17 @@ But to get sense of the dynamics, I run a benchmark over different values of $K$
 
 The y-axis is the "Speedup Ratio" or **speedup** in short, which measures how much faster using speculative decoding is compared to vanilla decoding.
 If the speedup is 2, then using speculative decoding finishes the workload in half the time needed by vanilla decoding.
-We observe that the speedups of the 1.7B model are generally higher than the speedups of the 4B model.
-This shows that while the 4B model generates better draft tokens, its slower runtime compared to the 1.7B model slows down the overall speedup.
 
 ![Throughput as a function of $K$ for the dataset `likaixin/InstructCoder`, evaluating both the 1.7 and the 4B models as draft models.](imgs/draft_model_ratios.png){#fig-draft-model-ratios}
+
+We observe that the speedups of the 1.7B model are generally higher than the speedups of the 4B model.
+This shows that while the 4B model generates better draft tokens, the slower runtime compared to the 1.7B model slows down the overall speedup.
+The speedup is maximal for small batch sizes (concurrency) ranging from 1 to 4, and decays for larger batch sizes.
+At around batch size 128 or larger, SD becomes slower than vanilla decoding.
+This is in line with research results from the SD literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which show that SD is most effective in the **memory-bound regime** (small batches and thin matmuls),
+while in the compute-bound regime (large batches and squarish matmuls) SD is only adding extra compute work to an already saturated compute system.
+Interestingly, the speedup for low $K$ values (e.g. 1) are lower in small batch sizes, but the performance degradation in larger batch sizes is less pronounced.
+We also observe a **saturation** effect, where increasing $K$ beyond 4 does not lead to consistent speedups.
 
 ## SpecDecode on vLLM
 Speculative decoding is a feature that used to exist in vLLM V0.
@@ -140,3 +147,5 @@ Since then, nobody had implemented it in V1.
 * Long lived branches can experience a lot of merge conflicts.
 * Show example of `Eagle.propose()` method.
 * Its not always clear whom to ask for a review and who can actually accept your PR.
+
+# References
