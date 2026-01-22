@@ -133,14 +133,28 @@ while in the compute-bound regime (large batches and squarish matmuls) SD is onl
 Interestingly, the speedup for low $K$ values (e.g. 1) are lower in small batch sizes, but the performance degradation in larger batch sizes is less pronounced.
 We also observe a **saturation** effect, where increasing $K$ beyond 4 does not lead to consistent speedups.
 
-## SpecDecode on vLLM
-Speculative decoding is a feature that used to exist in vLLM V0.
+## Comparison against EAGLE3
+Let's now compare SD with the draft_model implementation against EAGLE3, which is a modern SD method supported by vLLM.
+The Eagle3 paper by @li2025eagle shows speedup ratios on SGLang^[https://github.com/sgl-project/sglang] of between 1.38x and 1.82x, at batch sizes ranging from 2 to 64 (table 3, MT-Bench dataset, GPU=H100).
+My results on @fig-eagle3-ratios show an even **greater speedup on vLLM**: 2.0x speedup at batch size 1, and 1.43x at batch size 64.
+I use the same dataset and GPU.
+In summary: EAGLE3 works very well on vLLM, and is a strong baseline to compare the draft_model implementation against.
+
+![Speedup ratios of EAGLE3](imgs/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE3" #fig-eagle3-ratios}
+
+The first advantage of draft_model is that you don't need to train a separate draft model.
+Instead, you can pick a smaller model from the same family.
+
+
+## History of SD With Draft Models on vLLM
+SD with draft models is a feature that used to exist in vLLM V0.
 There is an amazing [GPU Mode lecture](https://www.youtube.com/watch?v=9wNAgpX6z_4) on YouTube by [Daniel Cade](https://www.linkedin.com/in/cade-daniel/) from June 2024 where he outlines the speculative decoding implementation on vLLM.
 However, during the rearchiteuring towards V1, the code for the feature was removed.
 Since then, nobody had implemented it in V1.
 
 **Lessons Learned**:
 
+* pass `--request-ratio` to prevent statistical artifacts in the TTFT for non-SD (vanilla) decoding benchmarks.
 * Unit tests are great, but often don't capture the full picture
 * You need quick access to your sanity-check evaluation suite
 * These scripts should live outside the git repository to avoid being wiped.
