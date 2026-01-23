@@ -1,5 +1,6 @@
 ---
-title: "vLLM Speculative Decoding"
+title: "Up to 2.24x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1"
+subtitle: "Benchmarks and Lessons Learned"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -22,6 +23,13 @@ citation: true
 I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
 In this post, I benchmark the performance of this draft_model implementation and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM.
 My benchmarks show that draft_model can achieve speedups of up to 2.24x on MT-Bench, outperforming EAGLE-3, while requiring no specialized training.
+At the end, I share lessons learned from working in the vLLM codebase and a few practical tips for approaching and navigating it.
+
+::: {.callout-note}
+This is **not a tutorial** on speculative decoding.
+I assume you are already familiar with the technique and its basic trade-offs.
+The focus here is on benchmarking the new code and sharing lessons learned.
+:::
 
 ## Background
 
