@@ -64,6 +64,7 @@ I evaluated performance on two datasets:
 
 I benchmarked performance using `vllm bench serve` to measure token throughput metrics.
 All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0 (this feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459)).
+All experiments were run on an NVIDIA H100 96GB GPU.
 
 <details>
 <summary>Benchmarking Command</summary>
@@ -129,16 +130,16 @@ Per-position acceptance (%):
 
 I ran benchmarks across different concurrency levels ranging from 1 to 64.
 The resulting throughput metrics are shown in @fig-total-token-throughput-short.
-The x-axis represents the number of concurrent requests sent to the server (`--max-concurrency`).
-We observe that using speculative decoding increases token throughput by a factor of 1.5x to 2x compared to vanilla decoding.
-As we'll see later, increasing concurrency beyond 64 leads to a breakdown in throughput for speculative decoding.
+The x-axis is the inference batch size, implemented as concurrent requests sent to the server (`--max-concurrency`).
+We observe that using speculative decoding **nearly doubles** token throughput compared to vanilla decoding.
+However, the next section will show that increasing concurrency further leads to a breakdown in throughput for speculative decoding.
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Token Throughput Metrics. Experiment run on an NVIDIA H100 96GB GPU.](imgs/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
-
 # MT-Bench
-![Token Throughput Metrics. Experiment run on an NVIDIA H100 96GB GPU.](imgs/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
+![Token Throughput Metrics.](imgs/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
+
+# InstructCoder
+![Token Throughput Metrics.](imgs/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
 :::
 
 ### Optimal Number of Speculative Tokens $K$
@@ -150,26 +151,26 @@ If $K$ is set too low, we miss potential speedup.
 
 To understand these dynamics, I ran benchmarks across different values of $K$ and evaluated both the 1.7B and 4B models as draft models.
 The results are shown in @fig-draft-model-ratios.
-The y-axis shows the **speedup ratio** (or simply **speedup**), which measures how much faster speculative decoding is compared to vanilla decoding.
+The y-axis shows the **speedup ratio** (or simply **speedup**), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time).
 A speedup of 2 means speculative decoding finishes the workload in half the time of vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Throughput as a function of $K$ for the dataset `likaixin/InstructCoder`, evaluating both the 1.7 and the 4B models as draft models.](imgs/InstructCoder/draft_model_ratios.png){#fig-draft-model-ratios}
-
 # MT-Bench
-![Throughput as a function of $K$ for the dataset `likaixin/InstructCoder`, evaluating both the 1.7 and the 4B models as draft models.](imgs/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
+
+# InstructCoder
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/InstructCoder/draft_model_ratios.png){#fig-draft-model-ratios}
 :::
 
 The results show several key patterns:
 
 1. **Draft model size trade-off**: The 1.7B model achieves generally higher speedups than the 4B model.
-   While the 4B model generates better draft tokens (higher acceptance rate), its slower runtime outweighs this benefit.
+The 4B model generates better draft tokens (higher acceptance rate @fig-acceptance-lengths-vs-num-spec-toks), but it is also slower, so the speedup is hampered.
 
 2. **Batch size dependency**: Speedup is maximal for small batch sizes (concurrency 1-4) and decays for larger batch sizes.
-   At batch size 128 or larger, speculative decoding becomes slower than vanilla decoding.
-   This aligns with research from the speculative decoding literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which shows that speculative decoding is most effective in the **memory-bound regime** (small batches and thin matrix multiplications).
-   In the **compute-bound regime** (large batches and squarish matrix multiplications), speculative decoding adds extra compute work to an already saturated system.
+At batch size 128 or larger, speculative decoding becomes slower than vanilla decoding.
+This aligns with research from the speculative decoding literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which shows that speculative decoding is most effective in the **memory-bound regime** (small batches and thin matrix multiplications).
+In the **compute-bound regime** (large batches and regular matrix multiplications), speculative decoding adds extra compute work to an already saturated system.
 
 3. **Low $K$ behavior**: For low $K$ values (e.g., $K=1$), speedups are lower at small batch sizes, but performance degradation at larger batch sizes is less pronounced.
 
@@ -179,86 +180,89 @@ The results show several key patterns:
 
 EAGLE-3 is a modern speculative decoding method already supported by vLLM that uses lightweight draft models trained specifically for speculative decoding.
 The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[https://github.com/sgl-project/sglang] between 1.38x and 1.82x at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
-My results shown in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: 2.0x at batch size 1 and 1.43x at batch size 64.
-This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline for comparison.
+My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: around 2.0x or better at batch sizes 1 to 4.
+This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline to compare my draft_model implementation against.
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Speedup ratios of EAGLE-3](imgs/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
-
 # MT-Bench
-![Speedup ratios of EAGLE-3](imgs/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
+![Speedup ratios of EAGLE-3](imgs/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
+
+# InstructCoder
+![Speedup ratios of EAGLE-3](imgs/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
 :::
 
-Comparing the draft_model implementation against EAGLE-3, @fig-draft-model-vs-eagle3-ratios shows that draft models achieve speedups between 1.39x and 2.0x for batch sizes up to 64, matching EAGLE-3 up to batch size 16.
-For larger batch sizes, draft models show slightly lower speedups than EAGLE-3.
+@fig-draft-model-vs-eagle3-ratios compares the speedup ratios of both speculative decoding methods.
+ADD DESCRIPTION HERE
+<!-- draft_model achieves speedups between 1.39x and 2.0x for batch sizes up to 64, matching EAGLE-3 up to batch size 16.
+For larger batch sizes, draft models show slightly lower speedups than EAGLE-3. -->
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
-
 # MT-Bench
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
+
+# InstructCoder
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
 :::
 
-The similar performance of both methods is remarkable given their very different **acceptance lengths** (AL).
+The often comparable performance of both methods is remarkable given their very different **acceptance lengths** (AL).
 @fig-acceptance-lengths-vs-num-spec-toks shows the AL for both methods.
-Draft models start with better AL than EAGLE-3 because the smaller models used for draft_model speculative decoding generate tokens that are more likely to be accepted by the target model.
-We observe a saturation effect for EAGLE-3, where predicting more tokens leads to diminishing returns.
-In contrast, the AL for draft models continues to improve with more speculative tokens.
+Draft models achieve better AL than EAGLE-3 because they generate more tokens that are likely to be accepted by the target model.
+We observe a saturation effect on the AL for EAGLE-3: The AL line starts to plateau around AL=2.5.
+This means that predicting more tokens leads to diminishing returns.
+In contrast, the AL curve for draft models continues to climb with more speculative tokens.
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
-
 # MT-Bench
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
+
+# InstructCoder
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
 :::
 
-The fact that EAGLE-3 achieves similar speedups despite having lower AL demonstrates that its draft models are very lightweight and add minimal computational overhead.
-This aligns with our earlier observation in @fig-draft-model-ratios: using the 4B model in draft_model speculative decoding led to lower speedups than the 1.7B model, despite having better AL.
-The improved AL of the 4B model is not sufficient to compensate for its slower runtime.
+The fact that EAGLE-3 achieves similar speedups despite having lower AL demonstrates that its draft models are very **lightweight** and add minimal computational overhead.
+This is the opposite behaviour of what we observed for the 4B draft_model in @fig-draft-model-ratios: Despite it having higher AL than the 1.7B model, it is too slow to achieve major speedups.
 
 ### Total Token Throughput
 
-@fig-total-token-throughput-full shows the total token throughput for both speculative decoding methods and vanilla decoding (SD=None).
+@fig-total-token-throughput-full shows the Total Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None).
 Using a speculative decoding method outperforms vanilla decoding up to batch size 64.
-Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.
+Beyond this point, the throughput of speculative decoding methods plateau, while vanilla decoding continues to scale with larger batch sizes.
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Token Throughputs of all Methods](imgs/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods" #fig-total-token-throughput-full}
-
 # MT-Bench
-![Token Throughputs of all Methods](imgs/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
+![Token Throughputs of all Methods](imgs/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods" #fig-total-token-throughput-full}
+
+# InstructCoder
+![Token Throughputs of all Methods](imgs/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
 :::
 
 ### Inference Metrics
 
-The `vllm bench serve` command reports several inference metrics (lower is better for all):
+The `vllm bench serve` command reports several request-level inference metrics (lower is better for all):
 
+- **TTFT**: Time to first token
 - **TPOT**: Time per output token (excluding the first token)
 - **ITL**: Inter-token latency
-- **TTFT**: Time to first token
 
 The benchmark reports means, medians, and 99th percentiles for these metrics.
 @fig-ttft-itl-tpot shows the 99th percentile values for both speculative decoding methods and vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
-# InstructCoder
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics" #fig-ttft-itl-tpot}
-
 # MT-Bench
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics" #fig-ttft-itl-tpot}
+
+# InstructCoder
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
 :::
 
-All metrics generally increase with batch size.
-Both speculative decoding methods significantly reduce TPOT compared to vanilla decoding.
-The inter-token latency (ITL) differs from TPOT in a subtle way: it measures the time between batches of tokens as seen by the client.
+All metrics generally increase (worsen) with batch size. We observe the following patterns
+
+- **TTFT**: The TTFT is higher for speculative decoding methods because the server must prefill with both the draft and target models, rather than just the target model.
+- **TPOT**: Both speculative decoding methods significantly reduce TPOT compared to vanilla decoding.
+- **ITL**: The inter-token latency (ITL) differs from TPOT in a subtle way: it measures the time between batches of tokens as seen by the client.
 During speculative decoding, the client receives batches of multiple tokens, so ITL will be higher than TPOT.
 In vanilla decoding, ITL and TPOT should be equal or very similar.
 This effect is visible in the center plot, where vanilla decoding has the lowest ITL.
-The TTFT is higher for speculative decoding methods because the server must prefill with both the draft and target models, rather than just the target model.
 
 ## Discussion
 
@@ -268,16 +272,17 @@ Both draft_model and EAGLE-3 achieve similar speedups, but they have different t
 
 Advantages of draft_model:
 
-- **No training required**: You can use a smaller model from the same family without training a specialized draft model.
-- **Better acceptance rates**: Draft models from the same family tend to have higher acceptance lengths, as shown in @fig-acceptance-lengths-vs-num-spec-toks.
+- *No training required*: You can use a smaller model from the same family without training a specialized draft model.
+This is particularly effective when the smaller model is trained by distillation from the larger model, meaning they were explicitly trained to mimick the logits of the larger model.
+- *Better acceptance rates*: Draft models from the same family tend to have higher acceptance lengths, as shown in @fig-acceptance-lengths-vs-num-spec-toks.
 
 Advantages of EAGLE-3:
 
-- **Lower computational overhead**: EAGLE-3's lightweight draft models add minimal overhead, allowing it to maintain speedups at larger batch sizes.
-- **Better scaling**: EAGLE-3 shows slightly better performance at batch sizes above 16.
+- *Lower computational overhead*: EAGLE-3's lightweight draft models add minimal overhead, allowing get away with lower acceptance rates and to maintain speedups at larger batch sizes.
 
-**Recommendation**: Use draft_model when you have access to a smaller model from the same family and want to get started quickly without training.
-Use EAGLE-3 when you need optimal performance at larger batch sizes or are willing to train specialized draft models.
+**Recommendation**: Use draft_model when you have access to a smaller model from the same family and want to get started quickly without training a specialized draft model.
+Compare the performance with EAGLE-3 on your on workload if a corresponding draft model already exists on HuggingFace, or when you can and want to train a draft model yourself.
+You can use the vLLM speculators library^[https://github.com/vllm-project/speculators] to train draft models.
 
 
 <!-- 
