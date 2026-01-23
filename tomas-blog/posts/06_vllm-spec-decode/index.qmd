@@ -139,7 +139,8 @@ I ran benchmarks across different concurrency levels ranging from 1 to 64.
 The resulting throughput metrics are shown in @fig-total-token-throughput-short.
 The x-axis is the inference batch size, implemented as concurrent requests sent to the server (`--max-concurrency`).
 We observe that using speculative decoding **nearly doubles** token throughput compared to vanilla decoding.
-In the next section we see what happens when we continue increasing the batch size.
+I set the number of speculative tokens to $K=4$.
+In the next section we see what happens when we change $K$.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
@@ -151,15 +152,14 @@ In the next section we see what happens when we continue increasing the batch si
 
 ### Optimal Number of Speculative Tokens $K$
 
-For the benchmarks shown in @fig-total-token-throughput-short, I set the number of speculative tokens $K=4$.
-However, the optimal value of $K$ depends on the acceptance rate of draft tokens, which varies with the data distribution.
+The optimal value of $K$ depends on the acceptance rate of draft tokens, which varies with the data distribution.
 If $K$ is set too high, the model wastes time predicting draft tokens that will be rejected.
 If $K$ is set too low, we miss potential speedup.
 
 To understand these dynamics, I ran benchmarks across different values of $K$ and evaluated both the 1.7B and 4B models as draft models.
 The results are shown in @fig-draft-model-ratios.
 The y-axis shows the **speedup ratio** (or simply **speedup**), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time).
-A speedup of 2 means speculative decoding finishes the workload in half the time of vanilla decoding.
+A speedup of 2x means speculative decoding finishes the workload in half the time of vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
