@@ -20,8 +20,8 @@ citation: true
 # draft: true
 ---
 I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
-In this post, I benchmark the performance of this implementation and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding method already supported by vLLM.
-The results show that draft_model achieves 1.5x to 2x speedups, matching EAGLE-3's performance while offering the advantage of requiring no specialized training.
+In this post, I benchmark the performance of this draft_model implementation and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding method already supported by vLLM.
+My benchmarks show that draft_model can achieve speedups of up to 2.24x on MT-Bench, outperforming EAGLE-3, while offering the advantage of requiring no specialized training.
 
 ## Background
 
@@ -296,17 +296,13 @@ You can use the vLLM speculators library^[<https://github.com/vllm-project/specu
 
 ## Lessons Learned
 
-In this section I begin by sharing some lessons learned implementing speculative decoding in vLLM, and then in @sec-start-high-level I share tips
-about how to approach the vLLM codebase as a new contributor.
+In this section I begin by sharing some quirks I learned about vLLM while implementing speculative decoding, and then in @sec-start-high-level I share tips about how to approach the vLLM codebase as a new contributor.
 
 ### Side-Effects
 The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are.
-The most important example to understand is the `forward_context`, which is a global variable that contains information about every layer in the model,
-and references it KV cache.
-The forward context is manipulated at runtime with `set_forward_context()` function, [here](https://github.com/vllm-project/vllm/blob/5da4c7d789fe0c4ca2c49913441f99df24715a97/vllm/v1/worker/gpu_model_runner.py#L3287) in the main loop of the `gpu_model_runner.py` file.
-It looks similar to @lst-set-forward-context, and its important to understand that it also determines what goes into the model.
-The forward context contains e.g. `AttentionMetadata.slot_mapping` object containing **pointers to the KV cache**.
-If these pointers are incorrect, the KV cache will be corrupted at runtime, and your outputs will be garbage.
+The most important example to understand is the `forward_context` object, which is a global variable that contains information about every layer in the model and references its KV cache.
+The forward context is manipulated at runtime with the `set_forward_context()` function, [here](https://github.com/vllm-project/vllm/blob/5da4c7d789fe0c4ca2c49913441f99df24715a97/vllm/v1/worker/gpu_model_runner.py#L3287) in the main loop of the `gpu_model_runner.py` file.
+It looks similar to @lst-set-forward-context, and its important to understand that it partially determines the inputs to the model.
 
 ```{#lst-set-forward-context .python lst-cap="Set Forward Context"}
 with set_forward_context(
@@ -317,11 +313,16 @@ with set_forward_context(
     )
 ```
 
+The forward context contains e.g. `AttentionMetadata.slot_mapping` object containing **pointers to the KV cache**.
+If these pointers are incorrect, the KV cache will be corrupted at runtime, and your outputs will be garbage.
+Saving to the KV cache happens concretely in the function `reshape_and_cache_flash()` (FlashAttention code path: [permalink](https://github.com/vllm-project/vllm/blob/13d8746c545576bcb6e0771ee4dc0b6fae694fa1/vllm/v1/attention/backends/flash_attn.py#L670)).
+The function directly takes this `slot_mapping` tensor as an input.
+
 The forward context also includes the `batch_descriptor` and `cudagraph_runtime_mode` objects, which together determine which **CUDA graph
-mode** the model will run in.
-CUDA graphs are a complex topic by themselves, but in short they make the code within the graph run impressively fast.
+mode** the model will dispatch to.
+CUDA graphs are a complex topic by themselves, but in short: they make the code within the graph run impressively fast.
 There is an introduction to CUDA graphs in the vLLM docs^[<https://docs.vllm.ai/en/stable/design/cuda_graphs/>].
-What's important to understand is that CUDA graphs require the input and output tensors (*buffers*) to be allocated before running the code (i.e. no allocating PyTorch tensors during the graph's execution).
+What's important to understand is that CUDA graphs require the input and output tensors (**buffers**) to be allocated before running the code (i.e. no allocating PyTorch tensors during the graph's execution).
 All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects.
 I found that if you run CUDA graphs, but don't reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again.
 This is why you find comments like @lst-use-persistent-buffers everywhere in the codebase.
@@ -343,8 +344,9 @@ You will obviously hit errors that prevent your feature from working, but that i
 You are working from the inside out, catching and solving problems locally one at a time without having to understand the whole codebase at once.
 Set a debugger and try to understand only one error at a time, interactively and with the local context.
 vLLM is a very complex system, and trying to understand the whole codebase at once would be overwhelming and lead to frustration.
+Reading about the big picture of the codebase can be useful after getting some exposure to the codebase, e.g. [in this post](https://www.aleksagordic.com/blog/vllm) by Aleksa Gordić.
 
-### Use The Debugger
+### Use the Debugger
 Most features require you to manipulate tensors, and change their shape or content.
 This type of PyTorch code is often not simple to read or write, because its often more imperative than declarative.
 Good contributors comment their code to communicate the intent of it, without repeating the code itself, and without making the code 
@@ -353,7 +355,7 @@ For these code regions heavy in PyTorch code, I suggest to factor out a pure Pyt
 Then you create a unit test for it and can easily set breakpoints into the function without having to restart the envire vLLM server 
 (which is painfully slow).
 
-### Test extensively
+### Test Extensively
 I mentioned that you speed up your feedback cycles by setting e.g. `enforce-eager=True`, but that leaves the most important paths of the codebase untested.
 In production, you never run in eager mode, so you want to test these paths as well.
 I recommend the `pytest.mark.parametrize` decorator to test your code with different inputs, e.g. as shown in @lst-pytest-mark-parametrize to test both eager and compiled mode.
