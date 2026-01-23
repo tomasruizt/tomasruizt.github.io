@@ -49,16 +49,23 @@ vllm serve Qwen/Qwen3-32B \
 
 ## Experimental Setup
 
+### Models
+As a target model, I used **`Qwen3/Qwen-32B`**^[<https://huggingface.co/Qwen/Qwen3-32B>].
+Vanilla decoding uses this model directly.
+For draft_model, I evaluated two different draft models: **`Qwen3/Qwen-1.7B`**^[<https://huggingface.co/Qwen/Qwen3-1.7B>], and **`Qwen3/Qwen-4B`**^[<https://huggingface.co/Qwen/Qwen3-4B>].
+The 0.6B model threw a runtime exception (probable bug).
+For EAGLE-3, I evaluated the **`RedHatAI/Qwen3-32B-speculator.eagle3`** draft model^[<https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3>].
+
 ### Datasets
 
 I evaluated performance on two datasets:
 
-- **`philschmid/mt-dataset`**: A dataset of 80 multi-turn questions used to benchmark speedups in the EAGLE-3 paper.
-  This dataset is too small to test batch sizes larger than 80 without repeating prompts.
+- **MT-Bench**^[<https://huggingface.co/datasets/philschmid/mt-bench>]: A dataset of 80 multi-turn questions used to benchmark speedups in the EAGLE-3 paper by @li2025eagle.
+This dataset is too small to test batch sizes larger than 80 without repeating prompts.
 
-- **`likaixin/InstructCoder`**: A dataset of 114k prompts about programming tasks.
-  This larger dataset enables testing at higher batch sizes.
-  Programming tasks are thought to contain substantial repetition between input and output tokens, which may be beneficial for speculative decoding.
+- **InstructCoder**^[<https://huggingface.co/datasets/likaixin/InstructCoder>]: A dataset of 114k prompts about programming tasks.
+This larger dataset enables testing at higher batch sizes.
+Programming tasks are thought to contain substantial repetition between input and output tokens, which may be beneficial for speculative decoding.
 
 ### Benchmarking Methodology
 
@@ -132,7 +139,7 @@ I ran benchmarks across different concurrency levels ranging from 1 to 64.
 The resulting throughput metrics are shown in @fig-total-token-throughput-short.
 The x-axis is the inference batch size, implemented as concurrent requests sent to the server (`--max-concurrency`).
 We observe that using speculative decoding **nearly doubles** token throughput compared to vanilla decoding.
-However, the next section will show that increasing concurrency further leads to a breakdown in throughput for speculative decoding.
+In the next section we see what happens when we continue increasing the batch size.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
@@ -179,7 +186,7 @@ In the **compute-bound regime** (large batches and regular matrix multiplication
 ### Comparison with EAGLE-3
 
 EAGLE-3 is a modern speculative decoding method already supported by vLLM that uses lightweight draft models trained specifically for speculative decoding.
-The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[https://github.com/sgl-project/sglang] between 1.38x and 1.82x at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
+The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[<https://github.com/sgl-project/sglang>] between 1.38x and 1.82x at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
 My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: around 2.0x or better at batch sizes 1 to 4.
 This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline to compare my draft_model implementation against.
 
@@ -192,9 +199,9 @@ This confirms that EAGLE-3 works very well on vLLM and provides a strong baselin
 :::
 
 @fig-draft-model-vs-eagle3-ratios compares the speedup ratios of both speculative decoding methods.
-ADD DESCRIPTION HERE
-<!-- draft_model achieves speedups between 1.39x and 2.0x for batch sizes up to 64, matching EAGLE-3 up to batch size 16.
-For larger batch sizes, draft models show slightly lower speedups than EAGLE-3. -->
+It uses $K=4$ for both speculative decoding methods.
+In the MT-Bench dataset, the draft_model speedups outperform EAGLE-3 in every batch size.
+In the InstructCoder dataset, both methods have comparable speedups, with EAGLE-3 sligthly outperforming draft_model in the largest batch sizes.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
@@ -207,9 +214,10 @@ For larger batch sizes, draft models show slightly lower speedups than EAGLE-3. 
 The often comparable performance of both methods is remarkable given their very different **acceptance lengths** (AL).
 @fig-acceptance-lengths-vs-num-spec-toks shows the AL for both methods.
 Draft models achieve better AL than EAGLE-3 because they generate more tokens that are likely to be accepted by the target model.
-We observe a saturation effect on the AL for EAGLE-3: The AL line starts to plateau around AL=2.5.
+We observe a saturation effect on the AL for EAGLE-3: The AL line starts to plateau around AL=2.5 (MT-Bench).
 This means that predicting more tokens leads to diminishing returns.
 In contrast, the AL curve for draft models continues to climb with more speculative tokens.
+Should we increase $K$? No, as we saw in @fig-draft-model-ratios, increasing $K$ has diminishing returns.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
@@ -226,7 +234,7 @@ This is the opposite behaviour of what we observed for the 4B draft_model in @fi
 
 @fig-total-token-throughput-full shows the Total Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None).
 Using a speculative decoding method outperforms vanilla decoding up to batch size 64.
-Beyond this point, the throughput of speculative decoding methods plateau, while vanilla decoding continues to scale with larger batch sizes.
+Beyond this point, the throughput of speculative decoding methods plateaus at aroun 4000 toks/s, while vanilla decoding continues to scale with larger batch sizes, reaching over 5600 toks/s.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
@@ -255,14 +263,16 @@ The benchmark reports means, medians, and 99th percentiles for these metrics.
 ![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
 :::
 
-All metrics generally increase (worsen) with batch size. We observe the following patterns
+All metrics generally increase (worsen) with batch size. Note that the graph shows worst case statistics (99th percentile). We observe the following patterns
 
 - **TTFT**: The TTFT is higher for speculative decoding methods because the server must prefill with both the draft and target models, rather than just the target model.
-- **TPOT**: Both speculative decoding methods significantly reduce TPOT compared to vanilla decoding.
+It is not clear to me why the TTFT of EAGLE-3 is consistently higher than for draft_model, since the EAGLE-3 drafters are lighter.
+- **TPOT**: Both speculative decoding methods significantly reduce TPOT compared to vanilla decoding from 35-40ms to 19-30ms.
+EAGLE-3 has slightly better TPOT, since the drafters are lighter.
 - **ITL**: The inter-token latency (ITL) differs from TPOT in a subtle way: it measures the time between batches of tokens as seen by the client.
 During speculative decoding, the client receives batches of multiple tokens, so ITL will be higher than TPOT.
 In vanilla decoding, ITL and TPOT should be equal or very similar.
-This effect is visible in the center plot, where vanilla decoding has the lowest ITL.
+In the plot, vanilla decoding (SD=None) has the lowest ITL, followed by EAGLE-3 and finally draft_model.
 
 ## Discussion
 
@@ -282,7 +292,7 @@ Advantages of EAGLE-3:
 
 **Recommendation**: Use draft_model when you have access to a smaller model from the same family and want to get started quickly without training a specialized draft model.
 Compare the performance with EAGLE-3 on your on workload if a corresponding draft model already exists on HuggingFace, or when you can and want to train a draft model yourself.
-You can use the vLLM speculators library^[https://github.com/vllm-project/speculators] to train draft models.
+You can use the vLLM speculators library^[<https://github.com/vllm-project/speculators>] to train draft models.
 
 ## Lessons Learned
 
@@ -310,7 +320,7 @@ with set_forward_context(
 The forward context also includes the `batch_descriptor` and `cudagraph_runtime_mode` objects, which together determine which **CUDA graph
 mode** the model will run in.
 CUDA graphs are a complex topic by themselves, but in short they make the code within the graph run impressively fast.
-There is an introduction to CUDA graphs in the vLLM docs^[https://docs.vllm.ai/en/stable/design/cuda_graphs/].
+There is an introduction to CUDA graphs in the vLLM docs^[<https://docs.vllm.ai/en/stable/design/cuda_graphs/>].
 What's important to understand is that CUDA graphs require the input and output tensors (*buffers*) to be allocated before running the code (i.e. no allocating PyTorch tensors during the graph's execution).
 All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects.
 I found that if you run CUDA graphs, but don't reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again.
