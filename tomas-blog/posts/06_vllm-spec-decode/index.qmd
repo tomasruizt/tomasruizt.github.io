@@ -284,11 +284,90 @@ Advantages of EAGLE-3:
 Compare the performance with EAGLE-3 on your on workload if a corresponding draft model already exists on HuggingFace, or when you can and want to train a draft model yourself.
 You can use the vLLM speculators library^[https://github.com/vllm-project/speculators] to train draft models.
 
+## Lessons Learned
+
+In this section I begin by sharing some lessons learned implementing speculative decoding in vLLM, and then in @sec-start-high-level I share tips
+about how to approach the vLLM codebase as a new contributor.
+
+### Side-Effects
+The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are.
+The most important example to understand is the `forward_context`, which is a global variable that contains information about every layer in the model,
+and references it KV cache.
+The forward context is manipulated at runtime with `set_forward_context()` function, [here](https://github.com/vllm-project/vllm/blob/5da4c7d789fe0c4ca2c49913441f99df24715a97/vllm/v1/worker/gpu_model_runner.py#L3287) in the main loop of the `gpu_model_runner.py` file.
+It looks similar to @lst-set-forward-context, and its important to understand that it also determines what goes into the model.
+The forward context contains e.g. `AttentionMetadata.slot_mapping` object containing **pointers to the KV cache**.
+If these pointers are incorrect, the KV cache will be corrupted at runtime, and your outputs will be garbage.
+
+```{#lst-set-forward-context .python lst-cap="Set Forward Context"}
+with set_forward_context(
+  ... # A bunch of params that determine the inputs to the model
+):
+    self._model_forward(
+      ...  # What you THINK are the only inputs to the model
+    )
+```
+
+The forward context also includes the `batch_descriptor` and `cudagraph_runtime_mode` objects, which together determine which **CUDA graph
+mode** the model will run in.
+CUDA graphs are a complex topic by themselves, but in short they make the code within the graph run impressively fast.
+There is an introduction to CUDA graphs in the vLLM docs^[https://docs.vllm.ai/en/stable/design/cuda_graphs/].
+What's important to understand is that CUDA graphs require the input and output tensors (*buffers*) to be allocated before running the code (i.e. no allocating PyTorch tensors during the graph's execution).
+All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects.
+I found that if you run CUDA graphs, but don't reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again.
+This is why you find comments like @lst-use-persistent-buffers everywhere in the codebase.
+
+```{#lst-use-persistent-buffers .python lst-cap="Example Comment About CUDA Graphs"}
+# Run the model.
+# Use persistent buffers for CUDA graphs.
+with set_forward_context(...):
+```
+
+### Start High-Level {#sec-start-high-level}
+Introduce one or more unit tests for your desired API (e.g. `method=draft_model` for speculative decoding)
+Think about how as a user you would observe the outputs to identify if API is correct (e.g. `acceptance_rate=100%` in greedy decoding).
+Then go ahead and run the tests. 
+You will find yourself waiting for vLLM to spin up and compile the model, so you want to deactivate all features that make you wait for your code to execute
+(e.g. set `enforce-eager=True`).
+The reason is that slow **feedback loops** sap your focus and kill your flow.
+You will obviously hit errors that prevent your feature from working, but that is the goal.
+You are working from the inside out, catching and solving problems locally one at a time without having to understand the whole codebase at once.
+Set a debugger and try to understand only one error at a time, interactively and with the local context.
+vLLM is a very complex system, and trying to understand the whole codebase at once would be overwhelming and lead to frustration.
+
+### Use The Debugger
+Most features require you to manipulate tensors, and change their shape or content.
+This type of PyTorch code is often not simple to read or write, because its often more imperative than declarative.
+Good contributors comment their code to communicate the intent of it, without repeating the code itself, and without making the code 
+so verbose that its buried in noisy comments.
+For these code regions heavy in PyTorch code, I suggest to factor out a pure Python function that you can test independently.
+Then you create a unit test for it and can easily set breakpoints into the function without having to restart the envire vLLM server 
+(which is painfully slow).
+
+### Test extensively
+I mentioned that you speed up your feedback cycles by setting e.g. `enforce-eager=True`, but that leaves the most important paths of the codebase untested.
+In production, you never run in eager mode, so you want to test these paths as well.
+I recommend the `pytest.mark.parametrize` decorator to test your code with different inputs, e.g. as shown in @lst-pytest-mark-parametrize to test both eager and compiled mode.
+If you look at my [draft_model PR](https://github.com/vllm-project/vllm/pull/24322/changes#diff-51dd765a6984b59836ab7ec3c6c12c904afe4c325d72659fb82611b40521d008R658-R659), you will find that I used parametrizations almost like a paranoid to test many combinations.
+E.g. Is the target model in FP8 or in FP16? 
+Is the draft model in FP8/FP16? 
+Are we using greedy sampling or temperature >= 0.0?
+Is the target model using tensor parallelism of 1 or more?
+What happens if we pass invalid combinations of these parameters?
+Obviously, these are specific cases for speculative decoding, and the code paths that are relevant to your feature will become apparent as you understand the code from the outside in.
+
+```{#lst-pytest-mark-parametrize .python lst-cap="Pytest Parametrization"}
+@pytest.mark.parametrize("enforce_eager", [True, False])
+def test_draft_model_correctness(enforce_eager):
+  ...
+```
+
 
 <!-- 
 # TODO: 
 Report MT-Bench first since they are great.
 Make sure the numbers in the text don't refer to InstructCoder only.
+
+Mention that the tokenizers must be the same. models speak the same language. This is the case for smaller models in the same family.
 
 **Lessons Learned**:
 
