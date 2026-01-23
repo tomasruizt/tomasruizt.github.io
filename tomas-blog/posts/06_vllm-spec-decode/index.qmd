@@ -47,7 +47,7 @@ vllm serve Qwen/Qwen3-32B \
     --max-model-len 5000
 ```
 
-## Experimental Setup
+## Benchmarking Setup
 
 ### Models
 As a target model, I used **`Qwen3/Qwen-32B`**^[<https://huggingface.co/Qwen/Qwen3-32B>].
@@ -290,9 +290,13 @@ Advantages of EAGLE-3:
 
 - *Lower computational overhead*: EAGLE-3's lightweight draft models add minimal overhead, allowing get away with lower acceptance rates and to maintain speedups at larger batch sizes.
 
-**Recommendation**: Use draft_model when you have access to a smaller model from the same family and want to get started quickly without training a specialized draft model.
+### Recommendation
+Use draft_model when you have access to a smaller model from the same family and want to get started quickly without training a specialized draft model.
 Compare the performance with EAGLE-3 on your on workload if a corresponding draft model already exists on HuggingFace, or when you can and want to train a draft model yourself.
 You can use the vLLM speculators library^[<https://github.com/vllm-project/speculators>] to train draft models.
+
+In any case, the draft model must have the same tokenizer as the target model, i.e. both models must "speak the same language".
+This is most often a given when models belong to the same family.
 
 ## Lessons Learned
 
@@ -332,6 +336,22 @@ This is why you find comments like @lst-use-persistent-buffers everywhere in the
 # Use persistent buffers for CUDA graphs.
 with set_forward_context(...):
 ```
+
+### Benchmarking Artifacts
+While creating @fig-ttft-itl-tpot, I ran into a strange phenomenon:
+The average TTFT of the SD methods were consistently lower than for vanilla decoding.
+This was contrary to the expected behavior, since the SD methods have to perform the prefill with both the draft and target models, so their TTFT should be higher.
+What was going on here?
+
+![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/statistical-artifact.png){width="60%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
+
+Its important to keep in mind that we deal with a distribution of points, and to visualize not only the mean but also the median and 99th percentile.
+The mean can be heavily skewed by outliers, which happens for TTFT when requests are slow.
+
+The root cause of the problem was the default `--request-rate` parameter of the `vllm bench serve` command, which is infinite, meaning that all requests were sent to the server *exactly* at the same time.
+This meant that the server was batch processing all prefills at once in synchrony, and this inflated the TTFT for all requests of vanilla decoding.
+It did not affect the SD methods, because each request finished at a different step due to the different number of accepted tokens, which broke the batch synchrony.
+To prevent this artifact, I'm from now on always setting a request rate (e.g. `--request-rate` equals `--max-concurrency`), so that the requests are sent on average over the first second.
 
 ### Start High-Level {#sec-start-high-level}
 Introduce one or more unit tests for your desired API (e.g. `method=draft_model` for speculative decoding)
@@ -373,22 +393,18 @@ def test_draft_model_correctness(enforce_eager):
   ...
 ```
 
+### Code Evolution
+The vLLM project is very short on reviewers and many people wish to contribute to it, which means that many PRs sit unreviewed for a long time.
+My [PR](https://github.com/vllm-project/vllm/pull/24322) was open from 2025.09.05 and merged on 2026.01.19, 
+which is 136 days or about 4.5 months (!), and that was despite relatively engaged reviewers.
+That is a very long time to have a PR open, and the vLLM codebase evolves very quickly.
+As a result, I had to resolve **merge conflicts** at least 10 times.
+After resolving several very painful conflicts, I learned that some code changes are more likely to cause conflicts than others.
+E.g. moving a function to a new file _and_ changing its body will create a painful merge conflict, because the function will evolve on main in its old location.
+The same applies to extracting a superclass or child class, changing its body, and then moving it to a new file.
+We should not wish for our PRs to stay open for a long time, but we should be prepared if the code evolves underneath our PR.
+E.g. We can modify functions and classes in-place (same file), and defer moving functions/classes to other files in a subsequent PR.
+This might sound strange for experienced engineers, but it is what I found effective to reduce the merge conflict pains.
 
-<!-- 
-# TODO: 
-Report MT-Bench first since they are great.
-Make sure the numbers in the text don't refer to InstructCoder only.
-
-Mention that the tokenizers must be the same. models speak the same language. This is the case for smaller models in the same family.
-
-**Lessons Learned**:
-
-* pass `--request-ratio` to prevent statistical artifacts in the TTFT for non-SD (vanilla) decoding benchmarks.
-* Unit tests are great, but often don't capture the full picture
-* You need quick access to your sanity-check evaluation suite
-* These scripts should live outside the git repository to avoid being wiped.
-* Long lived branches can experience a lot of merge conflicts.
-* Show example of `Eagle.propose()` method.
-* Its not always clear whom to ask for a review and who can actually accept your PR. -->
 
 # References
