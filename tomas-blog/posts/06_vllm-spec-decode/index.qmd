@@ -345,6 +345,15 @@ This is why you find comments like @lst-use-persistent-buffers everywhere in the
 with set_forward_context(...):
 ```
 
+### CPU-GPU Synchronizations & Triton Kernels
+I wrote about CPU-GPU synchronizations in full length in a [separate post](https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/).
+In short: To write fast and efficient PyTorch code, its important to avoid CPU-GPU synchronizations.
+Synchronizations prevent the CPU from scheduling enough work for the GPU to keep it busy, leading to low GPU utilization.
+In the vLLM speculative decoding PR, I needed to prepare the input tokens for the draft_model, which required multiple PyTorch operations (including a synchronization).
+To prevent CPU-GPU synchronizations, and also fuse all these operations into a single one, I implemented a custom [Triton kernel](https://github.com/vllm-project/vllm/blob/1209b784f2ba976eff2ea24bc33c61f35c6eb213/vllm/v1/spec_decode/draft_model.py#L234).
+The kernel is quite simple, but it replaced around 8 calls to PyTorch functions. 
+If you are interested in learning about Triton kernels, I recommend looking at the [tutorial examples](https://triton-lang.org/main/getting-started/tutorials/index.html).
+
 ### Benchmarking Artifacts
 While creating @fig-ttft-itl-tpot, I ran into a strange phenomenon:
 The average TTFT of the SD methods were consistently lower than for vanilla decoding.
