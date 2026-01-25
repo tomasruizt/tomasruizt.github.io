@@ -307,9 +307,9 @@ You can use the vLLM speculators library^[<https://github.com/vllm-project/specu
 In any case, the draft model must have the same tokenizer as the target model, i.e., both models must "speak the same language."
 This is typically the case when models belong to the same family.
 
-## Lessons Learned
+## Key Learnings
 
-In this section, I begin by sharing some quirks I learned about vLLM while implementing speculative decoding, and then in @sec-start-high-level I share tips about how to approach the vLLM codebase as a new contributor.
+In this section, I share key lessons I learned about vLLM while implementing speculative decoding.
 
 ### Side-Effects
 The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are.
@@ -331,12 +331,21 @@ If these pointers are incorrect, the KV cache will be corrupted at runtime, and 
 Saving to the KV cache happens concretely in the function `reshape_and_cache_flash()` (FlashAttention code path: [permalink](https://github.com/vllm-project/vllm/blob/13d8746c545576bcb6e0771ee4dc0b6fae694fa1/vllm/v1/attention/backends/flash_attn.py#L670)).
 The function directly takes this `slot_mapping` tensor as an input.
 
-The forward context also includes the `batch_descriptor` and `cudagraph_runtime_mode` objects, which together determine which **CUDA graph mode** the model will dispatch to.
+### Performance Optimizations
+There were three noteworthy drivers of performance I encountered when implementing speculative decoding:
+
+1. **CUDA Graphs**
+2. **CPU-GPU synchronizations**
+3. **Triton Kernels**
+
+#### CUDA Graphs
+
 CUDA graphs are a complex topic by themselves, but in short: they make the code within the graph run impressively fast.
 There is an introduction to CUDA graphs in the vLLM docs^[<https://docs.vllm.ai/en/stable/design/cuda_graphs/>].
-What's important to understand is that CUDA graphs require the input and output tensors (**buffers**) to be allocated before running the code (i.e. no allocating PyTorch tensors during the graph's execution).
+What's important to understand is that CUDA graphs require the input and output tensors (**buffers**) to be allocated before running the code (i.e. no dynamic-shape allocation of PyTorch tensors during the graph's execution).
 All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects.
 I found that if you run CUDA graphs, but don't reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again.
+The forward context I mentioned earlier includes the `batch_descriptor` and `cudagraph_runtime_mode` objects, which together determine which *CUDA graph mode* the model will dispatch to.
 This is why you find comments like @lst-use-persistent-buffers everywhere in the codebase.
 
 ```{#lst-use-persistent-buffers .python lst-cap="Example Comment About CUDA Graphs"}
@@ -345,16 +354,20 @@ This is why you find comments like @lst-use-persistent-buffers everywhere in the
 with set_forward_context(...):
 ```
 
-### CPU-GPU Synchronizations & Triton Kernels
-I wrote about CPU-GPU synchronizations in full length in a [separate post](https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/).
-In short: To write fast and efficient PyTorch code, its important to avoid CPU-GPU synchronizations.
+#### CPU-GPU synchronizations
+To write fast and efficient PyTorch code, its important to avoid CPU-GPU synchronizations.
 Synchronizations prevent the CPU from scheduling enough work for the GPU to keep it busy, leading to low GPU utilization.
-In the vLLM speculative decoding PR, I needed to prepare the input tokens for the draft_model, which required multiple PyTorch operations (including a synchronization).
-To prevent CPU-GPU synchronizations, and also fuse all these operations into a single one, I implemented a custom [Triton kernel](https://github.com/vllm-project/vllm/blob/1209b784f2ba976eff2ea24bc33c61f35c6eb213/vllm/v1/spec_decode/draft_model.py#L234).
-The kernel is quite simple, but it replaced around 8 calls to PyTorch functions. 
-If you are interested in learning about Triton kernels, I recommend looking at the [tutorial examples](https://triton-lang.org/main/getting-started/tutorials/index.html).
+I wrote a full-length [separate post](https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/) about them, which I recommend reading for a deeper explanation including PyTorch examples.
 
-### Benchmarking Artifacts
+#### Triton Kernels
+Preparing the input tokens for the speculative decoding draft model required a lot of small PyTorch operations.
+Launching many small kernels incurs unnecessary overhead (2-3µs per kernel).
+To fuse all these operations into a single one, I implemented a custom [Triton kernel](https://github.com/vllm-project/vllm/blob/1209b784f2ba976eff2ea24bc33c61f35c6eb213/vllm/v1/spec_decode/draft_model.py#L234).
+The kernel is quite simple, but it replaced around 8 calls to PyTorch functions, avoiding their launch overhead.
+If you are interested in learning about Triton kernels, I recommend looking at the [tutorial examples](https://triton-lang.org/main/getting-started/tutorials/index.html).
+The langauge is easy to learn and it gets you 85% of the way to speed-of-light performance.
+
+### Dive Deep
 While creating @fig-ttft-itl-tpot, I ran into a strange phenomenon:
 The average TTFT of the SD methods were consistently lower than for vanilla decoding.
 This was contrary to the expected behavior, since the SD methods have to perform the prefill with both the draft and target models, so their TTFT should be higher.
@@ -362,13 +375,17 @@ What was going on here?
 
 ![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/statistical-artifact.png){width="60%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
 
-It's important to keep in mind that we deal with a distribution of points, and to visualize not only the mean but also the median and 99th percentile.
-The mean can be heavily skewed by outliers, which happens for TTFT when requests are slow.
-
 The root cause of the problem was the default `--request-rate` parameter of the `vllm bench serve` command, which is infinite, meaning that all requests were sent to the server *exactly* at the same time.
 This meant that the server was batch processing all prefills at once in synchrony, which inflated the TTFT for all requests of vanilla decoding.
 It did not affect the SD methods, because each request finished at a different step due to the different number of accepted tokens, which broke the batch synchrony.
 To prevent this artifact, I now always set a request rate (e.g., `--request-rate` equals `--max-concurrency`), so that the requests are sent on average over the first second.
+
+We sometimes find that our empirical results don't match our expectations or intuitions.
+In these cases, we need to dive deep and understand what is driving the disagreement.
+Otherwise, we would miss an opportunity to learn something about our system.
+
+## Contributing to vLLM
+In this section, I share some tips about how to approach the vLLM codebase as a new contributor.
 
 ### Start High-Level {#sec-start-high-level}
 Introduce one or more unit tests for your desired API (e.g., `method=draft_model` for speculative decoding).
@@ -390,15 +407,15 @@ Good contributors comment their code to communicate the intent without repeating
 so verbose that it's buried in noisy comments.
 For code regions heavy in PyTorch code, I suggest factoring out a pure Python function that you can test independently.
 Then you can create a unit test for it and easily set breakpoints in the function without having to restart the entire vLLM server 
-(which is painfully slow).
+(which is very slow).
 
 ### Test Extensively
 I mentioned that you speed up your feedback cycles by setting, e.g., `enforce-eager=True`, but that leaves the most important paths of the codebase untested.
 In production, you never run in eager mode, so you want to test these paths as well.
 I recommend the `pytest.mark.parametrize` decorator to test your code with different inputs, e.g., as shown in @lst-pytest-mark-parametrize to test both eager and compiled mode.
 If you look at my [draft_model PR](https://github.com/vllm-project/vllm/pull/24322/changes#diff-51dd765a6984b59836ab7ec3c6c12c904afe4c325d72659fb82611b40521d008R658-R659), you will find that I used parametrizations almost obsessively to test many combinations.
-For example: Is the target model in FP8 or FP16? 
-Is the draft model in FP8/FP16? 
+For example: Is the *target* model in FP8 or FP16? 
+Is the *draft* model in FP8/FP16? 
 Are we using greedy sampling or temperature >= 0.0?
 Is the target model using tensor parallelism of 1 or more?
 What happens if we pass invalid combinations of these parameters?
@@ -412,16 +429,19 @@ def test_draft_model_correctness(enforce_eager):
 
 ### Code Evolution
 The vLLM project has far more contributors than reviewers, so many PRs sit unreviewed for extended periods.
-My [PR](https://github.com/vllm-project/vllm/pull/24322) was open from 2025.09.05 and merged on 2026.01.19—136 days, or about 4.5 months—despite having relatively engaged reviewers.
+My [PR](https://github.com/vllm-project/vllm/pull/24322) was open from 2025.09.05 and merged on 2026.01.19, which is 136 days, or about **4.5 months**, despite having relatively engaged reviewers.
 With the vLLM codebase evolving so quickly, this long review cycle meant I had to resolve merge conflicts at least 10 times.
 
 After resolving several painful conflicts, I learned that certain types of changes and patterns are more likely to cause conflicts.
-For example, moving a function to a new file _and_ changing its body creates painful merge conflicts, because the function continues to evolve on main in its old location.
+For example, moving a function to a new file _and_ changing its body creates painful merge conflicts, because the function continues to evolve on the main branch in its old location.
 The same applies to extracting a superclass or child class, changing its body, and then moving it to a new file.
 
-While we shouldn't plan for PRs to stay open this long, we should be prepared for code to evolve underneath them.
+While we shouldn't plan for PRs to stay open this long, we should be prepared for the main branch to evolve in parallel to our PR.
 One strategy is to modify functions and classes in-place (within the same file) and defer moving them to other files in a subsequent PR.
-This might sound counterintuitive to experienced engineers, but I found it effective for reducing merge conflict pain.
+This might sound counterintuitive to experienced engineers, but it proved effective to minimize merge conflicts.
+
+## Acknowledgments
+I thank the reviewers and collabroators of the vLLM project who engaged with my PR and provided valuable feedback: [Benjamin Chislett](https://www.linkedin.com/in/benjamin-chislett-05502818a/) from NVIDIA, [Ekagra Ranjan](https://www.linkedin.com/in/ekagra-ranjan/) from Cohere, [Lily Liu](https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/) from OpenAI, [Wentao Ye](https://www.linkedin.com/in/yewentao/) from Red Hat, [Harry Mellor](https://www.linkedin.com/in/harrymellor/) from Hugging Face.
 
 
 # References
