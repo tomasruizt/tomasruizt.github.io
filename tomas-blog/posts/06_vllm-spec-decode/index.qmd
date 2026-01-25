@@ -20,7 +20,7 @@ code-annotations: below
 citation: true
 # draft: true
 ---
-I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
+I recently contributed speculative decoding with draft models to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)).
 In this post, I benchmark the performance of my implementation (draft_model) and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM.
 My benchmarks show that draft_model can achieve speedups of up to 2.24× on MT-Bench, outperforming EAGLE-3, while requiring no specialized training.
 At the end, I share key learnings from working in the vLLM codebase and a few practical tips for approaching and navigating it.
@@ -80,10 +80,12 @@ Programming tasks typically contain substantial repetition between input and out
 I benchmarked performance using `vllm bench serve` to measure token throughput metrics.
 All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0.
 This feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459).
-All experiments were run on an NVIDIA H100 96GB GPU.
+All experiments were run on an NVIDIA H100 96GB GPU, within the SLURM cluster of the [LRZ AI Systems](https://doku.lrz.de/lrz-ai-systems-11484278.html).
+The benchmarking code can be found on [Github](https://github.com/tomasruizt/vllm-scripts/blob/3564bb62538d75b2337e3aa65f502a17f5408dc7/README.md).
+All benchmark results are available in a single [Parquet file](https://github.com/tomasruizt/vllm-scripts/blob/fccb861997697293835325cdc551c820aa1aa290/results/data-2026-01-23.parquet) for download.
 
 <details>
-<summary>Benchmarking Command</summary>
+<summary>Example Benchmarking Command</summary>
 ```shell
 vllm bench serve \
   --model Qwen/Qwen3-32B \
@@ -100,7 +102,7 @@ For `--num-prompts`, I use 10 times `--max-concurrency` or at least 50 prompts.
 </details>
 
 <details>
-<summary>Benchmarking Output</summary>
+<summary>Example Benchmarking Output</summary>
 ```shell
 ============ Serving Benchmark Result ============
 Successful requests:                     320       
@@ -197,7 +199,7 @@ In the **compute-bound regime** (large batches and regular matrix multiplication
 
 EAGLE-3 is a modern speculative decoding technique supported by vLLM that uses lightweight draft models trained specifically for speculative decoding.
 The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[<https://github.com/sgl-project/sglang>] between 1.38× and 1.82× at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
-My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: around 2.0× or better at batch sizes 1 to 4.
+My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: around 2.0× or better at batch sizes 1 to 4, although we used different models (LLaMA-Instruct-3.1-8B vs Qwen3-32B, respectively).
 This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline against which to compare my draft_model implementation.
 
 ::: {.panel-tabset group="dataset"}
@@ -445,7 +447,7 @@ This might sound counterintuitive to experienced engineers, but it proved effect
 In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)) and compared it against vanilla decoding and EAGLE-3. 
 On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24×) without specialized training.
 Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes.
-The performance numbers are meant as a reference as of today (2026-01-25), and can vary with model, workload, and deployment.
+The performance numbers are meant as a reference as of today (2026-01-25, commit `e1a34c3`), and can vary with model, workload, and deployment.
 Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.
 
 ## Acknowledgments
