@@ -1,6 +1,6 @@
 ---
 title: "Up to 2.24x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1"
-subtitle: "Benchmarks and Lessons Learned"
+subtitle: "Benchmarks and Key Learnings"
 author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
@@ -23,12 +23,12 @@ citation: true
 I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
 In this post, I benchmark the performance of this draft_model implementation and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM.
 My benchmarks show that draft_model can achieve speedups of up to 2.24x on MT-Bench, outperforming EAGLE-3, while requiring no specialized training.
-At the end, I share lessons learned from working in the vLLM codebase and a few practical tips for approaching and navigating it.
+At the end, I share key learnings from working in the vLLM codebase and a few practical tips for approaching and navigating it.
 
 ::: {.callout-note}
 This is **not a tutorial** on speculative decoding.
 I assume you are already familiar with the technique and its basic trade-offs.
-The focus here is on benchmarking the new code and sharing lessons learned.
+The focus here is on benchmarking the new code and sharing key learnings.
 :::
 
 ## Background
@@ -373,7 +373,7 @@ The average TTFT of the SD methods were consistently lower than for vanilla deco
 This was contrary to the expected behavior, since the SD methods have to perform the prefill with both the draft and target models, so their TTFT should be higher.
 What was going on here?
 
-![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/statistical-artifact.png){width="60%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
+![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/statistical-artifact.png){width="50%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
 
 The root cause of the problem was the default `--request-rate` parameter of the `vllm bench serve` command, which is infinite, meaning that all requests were sent to the server *exactly* at the same time.
 This meant that the server was batch processing all prefills at once in synchrony, which inflated the TTFT for all requests of vanilla decoding.
@@ -440,8 +440,14 @@ While we shouldn't plan for PRs to stay open this long, we should be prepared fo
 One strategy is to modify functions and classes in-place (within the same file) and defer moving them to other files in a subsequent PR.
 This might sound counterintuitive to experienced engineers, but it proved effective to minimize merge conflicts.
 
+## Summary
+In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)) and compared it against vanilla decoding and EAGLE-3. 
+On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24x) without specialized training.
+Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes.
+The performance numbers are meant as a reference as of today (2026.01.25), and can vary with model and deployment.
+Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.
+
 ## Acknowledgments
 I thank the reviewers and collabroators of the vLLM project who engaged with my PR and provided valuable feedback: [Benjamin Chislett](https://www.linkedin.com/in/benjamin-chislett-05502818a/) from NVIDIA, [Ekagra Ranjan](https://www.linkedin.com/in/ekagra-ranjan/) from Cohere, [Lily Liu](https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/) from OpenAI, [Wentao Ye](https://www.linkedin.com/in/yewentao/) from Red Hat, [Harry Mellor](https://www.linkedin.com/in/harrymellor/) from Hugging Face.
-
 
 # References
