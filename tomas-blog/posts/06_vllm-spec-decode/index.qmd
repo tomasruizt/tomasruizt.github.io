@@ -5,8 +5,8 @@ author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
     affiliations: Ludwig-Maximilians-Universität München
-# date: "2024-12-23"
-# categories: [Mathematics, GPUs]
+date: "2026-01-25"
+categories: [vLLM, PyTorch, Triton, Transformers]
 format:
   html:
     toc: true
@@ -21,8 +21,8 @@ citation: true
 # draft: true
 ---
 I recently contributed speculative decoding with draft models to vLLM V1 [PR #24322](https://github.com/vllm-project/vllm/pull/24322).
-In this post, I benchmark the performance of this draft_model implementation and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM.
-My benchmarks show that draft_model can achieve speedups of up to 2.24x on MT-Bench, outperforming EAGLE-3, while requiring no specialized training.
+In this post, I benchmark the performance of my implementation (draft_model) and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM.
+My benchmarks show that draft_model can achieve speedups of up to 2.24× on MT-Bench, outperforming EAGLE-3, while requiring no specialized training.
 At the end, I share key learnings from working in the vLLM codebase and a few practical tips for approaching and navigating it.
 
 ::: {.callout-note}
@@ -44,7 +44,7 @@ However, during the rearchitecting to V1, this feature was removed and hadn't be
 
 To use speculative decoding with vLLM, simply pass additional arguments to the `vllm serve` command.
 You'll need to specify the draft model and the number of speculative tokens to generate.
-I also recommend passing `--max-model-len` to leave more memory for the KV cache.
+I also recommend setting `--max-model-len` to leave more memory for the KV cache.
 
 ```shell
 vllm serve Qwen/Qwen3-32B \
@@ -90,6 +90,7 @@ vllm bench serve \
   --dataset-name hf \
   --dataset-path likaixin/InstructCoder \
   --max-concurrency 32 \
+  --request-rate 32 \
   --num-prompts 320 \
   --temperature 0.0 \
   --top-p 1.0 \
@@ -168,14 +169,14 @@ If $K$ is set too low, we miss potential speedups.
 To understand these dynamics, I ran benchmarks across different values of $K$ and evaluated both the 1.7B and 4B models as draft models.
 The results are shown in @fig-draft-model-ratios.
 The y-axis shows the **speedup ratio** (or simply **speedup**), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time).
-A speedup of 2x means speculative decoding finishes the workload in half the time of vanilla decoding.
+A speedup of 2× means speculative decoding finishes the workload in half the time of vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
 ![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
 
 # InstructCoder
-![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/InstructCoder/draft_model_ratios.png){#fig-draft-model-ratios}
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/InstructCoder/draft_model_ratios.png)
 :::
 
 The results show several key patterns:
@@ -195,8 +196,8 @@ In the **compute-bound regime** (large batches and regular matrix multiplication
 ### Comparison with EAGLE-3
 
 EAGLE-3 is a modern speculative decoding technique supported by vLLM that uses lightweight draft models trained specifically for speculative decoding.
-The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[<https://github.com/sgl-project/sglang>] between 1.38x and 1.82x at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
-My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: around 2.0x or better at batch sizes 1 to 4.
+The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[<https://github.com/sgl-project/sglang>] between 1.38× and 1.82× at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
+My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups on vLLM**: around 2.0× or better at batch sizes 1 to 4.
 This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline against which to compare my draft_model implementation.
 
 ::: {.panel-tabset group="dataset"}
@@ -355,7 +356,7 @@ with set_forward_context(...):
 ```
 
 #### CPU-GPU synchronizations
-To write fast and efficient PyTorch code, its important to avoid CPU-GPU synchronizations.
+To write fast and efficient PyTorch code, it's important to avoid CPU-GPU synchronizations.
 Synchronizations prevent the CPU from scheduling enough work for the GPU to keep it busy, leading to low GPU utilization.
 I wrote a full-length [separate post](https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/) about them, which I recommend reading for a deeper explanation including PyTorch examples.
 
@@ -369,7 +370,7 @@ The langauge is easy to learn and it gets you 85% of the way to speed-of-light p
 
 ### Dive Deep
 While creating @fig-ttft-itl-tpot, I ran into a strange phenomenon:
-The average TTFT of the SD methods were consistently lower than for vanilla decoding.
+The mean TTFT of the SD methods was consistently lower than for vanilla decoding.
 This was contrary to the expected behavior, since the SD methods have to perform the prefill with both the draft and target models, so their TTFT should be higher.
 What was going on here?
 
@@ -392,7 +393,7 @@ Introduce one or more unit tests for your desired API (e.g., `method=draft_model
 Think about how, as a user, you would observe the outputs to identify if the API is correct (e.g., `acceptance_rate=100%` in greedy decoding).
 Then go ahead and run the tests.
 You will find yourself waiting for vLLM to spin up and compile the model, so you want to deactivate all features that make you wait for your code to execute
-(e.g., set `enforce-eager=True`).
+(e.g., pass `--enforce-eager`).
 The reason is that slow **feedback loops** sap your focus and kill your flow.
 You will obviously hit errors that prevent your feature from working, but that is the goal.
 You are working from the inside out, catching and solving problems locally one at a time without having to understand the whole codebase at once.
@@ -410,7 +411,7 @@ Then you can create a unit test for it and easily set breakpoints in the functio
 (which is very slow).
 
 ### Test Extensively
-I mentioned that you speed up your feedback cycles by setting, e.g., `enforce-eager=True`, but that leaves the most important paths of the codebase untested.
+I mentioned that you speed up your feedback cycles by passing, e.g., `--enforce-eager`, but that leaves the most important paths of the codebase untested.
 In production, you never run in eager mode, so you want to test these paths as well.
 I recommend the `pytest.mark.parametrize` decorator to test your code with different inputs, e.g., as shown in @lst-pytest-mark-parametrize to test both eager and compiled mode.
 If you look at my [draft_model PR](https://github.com/vllm-project/vllm/pull/24322/changes#diff-51dd765a6984b59836ab7ec3c6c12c904afe4c325d72659fb82611b40521d008R658-R659), you will find that I used parametrizations almost obsessively to test many combinations.
@@ -429,7 +430,7 @@ def test_draft_model_correctness(enforce_eager):
 
 ### Code Evolution
 The vLLM project has far more contributors than reviewers, so many PRs sit unreviewed for extended periods.
-My [PR](https://github.com/vllm-project/vllm/pull/24322) was open from 2025.09.05 and merged on 2026.01.19, which is 136 days, or about **4.5 months**, despite having relatively engaged reviewers.
+My [PR](https://github.com/vllm-project/vllm/pull/24322) was open from 2025-09-05 and merged on 2026-01-19, which is 136 days, or about **4.5 months**, despite having relatively engaged reviewers.
 With the vLLM codebase evolving so quickly, this long review cycle meant I had to resolve merge conflicts at least 10 times.
 
 After resolving several painful conflicts, I learned that certain types of changes and patterns are more likely to cause conflicts.
@@ -442,12 +443,12 @@ This might sound counterintuitive to experienced engineers, but it proved effect
 
 ## Summary
 In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)) and compared it against vanilla decoding and EAGLE-3. 
-On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24x) without specialized training.
+On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24×) without specialized training.
 Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes.
-The performance numbers are meant as a reference as of today (2026.01.25), and can vary with model and deployment.
+The performance numbers are meant as a reference as of today (2026-01-25), and can vary with model, workload, and deployment.
 Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.
 
 ## Acknowledgments
-I thank the reviewers and collabroators of the vLLM project who engaged with my PR and provided valuable feedback: [Benjamin Chislett](https://www.linkedin.com/in/benjamin-chislett-05502818a/) from NVIDIA, [Ekagra Ranjan](https://www.linkedin.com/in/ekagra-ranjan/) from Cohere, [Lily Liu](https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/) from OpenAI, [Wentao Ye](https://www.linkedin.com/in/yewentao/) from Red Hat, [Harry Mellor](https://www.linkedin.com/in/harrymellor/) from Hugging Face.
+I thank the reviewers and collaborators of the vLLM project who engaged with my PR and provided valuable feedback: [Benjamin Chislett](https://www.linkedin.com/in/benjamin-chislett-05502818a/) from NVIDIA, [Ekagra Ranjan](https://www.linkedin.com/in/ekagra-ranjan/) from Cohere, [Lily Liu](https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/) from OpenAI, [Wentao Ye](https://www.linkedin.com/in/yewentao/) from Red Hat, [Harry Mellor](https://www.linkedin.com/in/harrymellor/) from Hugging Face.
 
 # References
