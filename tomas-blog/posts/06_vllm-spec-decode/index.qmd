@@ -57,14 +57,12 @@ vllm serve Qwen/Qwen3-32B \
 
 ## Benchmarking Setup
 
-### Models
+### Models & Datasets
 As a target model, I used **`Qwen3/Qwen-32B`**^[<https://huggingface.co/Qwen/Qwen3-32B>].
 Vanilla decoding uses this model directly.
 For draft_model, I evaluated two different draft models: **`Qwen3/Qwen-1.7B`**^[<https://huggingface.co/Qwen/Qwen3-1.7B>] and **`Qwen3/Qwen-4B`**^[<https://huggingface.co/Qwen/Qwen3-4B>].
 The 0.6B model encountered a runtime exception (likely a bug).
 For EAGLE-3, I evaluated the **`RedHatAI/Qwen3-32B-speculator.eagle3`** draft model^[<https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3>].
-
-### Datasets
 
 I evaluated performance on two datasets:
 
@@ -357,60 +355,6 @@ This is why you find comments like @lst-use-persistent-buffers everywhere in the
 with set_forward_context(...):
 ```
 
-#### Follow-up Analysis: Full CUDA Graphs
-Currently, vLLM supports two different CUDA graph modes: `piecewise` and `full`. 
-The `full` CUDA graph mode achieves the highest speeds, but is not compatible with all features.
-At the moment, draft models (both EAGLE-3 and draft_model) use the `piecewise` CUDA graph mode.
-In this section, I estimate the speedups we could achieve by supporting the `full` CUDA graph mode for draft models.
-
-1. **Speed of full CUDA graphs:**
-I deactivate speculative decoding, run each model (Qwen3 32B and 1.7B) separately on a single request of the InstructCoder dataset with 1000 output tokens, and measure their respective ITLs.
-This sets a baseline for the runtime to produce a single token under full CUDA graphs.
-
-2. **Speed of piecewise CUDA graphs:**
-I activate speculative decoding (draft_model), run draft + target, and measure the ITL.
-I vary the number of speculative tokens to estimate the duration of each additional forward run of the draft model.
-The resulting ITL regression is shown in @fig-itl-vs-num-spec-toks.
-The intercept is the runtime of the target model within the SD framework, and the slope is the runtime of the draft model within the SD framework. 
-
-![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
-
-Having the runtime of both models under both CUDA graph modes, we can calculate the speedups in @tbl-speed-comparison-full-vs-piecewise.
-The column "SD Runtime" is the estimate based on the ITL regression mentioned above.
-The column "Standalone Runtime" is the median ITL metric reported by `vllm bench serve` without speculative decoding.
-The runtime of the draft model is 9.10% shorter under full CUDA graphs.
-
-| Model        | SD Runtime (piecewise CG) | Standalone Runtime (full CG) | Runtime Reduction |
-|--------------|------------------|----------------|----------------|
-| Qwen3-1.7B  | 2.50 ms | 2.27 ms | 9.10 % |
-| Qwen3-32B   | 24.36 ms | 23.65 ms | 2.91 % |  
-
-:Table: Speed comparison of full and piecewise CUDA graphs. {#tbl-speed-comparison-full-vs-piecewise}
-
-Now assuming we implemented the shorter runtime using full CUDA graphs, what end-to-end speedups for draft_model could we achieve?
-I used the formula below to calculate the TPOT values, and forecast the speedups for full CUDA graphs.
-$$
-\text{TPOT} = \frac{\text{ITL}}{\text{AL}} = \frac{T_{d} \cdot K + T_{t}}{\text{AL}}
-$$
-
-Where $T_{d}$ is the runtime of the draft model, $T_{t}$ is the runtime of the target model, $K$ is the number of speculative tokens, and $\text{AL}$ is the acceptance length.
-@fig-tpot-comparison-full-vs-piecewise shows the TPOT values under piecewise CUDA graphs (Current), and full CUDA graphs (Expected).
-The minimum (best) TPOT values for each curve are marked with a cross.
-At $K=5$, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement).
-**The speedup ratios over vanilla decoding grow from 2.26× to 2.37×.**
-When I started this analysis, I expected larger improvements (around 20%).
-Nevertheless, these forecasted improvements are significant, because they would be universal across all draft_model workloads.
-
-![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
-
-::: {.callout-note}
-In this experiment, I used only a single request from the InstructCoder dataset, with `--output-len=1000`.
-The best TPOT values were achieved at $K=5$ rather than the $K=4$ for the larger benchmark,
-but the TPOT differences are insignificant.
-The code for this analysis is available on [Github](https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb)
-:::
-
-
 #### CPU-GPU synchronizations
 To write fast and efficient PyTorch code, it's important to avoid CPU-GPU synchronizations.
 Synchronizations prevent the CPU from scheduling enough work for the GPU to keep it busy, leading to low GPU utilization.
@@ -497,6 +441,61 @@ While we shouldn't plan for PRs to stay open this long, we should be prepared fo
 One strategy is to modify functions and classes in-place (within the same file) and defer moving them to other files in a subsequent PR.
 This might sound counterintuitive to experienced engineers, but it proved effective to minimize merge conflicts.
 
+## Future Outlook
+
+### Full CUDA Graphs
+Currently, vLLM supports two different CUDA graph modes: `piecewise` and `full`. 
+The `full` CUDA graph mode achieves the highest speeds, but is not compatible with all features.
+At the moment, draft models (both EAGLE-3 and draft_model) use the `piecewise` CUDA graph mode.
+In this section, I estimate the speedups we could achieve by supporting the `full` CUDA graph mode for draft models.
+
+1. **Speed of full CUDA graphs:**
+I deactivate speculative decoding, run each model (Qwen3 32B and 1.7B) separately on a single request of the InstructCoder dataset with 1000 output tokens, and measure their respective ITLs.
+This sets a baseline for the runtime to produce a single token under full CUDA graphs.
+
+2. **Speed of piecewise CUDA graphs:**
+I activate speculative decoding (draft_model), run draft + target, and measure the ITL.
+I vary the number of speculative tokens to estimate the duration of each additional forward run of the draft model.
+The resulting ITL regression is shown in @fig-itl-vs-num-spec-toks.
+The intercept is the runtime of the target model within the SD framework, and the slope is the runtime of the draft model within the SD framework. 
+
+![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
+
+Having the runtime of both models under both CUDA graph modes, we can calculate the speedups in @tbl-speed-comparison-full-vs-piecewise.
+The column "SD Runtime" is the estimate based on the ITL regression mentioned above.
+The column "Standalone Runtime" is the median ITL metric reported by `vllm bench serve` without speculative decoding.
+The runtime of the draft model is 9.10% shorter under full CUDA graphs.
+
+| Model        | SD Runtime (piecewise CG) | Standalone Runtime (full CG) | Runtime Reduction |
+|--------------|------------------|----------------|----------------|
+| Qwen3-1.7B  | 2.50 ms | 2.27 ms | 9.10 % |
+| Qwen3-32B   | 24.36 ms | 23.65 ms | 2.91 % |  
+
+:Table: Speed comparison of full and piecewise CUDA graphs. {#tbl-speed-comparison-full-vs-piecewise}
+
+Now assuming we implemented the shorter runtime using full CUDA graphs, what end-to-end speedups for draft_model could we achieve?
+I used the formula below to calculate the TPOT values, and forecast the speedups for full CUDA graphs.
+$$
+\text{TPOT} = \frac{\text{ITL}}{\text{AL}} = \frac{T_{d} \cdot K + T_{t}}{\text{AL}}
+$$
+
+Where $T_{d}$ is the runtime of the draft model, $T_{t}$ is the runtime of the target model, $K$ is the number of speculative tokens, and $\text{AL}$ is the acceptance length.
+@fig-tpot-comparison-full-vs-piecewise shows the TPOT values under piecewise CUDA graphs (Current), and full CUDA graphs (Expected).
+The minimum (best) TPOT values for each curve are marked with a cross.
+At $K=5$, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement).
+**The speedup ratios over vanilla decoding grow from 2.26× to 2.37×.**
+When I started this analysis, I expected larger improvements (around 20%).
+Nevertheless, these forecasted improvements are significant, because they would be universal across all draft_model workloads.
+
+![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
+
+::: {.callout-note}
+In this experiment, I used only a single request from the InstructCoder dataset, with `--output-len=1000`.
+The best TPOT values were achieved at $K=5$ rather than the $K=4$ for the larger benchmark,
+but the TPOT differences are insignificant.
+The code for this analysis is available on [Github](https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb)
+:::
+
 ## Summary
 In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)) and compared it against vanilla decoding and EAGLE-3. 
 On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24×) without specialized training.
@@ -507,4 +506,4 @@ Finally, I hope the key learnings and contributor tips I shared here help other 
 ## Acknowledgments
 I thank the reviewers and collaborators of the vLLM project who engaged with my PR and provided valuable feedback: [Benjamin Chislett](https://www.linkedin.com/in/benjamin-chislett-05502818a/) from NVIDIA, [Ekagra Ranjan](https://www.linkedin.com/in/ekagra-ranjan/) from Cohere, [Lily Liu](https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/) from OpenAI, [Wentao Ye](https://www.linkedin.com/in/yewentao/) from Red Hat, [Harry Mellor](https://www.linkedin.com/in/harrymellor/) from Hugging Face.
 
-# References
+## References
