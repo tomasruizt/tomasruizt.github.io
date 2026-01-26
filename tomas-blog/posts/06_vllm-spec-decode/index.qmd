@@ -444,27 +444,32 @@ This might sound counterintuitive to experienced engineers, but it proved effect
 ## Future Outlook
 
 ### Full CUDA Graphs
-Currently, vLLM supports two different CUDA graph modes: `piecewise` and `full`. 
-The `full` CUDA graph mode achieves the highest speeds, but is not compatible with all features.
-At the moment, draft models (both EAGLE-3 and draft_model) use the `piecewise` CUDA graph mode.
-In this section, I estimate the speedups we could achieve by supporting the `full` CUDA graph mode for draft models.
+Currently, vLLM supports two CUDA graph modes: `piecewise` and `full`.
+The `full` mode is typically fastest, but it comes with stricter constraints and isn't compatible with all execution paths.
+At the moment, draft models (both EAGLE-3 and `draft_model`) use `piecewise`.
+In this section, I estimate the end-to-end speedups we could achieve by supporting `full` CUDA graphs for draft-model speculative decoding.
+My results suggest that the speedup ratios over vanilla decoding would grow **from 2.26× to 2.37×**.
 
-1. **Speed of full CUDA graphs:**
-I deactivate speculative decoding, run each model (Qwen3 32B and 1.7B) separately on a single request of the InstructCoder dataset with 1000 output tokens, and measure their respective ITLs.
-This sets a baseline for the runtime to produce a single token under full CUDA graphs.
+#### Method
+I break the question into two measurements:
 
-2. **Speed of piecewise CUDA graphs:**
-I activate speculative decoding (draft_model), run draft + target, and measure the ITL.
-I vary the number of speculative tokens to estimate the duration of each additional forward run of the draft model.
-The resulting ITL regression is shown in @fig-itl-vs-num-spec-toks.
-The intercept is the runtime of the target model within the SD framework, and the slope is the runtime of the draft model within the SD framework. 
+1. **Standalone (full CUDA graphs):**
+   I disable speculative decoding, run each model (Qwen3-32B and Qwen3-1.7B) separately on a single InstructCoder request with 1000 output tokens, and measure ITL.
+   This estimates the per-token runtime under full graphs.
+
+2. **Within speculative decoding (piecewise CUDA graphs):**
+   I enable speculative decoding (`draft_model`), run draft + target, and measure ITL while varying the number of speculative tokens \(K\).
+   Because each additional speculative token triggers one extra draft forward pass, a linear fit of ITL vs K is a good approximation.
+   The regression in @fig-itl-vs-num-spec-toks can be interpreted as follows:
+
+   - *The Intercept*: the target-model cost inside the SD loop (piecewise).
+   - *The Slope*: the incremental draft-model cost per additional speculative token (piecewise).
 
 ![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
 
-Having the runtime of both models under both CUDA graph modes, we can calculate the speedups in @tbl-speed-comparison-full-vs-piecewise.
-The column "SD Runtime" is the estimate based on the ITL regression mentioned above.
-The column "Standalone Runtime" is the median ITL metric reported by `vllm bench serve` without speculative decoding.
-The runtime of the draft model is 9.10% shorter under full CUDA graphs.
+With those two measurements, we can compare per-token runtimes across graph modes in @tbl-speed-comparison-full-vs-piecewise.
+"SD Runtime" comes from the ITL regression (piecewise, inside SD), and "Standalone Runtime" is the median ITL from `vllm bench serve` without SD (full graphs).
+For this setup, the draft model is **9.10% faster** under full graphs, while the target model is **2.91% faster**.
 
 | Model        | SD Runtime (piecewise CG) | Standalone Runtime (full CG) | Runtime Reduction |
 |--------------|------------------|----------------|----------------|
@@ -473,19 +478,20 @@ The runtime of the draft model is 9.10% shorter under full CUDA graphs.
 
 :Table: Speed comparison of full and piecewise CUDA graphs. {#tbl-speed-comparison-full-vs-piecewise}
 
-Now assuming we implemented the shorter runtime using full CUDA graphs, what end-to-end speedups for draft_model could we achieve?
-I used the formula below to calculate the TPOT values, and forecast the speedups for full CUDA graphs.
+#### Forecasted End-to-end Impact
+Assuming we could realize those per-token reductions inside speculative decoding, what does that translate to in terms of TPOT?
+I use the formula below to forecast the speedups for full CUDA graphs.
 $$
 \text{TPOT} = \frac{\text{ITL}}{\text{AL}} = \frac{T_{d} \cdot K + T_{t}}{\text{AL}}
 $$
 
-Where $T_{d}$ is the runtime of the draft model, $T_{t}$ is the runtime of the target model, $K$ is the number of speculative tokens, and $\text{AL}$ is the acceptance length.
+where $T_{d}$ is the runtime of the draft model, $T_{t}$ is the runtime of the target model, $K$ is the number of speculative tokens, and $\text{AL}$ is the acceptance length.
 @fig-tpot-comparison-full-vs-piecewise shows the TPOT values under piecewise CUDA graphs (Current), and full CUDA graphs (Expected).
 The minimum (best) TPOT values for each curve are marked with a cross.
 At $K=5$, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement).
 **The speedup ratios over vanilla decoding grow from 2.26× to 2.37×.**
-When I started this analysis, I expected larger improvements (around 20%).
-Nevertheless, these forecasted improvements are significant, because they would be universal across all draft_model workloads.
+When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains.
+Nevertheless, this improvement would positively impact the performance of draft_model across all workloads.
 
 ![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
 
