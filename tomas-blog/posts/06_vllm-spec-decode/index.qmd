@@ -154,10 +154,10 @@ In the next section, we see what happens when we change $K$.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Token Throughput Metrics.](imgs/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
+![Token Throughput Metrics.](imgs/qwen/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
 
 # InstructCoder
-![Token Throughput Metrics.](imgs/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
+![Token Throughput Metrics.](imgs/qwen/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
 :::
 
 ### Optimal Number of Speculative Tokens $K$
@@ -173,10 +173,10 @@ A speedup of 2× means speculative decoding finishes the workload in half the ti
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/qwen/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
 
 # InstructCoder
-![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/InstructCoder/draft_model_ratios.png)
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/qwen/InstructCoder/draft_model_ratios.png)
 :::
 
 The results show several key patterns:
@@ -202,10 +202,10 @@ This confirms that EAGLE-3 works very well on vLLM and provides a strong baselin
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Speedup ratios of EAGLE-3](imgs/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
+![Speedup ratios of EAGLE-3](imgs/qwen/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
 
 # InstructCoder
-![Speedup ratios of EAGLE-3](imgs/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
+![Speedup ratios of EAGLE-3](imgs/qwen/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
 :::
 
 @fig-draft-model-vs-eagle3-ratios compares the speedup ratios of both speculative decoding methods.
@@ -215,10 +215,10 @@ In the InstructCoder dataset, both methods have comparable speedups, with EAGLE-
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/qwen/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
 
 # InstructCoder
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/qwen/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
 :::
 
 The often comparable performance of both methods is remarkable given their very different **acceptance lengths** (AL).
@@ -231,10 +231,10 @@ Should we increase $K$? No—as we saw in @fig-draft-model-ratios, increasing $K
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/qwen/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
 
 # InstructCoder
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/qwen/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
 :::
 
 The fact that EAGLE-3 achieves similar speedups despite having lower AL demonstrates that its draft models are very **lightweight** and add minimal computational overhead.
@@ -248,10 +248,10 @@ Beyond this point, the throughput of speculative decoding methods plateaus at ar
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Token Throughputs of all Methods](imgs/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods" #fig-total-token-throughput-full}
+![Token Throughputs of all Methods](imgs/qwen/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods" #fig-total-token-throughput-full}
 
 # InstructCoder
-![Token Throughputs of all Methods](imgs/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
+![Token Throughputs of all Methods](imgs/qwen/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
 :::
 
 ### Inference Metrics
@@ -267,10 +267,10 @@ The benchmark reports means, medians, and 99th percentiles for these metrics.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics" #fig-ttft-itl-tpot}
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/qwen/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics" #fig-ttft-itl-tpot}
 
 # InstructCoder
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/qwen/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
 :::
 
 All metrics generally increase (worsen) with batch size. Note that the graph shows worst-case statistics (99th percentile). We observe the following patterns:
@@ -374,7 +374,7 @@ The mean TTFT of the SD methods was consistently lower than for vanilla decoding
 This was contrary to the expected behavior, since the SD methods have to perform the prefill with both the draft and target models, so their TTFT should be higher.
 What was going on here?
 
-![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/statistical-artifact.png){width="50%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
+![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/qwen/statistical-artifact.png){width="50%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
 
 The root cause of the problem was the default `--request-rate` parameter of the `vllm bench serve` command, which is infinite, meaning that all requests were sent to the server *exactly* at the same time.
 This meant that the server was batch processing all prefills at once in synchrony, which inflated the TTFT for all requests of vanilla decoding.
@@ -465,7 +465,7 @@ I break the question into two measurements:
    - *The Intercept*: the target-model cost inside the SD loop (piecewise).
    - *The Slope*: the incremental draft-model cost per additional speculative token (piecewise).
 
-![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
+![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/qwen/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
 
 With those two measurements, we can compare per-token runtimes across graph modes in @tbl-speed-comparison-full-vs-piecewise.
 "SD Runtime" comes from the ITL regression (piecewise, inside SD), and "Standalone Runtime" is the median ITL from `vllm bench serve` without SD (full graphs).
@@ -493,7 +493,7 @@ At $K=5$, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement).
 When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains.
 Nevertheless, this improvement would positively impact the performance of draft_model across all workloads.
 
-![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
+![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/qwen/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
 
 ::: {.callout-note}
 In this experiment, I used only a single request from the InstructCoder dataset, with `--output-len=1000`.
