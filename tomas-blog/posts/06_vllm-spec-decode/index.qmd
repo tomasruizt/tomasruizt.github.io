@@ -166,14 +166,14 @@ The number of speculative tokens $K$ is chosen to maximize the speedup ratio.
 In the next section, we see what happens when we change $K$.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Token Throughput Metrics.](imgs/qwen/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
-
-# InstructCoder
-![Token Throughput Metrics.](imgs/qwen/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
-
 # InstructCoder (LLaMa 70B)
-![Token Throughput Metrics.](imgs/llama70b/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
+![Token Throughput Metrics.](imgs/llama70b/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics" #fig-total-token-throughput-short}
+
+# MT-Bench (Qwen3)
+![Token Throughput Metrics.](imgs/qwen/mt-bench/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
+
+# InstructCoder (Qwen3)
+![Token Throughput Metrics.](imgs/qwen/InstructCoder/total_token_throughput_short.png){width="60%" text-align="left" fig-alt="Token throughput metrics"}
 :::
 
 ### Optimal Number of Speculative Tokens $K$
@@ -188,14 +188,14 @@ The y-axis shows the **speedup ratio** (or simply **speedup**), which measures h
 A speedup of 2× means speculative decoding finishes the workload in half the time of vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/qwen/mt-bench/draft_model_ratios.png){#fig-draft-model-ratios}
-
-# InstructCoder
-![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/qwen/InstructCoder/draft_model_ratios.png)
-
 # InstructCoder (LLaMa 70B)
-![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/llama70b/InstructCoder/draft_model_ratios.png){width="60%"}
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/llama70b/InstructCoder/draft_model_ratios.png){width="60%" #fig-draft-model-ratios}
+
+# MT-Bench (Qwen3)
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/qwen/mt-bench/draft_model_ratios.png)
+
+# InstructCoder (Qwen3)
+![Throughput as a function of $K$, evaluating both the 1.7 and the 4B models as draft models.](imgs/qwen/InstructCoder/draft_model_ratios.png)
 :::
 
 The results show several key patterns:
@@ -220,14 +220,14 @@ My benchmark results in @fig-eagle3-ratios demonstrate even **greater speedups o
 This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline against which to compare my draft_model implementation.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Speedup ratios of EAGLE-3](imgs/qwen/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
-
-# InstructCoder
-![Speedup ratios of EAGLE-3](imgs/qwen/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
-
 # InstructCoder (LLaMa 70B)
-![Speedup ratios of EAGLE-3](imgs/llama70b/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
+![Speedup ratios of EAGLE-3](imgs/llama70b/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3" #fig-eagle3-ratios}
+
+# MT-Bench (Qwen3)
+![Speedup ratios of EAGLE-3](imgs/qwen/mt-bench/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
+
+# InstructCoder (Qwen3)
+![Speedup ratios of EAGLE-3](imgs/qwen/InstructCoder/eagle3_ratios.png){width="60%" text-align="left" fig-alt="Speedup ratios of EAGLE-3"}
 :::
 
 @fig-draft-model-vs-eagle3-ratios compares the speedup ratios of both speculative decoding methods.
@@ -236,14 +236,14 @@ In the MT-Bench dataset, the draft_model speedups outperform EAGLE-3 in every ba
 In the InstructCoder dataset, both methods have comparable speedups, with EAGLE-3 slightly outperforming draft_model at the largest batch sizes.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/qwen/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
-
-# InstructCoder
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/qwen/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
-
 # InstructCoder (LLaMa 70B)
-![Comparison of Speedups of Draft Model and EAGLE-3](imgs/llama70b/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/llama70b/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3" #fig-draft-model-vs-eagle3-ratios}
+
+# MT-Bench (Qwen3)
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/qwen/mt-bench/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
+
+# InstructCoder (Qwen3)
+![Comparison of Speedups of Draft Model and EAGLE-3](imgs/qwen/InstructCoder/draft_model_vs_eagle3_ratios.png){width="60%" text-align="left" fig-alt="Comparison of Speedups of Draft Model and EAGLE-3"}
 :::
 
 The often comparable performance of both methods is remarkable given their very different **acceptance lengths** (AL).
@@ -255,14 +255,14 @@ In contrast, the AL curve for draft models continues to climb with more speculat
 Should we increase $K$? No—as we saw in @fig-draft-model-ratios, increasing $K$ has diminishing returns.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/qwen/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
-
-# InstructCoder
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/qwen/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
-
 # InstructCoder (LLaMa 70B)
-![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/llama70b/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/llama70b/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3" #fig-acceptance-lengths-vs-num-spec-toks}
+
+# MT-Bench (Qwen3)
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/qwen/mt-bench/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
+
+# InstructCoder (Qwen3)
+![Acceptance Lengths for draft_model and EAGLE-3. For draft_model, the acceptance lengths of the 4B model are higher than for the 1.7B model.](imgs/qwen/InstructCoder/acceptance_length_vs_num_spec_toks.png){width="90%" text-align="left" fig-alt="Acceptance Lengths for draft_model and EAGLE-3"}
 :::
 
 The fact that EAGLE-3 achieves similar speedups despite having lower AL demonstrates that its draft models are very **lightweight** and add minimal computational overhead.
@@ -275,14 +275,14 @@ Using a speculative decoding method outperforms vanilla decoding up to batch siz
 Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Token Throughputs of all Methods](imgs/qwen/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods" #fig-total-token-throughput-full}
-
-# InstructCoder
-![Token Throughputs of all Methods](imgs/qwen/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
-
 # InstructCoder (LLaMa 70B)
-![Token Throughputs of all Methods](imgs/llama70b/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
+![Token Throughputs of all Methods](imgs/llama70b/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods" #fig-total-token-throughput-full}
+
+# MT-Bench (Qwen3)
+![Token Throughputs of all Methods](imgs/qwen/mt-bench/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
+
+# InstructCoder (Qwen3)
+![Token Throughputs of all Methods](imgs/qwen/InstructCoder/total_token_throughput_full.png){width="60%" text-align="left" fig-alt="Token Throughputs of all Methods"}
 :::
 
 ### Inference Metrics
@@ -297,14 +297,14 @@ The benchmark reports means, medians, and 99th percentiles for these metrics.
 @fig-ttft-itl-tpot shows the 99th percentile values for both speculative decoding methods and vanilla decoding.
 
 ::: {.panel-tabset group="dataset"}
-# MT-Bench
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/qwen/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics" #fig-ttft-itl-tpot}
-
-# InstructCoder
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/qwen/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
-
 # InstructCoder (LLaMa 70B)
-![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/llama70b/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/llama70b/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics" #fig-ttft-itl-tpot}
+
+# MT-Bench (Qwen3)
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/qwen/mt-bench/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
+
+# InstructCoder (Qwen3)
+![Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.](imgs/qwen/InstructCoder/ttft_itl_tpot.png){width="100%" text-align="left" fig-alt="Inference Metrics"}
 :::
 
 All metrics generally increase (worsen) with batch size. Note that the graph shows worst-case statistics (99th percentile). We observe the following patterns:
