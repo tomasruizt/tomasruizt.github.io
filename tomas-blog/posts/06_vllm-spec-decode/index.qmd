@@ -22,7 +22,7 @@ citation: true
 ---
 I recently contributed speculative decoding with draft models to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)).
 In this post, I benchmark the performance of my implementation (draft_model) and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM.
-My benchmarks show that draft_model can achieve speedups of up to 3.55× on InstructCoder, outperforming EAGLE-3, while requiring no specialized training.
+My benchmarks show that draft_model can achieve **speedups of up to 3.55×** on InstructCoder, outperforming EAGLE-3, while requiring no specialized training.
 At the end, I share key learnings from working in the vLLM codebase and a few practical tips for approaching and navigating it.
 
 ::: {.callout-note}
@@ -93,6 +93,7 @@ All experiments were run with temperature set to 0.0 (greedy sampling) because v
 This feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459).
 I ran benchmarks across different batch sizes, since speculative decoding is known to be most effective in lower batch sizes.
 The batch size is implemented as concurrent requests sent to the server (`--max-concurrency`).
+I set `--request-rate` equal to `--max-concurrency` to prevent all prefills from happening at the exact same time, which would inflate the TTFT for vanilla decoding.
 
 <details>
 <summary>Example Benchmarking Command</summary>
@@ -416,23 +417,6 @@ The kernel is quite simple, but it replaced around 8 calls to PyTorch functions,
 If you are interested in learning about Triton kernels, I recommend looking at the [tutorial examples](https://triton-lang.org/main/getting-started/tutorials/index.html).
 The langauge is easy to learn and it gets you 85% of the way to speed-of-light performance.
 
-### Dive Deep
-While creating @fig-ttft-itl-tpot, I ran into a strange phenomenon:
-The mean TTFT of the SD methods was consistently lower than for vanilla decoding.
-This was contrary to the expected behavior, since the SD methods have to perform the prefill with both the draft and target models, so their TTFT should be higher.
-What was going on here?
-
-![Statistical Artifact in TTFT between SD methods and vanilla decoding.](imgs/statistical-artifact.png){width="50%" text-align="left" fig-alt="Statistical Artifact in TTFT" #fig-statistical-artifact}
-
-The root cause of the problem was the default `--request-rate` parameter of the `vllm bench serve` command, which is infinite, meaning that all requests were sent to the server *exactly* at the same time.
-This meant that the server was batch processing all prefills at once in synchrony, which inflated the TTFT for all requests of vanilla decoding.
-It did not affect the SD methods, because each request finished at a different step due to the different number of accepted tokens, which broke the batch synchrony.
-To prevent this artifact, I now always set a request rate (e.g., `--request-rate` equals `--max-concurrency`), so that the requests are sent on average over the first second.
-
-We sometimes find that our empirical results don't match our expectations or intuitions.
-In these cases, we need to dive deep and understand what is driving the disagreement.
-Otherwise, we would miss an opportunity to learn something about our system.
-
 ## Contributing to vLLM
 In this section, I share some tips about how to approach the vLLM codebase as a new contributor.
 
@@ -488,67 +472,6 @@ The same applies to extracting a superclass or child class, changing its body, a
 While we shouldn't plan for PRs to stay open this long, we should be prepared for the main branch to evolve in parallel to our PR.
 One strategy is to modify functions and classes in-place (within the same file) and defer moving them to other files in a subsequent PR.
 This might sound counterintuitive to experienced engineers, but it proved effective to minimize merge conflicts.
-
-## Future Outlook
-
-### Full CUDA Graphs
-Currently, vLLM supports two CUDA graph modes: `piecewise` and `full`.
-The `full` mode is typically fastest, but it comes with stricter constraints and isn't compatible with all execution paths.
-At the moment, draft models (both EAGLE-3 and `draft_model`) use `piecewise`.
-In this section, I estimate the end-to-end speedups we could achieve by supporting `full` CUDA graphs for draft-model speculative decoding.
-My results suggest that the speedup ratios over vanilla decoding would grow **from 2.26× to 2.37×**.
-
-#### Method
-I break the question into two measurements:
-
-1. **Standalone (full CUDA graphs):**
-   I disable speculative decoding, run each model (Qwen3-32B and Qwen3-1.7B) separately on a single InstructCoder request with 1000 output tokens, and measure ITL.
-   This estimates the per-token runtime under full graphs.
-
-2. **Within speculative decoding (piecewise CUDA graphs):**
-   I enable speculative decoding (`draft_model`), run draft + target, and measure ITL while varying the number of speculative tokens \(K\).
-   Because each additional speculative token triggers one extra draft forward pass, a linear fit of ITL vs K is a good approximation.
-   The regression in @fig-itl-vs-num-spec-toks can be interpreted as follows:
-
-   - *The Intercept*: the target-model cost inside the SD loop (piecewise).
-   - *The Slope*: the incremental draft-model cost per additional speculative token (piecewise).
-
-![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
-
-With those two measurements, we can compare per-token runtimes across graph modes in @tbl-speed-comparison-full-vs-piecewise.
-"SD Runtime" comes from the ITL regression (piecewise, inside SD), and "Standalone Runtime" is the median ITL from `vllm bench serve` without SD (full graphs).
-For this setup, the draft model is **9.10% faster** under full graphs, while the target model is **2.91% faster**.
-
-| Model        | SD Runtime (piecewise CG) | Standalone Runtime (full CG) | Runtime Reduction |
-|--------------|------------------|----------------|----------------|
-| Qwen3-1.7B  | 2.50 ms | 2.27 ms | 9.10 % |
-| Qwen3-32B   | 24.36 ms | 23.65 ms | 2.91 % |  
-
-:Table: Speed comparison of full and piecewise CUDA graphs. {#tbl-speed-comparison-full-vs-piecewise}
-
-#### Forecasted End-to-end Impact
-Assuming we could realize those per-token reductions inside speculative decoding, what does that translate to in terms of TPOT?
-I use the formula below to forecast the speedups for full CUDA graphs.
-$$
-\text{TPOT} = \frac{\text{ITL}}{\text{AL}} = \frac{T_{d} \cdot K + T_{t}}{\text{AL}}
-$$
-
-where $T_{d}$ is the runtime of the draft model, $T_{t}$ is the runtime of the target model, $K$ is the number of speculative tokens, and $\text{AL}$ is the acceptance length.
-@fig-tpot-comparison-full-vs-piecewise shows the TPOT values under piecewise CUDA graphs (Current), and full CUDA graphs (Expected).
-The minimum (best) TPOT values for each curve are marked with a cross.
-At $K=5$, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement).
-**The speedup ratios over vanilla decoding grow from 2.26× to 2.37×.**
-When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains.
-Nevertheless, this improvement would positively impact the performance of draft_model across all workloads.
-
-![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
-
-::: {.callout-note}
-In this experiment, I used only a single request from the InstructCoder dataset, with `--output-len=1000`.
-The best TPOT values were achieved at $K=5$ rather than the $K=4$ for the larger benchmark,
-but the TPOT differences are insignificant.
-The code for this analysis is available on [Github](https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb)
-:::
 
 ## Summary
 In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 ([PR #24322](https://github.com/vllm-project/vllm/pull/24322)) and compared it against vanilla decoding and EAGLE-3. 
