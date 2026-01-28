@@ -342,7 +342,7 @@ window.Quarto = {
 <section id="prefill-decode-ratio" class="level1">
 <h1>Prefill-Decode Ratio</h1>
 <p>We processed over 552 million input tokens, and generated over 9 million output tokens. Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average. The ratio of input tokens to output tokens is very skewed (61 to 1). It means that most compute in our workload was not spent decoding long answers, but rather processing the many input tokens. The workload is therefore called “prefill-heavy”. This contrasts to “decode-heavy” workloads, like those involved in solving mathematical problems that generate a long answer including reasoning. The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs. <a href="#fig-input-tokens" class="quarto-xref">Figure&nbsp;1</a> and <a href="#fig-output-tokens" class="quarto-xref">Figure&nbsp;2</a> show the distribution of input and output tokens for the entire workload.</p>
-<div id="fig-input-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of input tokens" data-text-align="left">
+<div id="fig-input-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Number of input tokens">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-input-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="imgs/input_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: Distribution of Input Tokens. The distribution is skewed to the left, and most requests required between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens."><img src="imgs/input_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of input tokens"></a>
@@ -352,7 +352,7 @@ Figure&nbsp;1: <strong>Distribution of Input Tokens</strong>. The distribution i
 </figcaption>
 </figure>
 </div>
-<div id="fig-output-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of output tokens" data-text-align="left">
+<div id="fig-output-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Number of output tokens">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-output-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="imgs/output_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure&nbsp;2: Distribution of Output Tokens. It’s important to note that the x-scale is 100 times smaller than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases."><img src="imgs/output_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of output tokens"></a>
@@ -1002,7 +1002,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <input type="hidden" id="giscus-base-theme" value="light">
 <input type="hidden" id="giscus-alt-theme" value="light">
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"loop":false,"openEffect":"zoom","selector":".lightbox","descPosition":"bottom","closeEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","selector":".lightbox","closeEffect":"zoom","openEffect":"zoom","loop":false});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
