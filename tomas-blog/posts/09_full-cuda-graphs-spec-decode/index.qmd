@@ -17,6 +17,7 @@ draft: true
 
 In a [previous post](../06_vllm-spec-decode/index.qmd), I benchmarked speculative decoding with draft models in vLLM V1.
 This follow-up analyzes the potential performance gains from supporting full CUDA graphs for draft-model speculative decoding.
+My results suggest that the speedup ratio over vanilla decoding would improve by ~5%, growing from **from 2.26× to 2.37×**.
 
 ## Background
 
@@ -24,7 +25,6 @@ Currently, vLLM supports two CUDA graph modes: `piecewise` and `full`.
 The `full` mode is typically fastest, but it comes with stricter constraints and isn't compatible with all execution paths.
 At the moment, draft models (both EAGLE-3 and `draft_model`) use `piecewise`.
 In this post, I estimate the end-to-end speedups we could achieve by supporting `full` CUDA graphs for draft-model speculative decoding.
-My results suggest that the speedup ratios over vanilla decoding would grow **from 2.26× to 2.37×**.
 
 ## Method
 
@@ -84,3 +84,4 @@ The code for this analysis is available on [Github](https://github.com/tomasruiz
 
 Supporting full CUDA graphs for speculative decoding could improve speedup ratios from 2.26× to 2.37× over vanilla decoding—a modest but meaningful gain.
 The improvement is limited because the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT improvements.
+The same method could be applied to estimate the performance gains for other combinations of draft and target models.
