@@ -83,13 +83,16 @@ Programming tasks typically contain substantial repetition between input and out
 
 ### Benchmarking Methodology
 
-I benchmarked performance using `vllm bench serve` to measure token throughput metrics.
-All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0.
-This feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459).
-The Qwen3 experiments were run on an NVIDIA H100 96GB GPU, within the SLURM cluster of the [LRZ AI Systems](https://doku.lrz.de/lrz-ai-systems-11484278.html),
-while the LLaMa 3.3 experiments were run on a 2× H100 80GB GPU launched from [NVIDIA Brev](https://developer.nvidia.com/brev).
 The benchmarking code can be found on [Github](https://github.com/tomasruizt/vllm-scripts/blob/3564bb62538d75b2337e3aa65f502a17f5408dc7/README.md).
 All benchmark results are available in a single [Parquet file](https://github.com/tomasruizt/vllm-scripts/blob/fccb861997697293835325cdc551c820aa1aa290/results/data-2026-01-23.parquet) for download.
+
+
+I benchmarked performance using `vllm bench serve` to inference metrics: token throughput (toks/s), TTFT, TPOT, and ITL.
+The **speedup ratio** metric is computed as the token throughput of speculative decoding over vanilla decoding.
+All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature > 0.0.
+This feature has an [open PR](https://github.com/vllm-project/vllm/pull/20459).
+I ran benchmarks across different batch sizes, since speculative decoding is known to be most effective in lower batch sizes.
+The batch size is implemented as concurrent requests sent to the server (`--max-concurrency`).
 
 <details>
 <summary>Example Benchmarking Command</summary>
@@ -150,15 +153,16 @@ Per-position acceptance (%):
 ```
 </details>
 
+#### Hardware
+The Qwen3 experiments were run on an NVIDIA H100 96GB GPU, within the SLURM cluster of the [LRZ AI Systems](https://doku.lrz.de/lrz-ai-systems-11484278.html),
+while the LLaMa 3.3 experiments were run on a 2× H100 80GB GPU launched from [NVIDIA Brev](https://developer.nvidia.com/brev).
+
 ## Results
 
-### Performance vs. Vanilla Decoding
-
-I ran benchmarks across different concurrency levels ranging from 1 to 64.
-The resulting throughput metrics are shown in @fig-total-token-throughput-short.
-The x-axis represents the inference batch size, implemented as concurrent requests sent to the server (`--max-concurrency`).
-We observe that using speculative decoding **nearly doubles** token throughput compared to vanilla decoding.
-I set the number of speculative tokens to $K=4$.
+### Versus Vanilla Decoding
+I compare the token throughput of speculative decoding (draft_model) vs. vanilla decoding on @fig-total-token-throughput-short.
+We observe that using speculative decoding **dramatically increases** token throughput compared to vanilla decoding.
+The number of speculative tokens $K$ is chosen to maximize the speedup ratio.
 In the next section, we see what happens when we change $K$.
 
 ::: {.panel-tabset group="dataset"}
@@ -178,7 +182,7 @@ The optimal value of $K$ depends on the acceptance rate of draft tokens, which v
 If $K$ is set too high, the model wastes time predicting draft tokens that will be rejected.
 If $K$ is set too low, we miss potential speedups.
 
-To understand these dynamics, I ran benchmarks across different values of $K$ and evaluated both the 1.7B and 4B models as draft models.
+To highlight this dynamic, I compared speedup ratios across different values of $K$.
 The results are shown in @fig-draft-model-ratios.
 The y-axis shows the **speedup ratio** (or simply **speedup**), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time).
 A speedup of 2× means speculative decoding finishes the workload in half the time of vanilla decoding.
@@ -196,19 +200,19 @@ A speedup of 2× means speculative decoding finishes the workload in half the ti
 
 The results show several key patterns:
 
-1. **Draft model size trade-off**: The 1.7B model generally achieves higher speedups than the 4B model.
+- **Draft model size trade-off**: The 1.7B model generally achieves higher speedups than the 4B model.
 The 4B model generates better draft tokens (higher acceptance rate @fig-acceptance-lengths-vs-num-spec-toks), but it is also slower, which limits the overall speedup.
 
-2. **Batch size dependency**: Speedup is maximal for small batch sizes (concurrency 1-4) and decays for larger batch sizes.
+- **Batch size dependency**: Speedup is maximal for small batch sizes (concurrency 1-4) and decays for larger batch sizes.
 At batch size 128 or larger, speculative decoding becomes slower than vanilla decoding.
 This aligns with research from the speculative decoding literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which shows that speculative decoding is most effective in the **memory-bound regime** (small batches and thin matrix multiplications).
 In the **compute-bound regime** (large batches and regular matrix multiplications), speculative decoding adds extra compute work to an already saturated system.
 
-3. **Low $K$ behavior**: For low $K$ values (e.g., $K=1$), speedups are lower at small batch sizes, but performance degradation at larger batch sizes is less pronounced.
+- **Low $K$ behavior**: For low $K$ values (e.g., $K=1$), speedups are lower at small batch sizes, but performance degradation at larger batch sizes is less pronounced.
 
-4. **Saturation effect**: Increasing $K$ beyond 4 does not consistently improve speedups, indicating a saturation point.
+- **Saturation effect**: Increasing $K$ beyond a certain value does not consistently improve speedups, indicating a saturation point.
 
-### Comparison with EAGLE-3
+### Versus EAGLE-3
 
 EAGLE-3 is a modern speculative decoding technique supported by vLLM that uses lightweight draft models trained specifically for speculative decoding.
 The EAGLE-3 paper by @li2025eagle reports speedup ratios on SGLang^[<https://github.com/sgl-project/sglang>] between 1.38× and 1.82× at batch sizes ranging from 2 to 64 (table 3, GPU=H100).
@@ -264,11 +268,11 @@ Should we increase $K$? No—as we saw in @fig-draft-model-ratios, increasing $K
 The fact that EAGLE-3 achieves similar speedups despite having lower AL demonstrates that its draft models are very **lightweight** and add minimal computational overhead.
 This contrasts with what we observed for the 4B draft_model in @fig-draft-model-ratios: despite having higher AL than the 1.7B model, it is too slow to achieve major speedups.
 
-### Total Token Throughput
+#### Token Throughput
 
-@fig-total-token-throughput-full shows the Total Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None).
+@fig-total-token-throughput-full shows the Output Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None).
 Using a speculative decoding method outperforms vanilla decoding up to batch size 64.
-Beyond this point, the throughput of speculative decoding methods plateaus at around 4000 toks/s, while vanilla decoding continues to scale with larger batch sizes, reaching over 5600 toks/s.
+Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.
 
 ::: {.panel-tabset group="dataset"}
 # MT-Bench
