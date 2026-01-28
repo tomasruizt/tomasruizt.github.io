@@ -324,6 +324,17 @@ In the plot, vanilla decoding (SD=None) has the lowest ITL, followed by EAGLE-3,
 
 ## Discussion
 
+### Limitations
+The draft model must share the same tokenizer as the target model, i.e., both models must "speak the same language."
+This is typically the case when models belong to the same family.
+
+At the moment, draft_model is limited to models with only a single KV-cache group.
+There is an open issue about this on Github [(#33133)](https://github.com/vllm-project/vllm/issues/33133)
+
+My benchmarks use the default `--output-len=200` parameter, which means that the speedups presented are valid for short-context inference.
+Long context inference is more complex: performance is bottlenecked KV-cache loading, and batch sizes must become a lot smaller to fit in VRAM.
+I might publish an analysis of long-context performance in the future.
+
 ### When to Use Draft Models vs. EAGLE-3
 
 In theory, EAGLE-3 should achieve higher speedups than draft_model.
@@ -339,13 +350,11 @@ Advantages of EAGLE-3:
 
 - *Lower computational overhead*: EAGLE-3's lightweight draft models add minimal overhead, allowing the method to achieve high speedups (assuming good enough acceptance lengths).
 
-### Recommendation
+My recommendation is to:
+
 * Prefer using draft_model over EAGLE-3 when you have access to a smaller model from the same family and want to get started quickly without training a specialized draft model.
 * If a corresponding EAGLE-3 drafter model already exists on Hugging Face, I still recommend comparing the performance of both methods on your workload, just to be sure.
 * If you want to train your own EAGLE-3 drafter, you can use the vLLM speculators library^[<https://github.com/vllm-project/speculators>].
-
-In any case, the draft model must have the same tokenizer as the target model, i.e., both models must "speak the same language."
-This is typically the case when models belong to the same family.
 
 ## Key Learnings
 
