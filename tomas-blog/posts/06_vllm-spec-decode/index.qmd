@@ -336,8 +336,6 @@ You can also train your own using the vLLM speculators library^[<https://github.
 
 ## Key Learnings
 
-In this section, I share key lessons I learned about vLLM while implementing speculative decoding.
-
 ### Side-Effects
 The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are.
 The most important example to understand is the `forward_context` object, which is a global variable that contains information about every layer in the model and references its KV cache.
@@ -359,11 +357,7 @@ Saving to the KV cache happens concretely in the function `reshape_and_cache_fla
 The function directly takes this `slot_mapping` tensor as an input.
 
 ### Performance Optimizations
-There were three noteworthy drivers of performance I encountered when implementing speculative decoding:
-
-1. **CUDA Graphs**
-2. **CPU-GPU synchronizations**
-3. **Triton Kernels**
+The three biggest performance themes I ran into were: **CUDA graphs**, avoiding **CPU–GPU synchronizations**, and **Triton kernels and Fusion**.
 
 #### CUDA Graphs
 
@@ -392,7 +386,7 @@ Launching many small kernels incurs unnecessary overhead (2-3µs per kernel).
 To fuse all these operations into a single one, I implemented a custom [Triton kernel](https://github.com/vllm-project/vllm/blob/1209b784f2ba976eff2ea24bc33c61f35c6eb213/vllm/v1/spec_decode/draft_model.py#L234).
 The kernel is quite simple, but it replaced around 8 calls to PyTorch functions, avoiding their launch overhead.
 If you are interested in learning about Triton kernels, I recommend looking at the [tutorial examples](https://triton-lang.org/main/getting-started/tutorials/index.html).
-The langauge is easy to learn and it gets you 85% of the way to speed-of-light performance.
+The language is easy to learn and it gets you 85% of the way to speed-of-light performance.
 
 ## Contributing to vLLM
 In this section, I share some tips about how to approach the vLLM codebase as a new contributor.
