@@ -10,7 +10,625 @@
 <atom:link href="https://tomasruizt.github.io/index.xml" rel="self" type="application/rss+xml"/>
 <description>Tomas Ruiz&#39;s blog</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Wed, 07 Jan 2026 05:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 27 Jan 2026 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Up to 3.55x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1</title>
+  <dc:creator>Tomas Ruiz</dc:creator>
+  <link>https://tomasruizt.github.io/posts/06_vllm-spec-decode/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>I recently contributed speculative decoding with draft models to vLLM V1 (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>). In this post, I benchmark the performance of my implementation (draft_model) and compare it against vanilla decoding and EAGLE-3, a modern speculative decoding technique supported by vLLM. My benchmarks show that draft_model can achieve <strong>speedups of up to 3.55×</strong> on InstructCoder, outperforming EAGLE-3, while requiring no specialized training. At the end, I share key learnings from working in the vLLM codebase and a few practical tips for approaching and navigating it.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This is <strong>not a tutorial</strong> on speculative decoding. I assume you are already familiar with the technique and its basic trade-offs. The focus here is on benchmarking the new code and sharing key learnings.</p>
+</div>
+</div>
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>Speculative decoding is a technique that accelerates LLM inference by using a smaller “draft” model to predict multiple tokens ahead, which are then verified in parallel by the larger target model. This approach can significantly improve throughput, especially in memory-bound regimes with small batch sizes.</p>
+<p><strong>A bit of history:</strong> Speculative decoding with draft models was previously available in vLLM V0. There’s an excellent <a href="https://www.youtube.com/watch?v=9wNAgpX6z_4">GPU Mode lecture</a> by <a href="https://www.linkedin.com/in/cade-daniel/">Daniel Cade</a> from June 2024 that outlines the original implementation. However, during the rearchitecting to V1, this feature was removed and hadn’t been reimplemented until now.</p>
+</section>
+<section id="using-speculative-decoding" class="level2">
+<h2 class="anchored" data-anchor-id="using-speculative-decoding">Using Speculative Decoding</h2>
+<p>To use speculative decoding with vLLM, simply pass additional arguments to the <code>vllm serve</code> command. You’ll need to specify the draft model and the number of speculative tokens to generate. I also recommend setting <code>--max-model-len</code> to leave more memory for the KV cache.</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1">vllm serve Qwen/Qwen3-32B \</span>
+<span id="cb1-2">    --speculative_config.method=draft_model \</span>
+<span id="cb1-3">    --speculative_config.model=Qwen/Qwen3-1.7B \</span>
+<span id="cb1-4">    --speculative_config.num_speculative_tokens=4 \</span>
+<span id="cb1-5">    --speculative_config.max_model_len=5000 \</span>
+<span id="cb1-6">    --max-model-len 5000</span></code></pre></div>
+</section>
+<section id="benchmarking-setup" class="level2">
+<h2 class="anchored" data-anchor-id="benchmarking-setup">Benchmarking Setup</h2>
+<section id="models-evaluated" class="level3">
+<h3 class="anchored" data-anchor-id="models-evaluated">Models Evaluated</h3>
+<p>I evaluated two model families: Qwen3 (dense) and LLaMa 3.3 70B. A summary of the models evaluated is shown in Table&nbsp;1. For vanilla decoding, I evaluate the target model without any speculative decoding. Within the Qwen3 family, using the 0.6B model as a draft_model raised a runtime exception (likely a bug). The Qwen3 familiy was evaluated on a single NVIDIA H100 GPU, while the LlaMa 3.3 family required 2× H100 GPUs (tensor-parallelism).</p>
+<div id="tbl-models" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-models-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Model configurations evaluated
+</figcaption>
+<div aria-describedby="tbl-models-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Family</th>
+<th style="text-align: left;">Target Model</th>
+<th style="text-align: left;">Draft Model(s)</th>
+<th style="text-align: left;">EAGLE-3 Model</th>
+<th style="text-align: left;">GPUs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Qwen3</strong></td>
+<td style="text-align: left;">Qwen3-32B<sup>1</sup></td>
+<td style="text-align: left;">Qwen3-1.7B<sup>2</sup> <br> Qwen3-4B<sup>3</sup></td>
+<td style="text-align: left;">Qwen3-32B-speculator.eagle3<sup>4</sup></td>
+<td style="text-align: left;">1× H100 96GB</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>LLaMa-3.3</strong></td>
+<td style="text-align: left;">Llama-3.3-70B-Instruct<sup>5</sup></td>
+<td style="text-align: left;">Llama-3.2-1B<sup>6</sup></td>
+<td style="text-align: left;">EAGLE3-LLaMA3.3-Instruct-70B<sup>7</sup></td>
+<td style="text-align: left;">2× H100 80GB</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+</section>
+<section id="datasets" class="level3">
+<h3 class="anchored" data-anchor-id="datasets">Datasets</h3>
+<p>I evaluated performance on two datasets:</p>
+<ul>
+<li><p><strong>MT-Bench</strong><sup>8</sup>: A dataset of 80 multi-turn questions used to benchmark speedups in the EAGLE-3 paper by <span class="citation" data-cites="li2025eagle">Li et al. (2025)</span>. This dataset is too small to test batch sizes larger than 80 without repeating prompts.</p></li>
+<li><p><strong>InstructCoder</strong><sup>9</sup>: A dataset of 114k prompts about programming tasks. This larger dataset enables testing at higher batch sizes (I benchmark up to 256<sup>10</sup>). Programming tasks typically contain substantial repetition between input and output tokens, which may be beneficial for speculative decoding.</p></li>
+</ul>
+</section>
+<section id="benchmarking-methodology" class="level3">
+<h3 class="anchored" data-anchor-id="benchmarking-methodology">Benchmarking Methodology</h3>
+<p>The benchmarking code can be found on <a href="https://github.com/tomasruizt/vllm-scripts/blob/3564bb62538d75b2337e3aa65f502a17f5408dc7/README.md">Github</a>. All benchmark results are available in a single <a href="https://github.com/tomasruizt/vllm-scripts/blob/d94d714fa4e451591f628542a57bbc7f9c2d2619/results/full-bench-data.parquet">Parquet file</a> for download.</p>
+<p>I benchmarked performance using <code>vllm bench serve</code> to inference metrics: token throughput (toks/s), TTFT, TPOT, and ITL. The <strong>speedup ratio</strong> metric is computed as the token throughput of speculative decoding over vanilla decoding. All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature &gt; 0.0. This feature has an <a href="https://github.com/vllm-project/vllm/pull/20459">open PR</a>. I ran benchmarks across different batch sizes, since speculative decoding is known to be most effective in lower batch sizes. The batch size is implemented as concurrent requests sent to the server (<code>--max-concurrency</code>). I set <code>--request-rate</code> equal to <code>--max-concurrency</code> to prevent all prefills from happening at the exact same time, which would inflate the TTFT for vanilla decoding.</p>
+<details>
+<summary>
+Example Benchmarking Command
+</summary>
+<div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb2-1">vllm bench serve \</span>
+<span id="cb2-2">  --model Qwen/Qwen3-32B \</span>
+<span id="cb2-3">  --dataset-name hf \</span>
+<span id="cb2-4">  --dataset-path likaixin/InstructCoder \</span>
+<span id="cb2-5">  --max-concurrency 32 \</span>
+<span id="cb2-6">  --request-rate 32 \</span>
+<span id="cb2-7">  --num-prompts 320 \</span>
+<span id="cb2-8">  --temperature 0.0 \</span>
+<span id="cb2-9">  --top-p 1.0 \</span>
+<span id="cb2-10">  --ready-check-timeout-sec 600</span></code></pre></div>
+For <code>--num-prompts</code>, I use 10 times <code>--max-concurrency</code> or at least 50 prompts.
+</details>
+<details>
+<summary>
+Example Benchmarking Output
+</summary>
+<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb3-1">============ Serving Benchmark Result ============</span>
+<span id="cb3-2">Successful requests:                     320       </span>
+<span id="cb3-3">Failed requests:                         0         </span>
+<span id="cb3-4">Maximum request concurrency:             32        </span>
+<span id="cb3-5">Benchmark duration (s):                  47.20     </span>
+<span id="cb3-6">Total input tokens:                      48266     </span>
+<span id="cb3-7">Total generated tokens:                  63991     </span>
+<span id="cb3-8">Request throughput (req/s):              6.78      </span>
+<span id="cb3-9">Output token throughput (tok/s):         1355.72   </span>
+<span id="cb3-10">Peak output token throughput (tok/s):    576.00    </span>
+<span id="cb3-11">Peak concurrent requests:                56.00     </span>
+<span id="cb3-12">Total token throughput (tok/s):          2378.30   </span>
+<span id="cb3-13">---------------Time to First Token----------------</span>
+<span id="cb3-14">Mean TTFT (ms):                          192.97    </span>
+<span id="cb3-15">Median TTFT (ms):                        140.48    </span>
+<span id="cb3-16">P99 TTFT (ms):                           629.06    </span>
+<span id="cb3-17">-----Time per Output Token (excl. 1st token)------</span>
+<span id="cb3-18">Mean TPOT (ms):                          21.75     </span>
+<span id="cb3-19">Median TPOT (ms):                        21.67     </span>
+<span id="cb3-20">P99 TPOT (ms):                           26.55     </span>
+<span id="cb3-21">---------------Inter-token Latency----------------</span>
+<span id="cb3-22">Mean ITL (ms):                           61.50     </span>
+<span id="cb3-23">Median ITL (ms):                         58.23     </span>
+<span id="cb3-24">P99 ITL (ms):                            114.37    </span>
+<span id="cb3-25">---------------Speculative Decoding---------------</span>
+<span id="cb3-26">Acceptance rate (%):                     46.13     </span>
+<span id="cb3-27">Acceptance length:                       2.85      </span>
+<span id="cb3-28">Drafts:                                  22519     </span>
+<span id="cb3-29">Draft tokens:                            90076     </span>
+<span id="cb3-30">Accepted tokens:                         41554     </span>
+<span id="cb3-31">Per-position acceptance (%):</span>
+<span id="cb3-32">  Position 0:                            71.44     </span>
+<span id="cb3-33">  Position 1:                            49.82     </span>
+<span id="cb3-34">  Position 2:                            36.32     </span>
+<span id="cb3-35">  Position 3:                            26.96     </span>
+<span id="cb3-36">==================================================</span></code></pre></div>
+</details>
+<section id="hardware" class="level4">
+<h4 class="anchored" data-anchor-id="hardware">Hardware</h4>
+<p>The Qwen3 experiments were run on an NVIDIA H100 96GB GPU, within the SLURM cluster of the <a href="https://doku.lrz.de/lrz-ai-systems-11484278.html">LRZ AI Systems</a>, while the LLaMa 3.3 experiments were run on a 2× H100 80GB GPU launched from <a href="https://developer.nvidia.com/brev">NVIDIA Brev</a>.</p>
+</section>
+</section>
+</section>
+<section id="results" class="level2">
+<h2 class="anchored" data-anchor-id="results">Results</h2>
+<section id="versus-vanilla-decoding" class="level3">
+<h3 class="anchored" data-anchor-id="versus-vanilla-decoding">Versus Vanilla Decoding</h3>
+<p>I compare the token throughput of speculative decoding (draft_model) vs.&nbsp;vanilla decoding on Figure&nbsp;1. We observe that using speculative decoding <strong>dramatically increases</strong> token throughput compared to vanilla decoding. The number of speculative tokens <img src="https://latex.codecogs.com/png.latex?K"> was chosen to maximize the speedup ratio. In the next section, we see what happens when we change <img src="https://latex.codecogs.com/png.latex?K">.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div id="fig-total-token-throughput-short" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Token throughput metrics" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-total-token-throughput-short-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-total-token-throughput-short-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Token Throughput Metrics.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics"></p>
+<figcaption>Token Throughput Metrics.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" aria-labelledby="tabset-1-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics"></p>
+<figcaption>Token Throughput Metrics.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="optimal-number-of-speculative-tokens-k" class="level3">
+<h3 class="anchored" data-anchor-id="optimal-number-of-speculative-tokens-k">Optimal Number of Speculative Tokens <img src="https://latex.codecogs.com/png.latex?K"></h3>
+<p>The optimal value of <img src="https://latex.codecogs.com/png.latex?K"> depends on the acceptance rate of draft tokens, which varies with the data distribution. If <img src="https://latex.codecogs.com/png.latex?K"> is set too high, the model wastes time predicting draft tokens that will be rejected. If <img src="https://latex.codecogs.com/png.latex?K"> is set too low, we miss potential speedups.</p>
+<p>To highlight this dynamic, I compared speedup ratios across different values of <img src="https://latex.codecogs.com/png.latex?K">. The results are shown in Figure&nbsp;2. The y-axis shows the <strong>speedup ratio</strong> (or simply <strong>speedup</strong>), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time). A speedup of 2× means speculative decoding finishes the workload in half the time of vanilla decoding.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" aria-controls="tabset-2-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<div id="fig-draft-model-ratios" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-draft-model-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/draft_model_ratios.png" class="img-fluid figure-img" style="width:60.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-draft-model-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Throughput as a function of <img src="https://latex.codecogs.com/png.latex?K">, evaluating both the 1.7 and the 4B models as draft models.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/draft_model_ratios.png" class="img-fluid figure-img"></p>
+<figcaption>Throughput as a function of <img src="https://latex.codecogs.com/png.latex?K">, evaluating both the 1.7 and the 4B models as draft models.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-2-3" class="tab-pane" aria-labelledby="tabset-2-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/draft_model_ratios.png" class="img-fluid figure-img"></p>
+<figcaption>Throughput as a function of <img src="https://latex.codecogs.com/png.latex?K">, evaluating both the 1.7 and the 4B models as draft models.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>The results show several key patterns:</p>
+<ul>
+<li><p><strong>Multi-GPU Setting</strong>: The greatest speedups (3.55×) were achieved with LLaMa 70B on 2× H100s. Surprisingly, inter-GPU communication overhead doesn’t dominate. draft_model works well with tensor parallelism &gt; 1.</p></li>
+<li><p><strong>Batch Size Dependency</strong>: Speedups peak at small batch sizes (concurrency 1-4) and decay at larger ones. At batch size 128+, speculative decoding becomes slower than vanilla decoding. This aligns with the literature <span class="citation" data-cites="li2025eagle tang2025efficientspeculativedecodingllama">(Li et al. 2025; Tang et al. 2025)</span>: speculative decoding helps most in the <strong>memory-bound regime</strong>, but adds overhead in the <strong>compute-bound regime</strong>.</p></li>
+<li><p><strong>Saturation Effect</strong>: Increasing <img src="https://latex.codecogs.com/png.latex?K"> beyond a threshold yields no further gains. Saturation occurs around <img src="https://latex.codecogs.com/png.latex?K=3">-<img src="https://latex.codecogs.com/png.latex?4"> for Qwen3 and <img src="https://latex.codecogs.com/png.latex?K=7"> for LLaMa 70B.</p></li>
+<li><p><strong>Draft Model Size Trade-off</strong>: The smaller 1.7B draft model achieves higher speedups than the 4B, despite the 4B having better acceptance rates (Figure&nbsp;5). The 4B’s slower inference limits its overall speedup.</p></li>
+<li><p><strong>Low <img src="https://latex.codecogs.com/png.latex?K"> Robustness</strong>: In InstructCoder (Qwen3), <img src="https://latex.codecogs.com/png.latex?K=1"> achieves modest speedups at small batch sizes, but degrades more gracefully at large batch sizes than higher <img src="https://latex.codecogs.com/png.latex?K"> values.</p></li>
+</ul>
+</section>
+<section id="versus-eagle-3" class="level3">
+<h3 class="anchored" data-anchor-id="versus-eagle-3">Versus EAGLE-3</h3>
+<p>EAGLE-3 is a modern speculative decoding technique supported by vLLM that uses lightweight draft models trained specifically for speculative decoding. The EAGLE-3 paper by <span class="citation" data-cites="li2025eagle">Li et al. (2025)</span> reports speedup ratios on SGLang<sup>11</sup> between 1.38× and 1.82× at batch sizes ranging from 2 to 64 (table 3), and slightly lower speedups on vLLM (table 5).</p>
+<p>My own benchmark results in Figure&nbsp;3 show <strong>greater speedups on vLLM</strong>: peaking at 2.94× for the LLaMa 70B family and 2.10× for the Qwen3 family. This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline against which to compare my draft_model implementation.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" aria-controls="tabset-3-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
+<div id="fig-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Speedup ratios of EAGLE-3" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Speedup ratios of EAGLE-3
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-3-2" class="tab-pane" aria-labelledby="tabset-3-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3"></p>
+<figcaption>Speedup ratios of EAGLE-3</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-3-3" class="tab-pane" aria-labelledby="tabset-3-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3"></p>
+<figcaption>Speedup ratios of EAGLE-3</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>Figure&nbsp;4 compares the speedup ratios of both speculative decoding methods. I used <img src="https://latex.codecogs.com/png.latex?K=4"> in the Qwen3 family and <img src="https://latex.codecogs.com/png.latex?K=7"> in the LLaMa 70B family. The speedups of draft_model are surprisingly good, often exceeding those of EAGLE-3 by a significant margin. This is particularly visible on InstructCoder (LLaMa 70B setting) and MT-Bench (Qwen3 setting). Both methods have very similar speedups on InstructCoder (Qwen3 setting).</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" aria-controls="tabset-4-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" aria-controls="tabset-4-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-3" aria-controls="tabset-4-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-4-1" class="tab-pane active" aria-labelledby="tabset-4-1-tab">
+<div id="fig-draft-model-vs-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Comparison of Speedups of Draft Model and EAGLE-3" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-draft-model-vs-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-draft-model-vs-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Comparison of Speedups of Draft Model and EAGLE-3
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-4-2" class="tab-pane" aria-labelledby="tabset-4-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3"></p>
+<figcaption>Comparison of Speedups of Draft Model and EAGLE-3</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-4-3" class="tab-pane" aria-labelledby="tabset-4-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3"></p>
+<figcaption>Comparison of Speedups of Draft Model and EAGLE-3</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>Both EAGLE-3 and draft_model have very different <strong>Acceptance Lengths</strong> (AL), shown in Figure&nbsp;5. The AL curve for EAGLE-3 is flatter, meaning that predicting more tokens leads to diminishing returns. In contrast, the AL curve for draft models continues to climb with more speculative tokens. Despite the EAGLE-3 draft models being lighter, the lower AL is a limiting factor that prevents it from reaching the same speedups as draft_model.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" aria-controls="tabset-5-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" aria-controls="tabset-5-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" aria-controls="tabset-5-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-5-1" class="tab-pane active" aria-labelledby="tabset-5-1-tab">
+<div id="fig-acceptance-lengths-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Acceptance Lengths for draft_model and EAGLE-3" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-acceptance-lengths-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-acceptance-lengths-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Acceptance Lengths for draft_model and EAGLE-3.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-5-2" class="tab-pane" aria-labelledby="tabset-5-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3"></p>
+<figcaption>Acceptance Lengths for draft_model and EAGLE-3.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-5-3" class="tab-pane" aria-labelledby="tabset-5-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3"></p>
+<figcaption>Acceptance Lengths for draft_model and EAGLE-3.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<section id="token-throughput" class="level4">
+<h4 class="anchored" data-anchor-id="token-throughput">Token Throughput</h4>
+<p>Figure&nbsp;6 shows the Output Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None). Using a speculative decoding method outperforms vanilla decoding up to batch size 64. Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" aria-controls="tabset-6-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" aria-controls="tabset-6-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-6-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-3" aria-controls="tabset-6-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-6-1" class="tab-pane active" aria-labelledby="tabset-6-1-tab">
+<div id="fig-total-token-throughput-full" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Token Throughputs of all Methods" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-total-token-throughput-full-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-total-token-throughput-full-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Token Throughputs of all Methods
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-6-2" class="tab-pane" aria-labelledby="tabset-6-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods"></p>
+<figcaption>Token Throughputs of all Methods</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-6-3" class="tab-pane" aria-labelledby="tabset-6-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods"></p>
+<figcaption>Token Throughputs of all Methods</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="inference-metrics" class="level3">
+<h3 class="anchored" data-anchor-id="inference-metrics">Inference Metrics</h3>
+<p>The <code>vllm bench serve</code> command reports several request-level inference metrics (lower is better for all):</p>
+<ul>
+<li><strong>TTFT</strong>: Time to first token</li>
+<li><strong>TPOT</strong>: Time per output token (excluding the first token)</li>
+<li><strong>ITL</strong>: Inter-token latency</li>
+</ul>
+<p>The benchmark reports means, medians, and 99th percentiles for these metrics. Figure&nbsp;7 shows the 99th percentile values for both speculative decoding methods and vanilla decoding.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" aria-controls="tabset-7-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" aria-controls="tabset-7-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-3" aria-controls="tabset-7-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<div class="tab-content" data-group="dataset">
+<div id="tabset-7-1" class="tab-pane active" aria-labelledby="tabset-7-1-tab">
+<div id="fig-ttft-itl-tpot" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Inference Metrics" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-ttft-itl-tpot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-ttft-itl-tpot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-2" class="tab-pane" aria-labelledby="tabset-7-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/mt-bench/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics"></p>
+<figcaption>Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-3" class="tab-pane" aria-labelledby="tabset-7-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/qwen/InstructCoder/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics"></p>
+<figcaption>Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>All metrics generally increase (worsen) with batch size. Note that the graph shows worst-case statistics (99th percentile). We observe the following patterns:</p>
+<ul>
+<li><strong>TTFT</strong>: The TTFT is generally higher for speculative decoding methods than vanilla decoding because the server must prefill with both the draft and target models, rather than just the target model. In MT-Bench (Qwen3), the TTFT of EAGLE-3 is consistently higher than for draft_model, which is surprising since EAGLE-3 drafters are lighter.</li>
+<li><strong>TPOT</strong>: Both speculative decoding methods significantly reduce TPOT compared to vanilla decoding, particularly in low batch sizes.</li>
+<li><strong>ITL</strong>: The inter-token latency (ITL) differs from TPOT in a subtle way: it measures the time between batches of tokens as seen by the client. During speculative decoding, the client receives batches of multiple tokens, so ITL will be higher than TPOT. In vanilla decoding, ITL and TPOT should be equal or very similar. In the plot, vanilla decoding (SD=None) has the lowest ITL, followed by EAGLE-3, and finally draft_model.</li>
+</ul>
+</section>
+</section>
+<section id="discussion" class="level2">
+<h2 class="anchored" data-anchor-id="discussion">Discussion</h2>
+<section id="limitations" class="level3">
+<h3 class="anchored" data-anchor-id="limitations">Limitations</h3>
+<p>The draft model must share the same tokenizer as the target model, i.e., both models must “speak the same language.” This is typically the case when models belong to the same family.</p>
+<p>At the moment, draft_model is limited to models with only a single KV-cache group. There is an open issue about this on Github <a href="https://github.com/vllm-project/vllm/issues/33133">(#33133)</a></p>
+<p>My benchmarks use the default <code>--output-len=200</code> parameter, which means that the speedups presented are valid for short-context inference. Long context inference is more complex: performance is bottlenecked KV-cache loading, and batch sizes must become a lot smaller to fit in VRAM. I might publish an analysis of long-context performance in the future.</p>
+</section>
+<section id="when-to-use-draft-models-vs.-eagle-3" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-draft-models-vs.-eagle-3">When to Use Draft Models vs.&nbsp;EAGLE-3</h3>
+<p>My benchmarks show that draft_model outperforms EAGLE-3 in 2 of 3 tested settings, primarily due to higher acceptance lengths (Figure&nbsp;5). <strong>Prefer draft_model</strong> when a smaller model from the same family is available, no training required. Distilled models (trained to mimic the larger model’s logits) work especially well. <strong>Consider EAGLE-3</strong> when a pre-trained EAGLE-3 drafter exists on Hugging Face and you want the lowest possible overhead. When in doubt, benchmark both methods on your workload. You can also train your own using the vLLM speculators library<sup>12</sup>.</p>
+</section>
+</section>
+<section id="key-learnings" class="level2">
+<h2 class="anchored" data-anchor-id="key-learnings">Key Learnings</h2>
+<section id="side-effects" class="level3">
+<h3 class="anchored" data-anchor-id="side-effects">Side-Effects</h3>
+<p>The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are. The most important example to understand is the <code>forward_context</code> object, which is a global variable that contains information about every layer in the model and references its KV cache. The forward context is manipulated at runtime with the <code>set_forward_context()</code> function, <a href="https://github.com/vllm-project/vllm/blob/5da4c7d789fe0c4ca2c49913441f99df24715a97/vllm/v1/worker/gpu_model_runner.py#L3287">here</a> in the main loop of the <code>gpu_model_runner.py</code> file. It looks similar to Listing&nbsp;1, and it’s important to understand that it partially determines the inputs to the model.</p>
+<div id="lst-set-forward-context" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-set-forward-context-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Set Forward Context
+</figcaption>
+<div aria-describedby="lst-set-forward-context-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-set-forward-context" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-set-forward-context-1"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> set_forward_context(</span>
+<span id="lst-set-forward-context-2">  ... <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># A bunch of params that determine the inputs to the model</span></span>
+<span id="lst-set-forward-context-3">):</span>
+<span id="lst-set-forward-context-4">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>._model_forward(</span>
+<span id="lst-set-forward-context-5">      ...  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># What you THINK are the only inputs to the model</span></span>
+<span id="lst-set-forward-context-6">    )</span></code></pre></div>
+</div>
+</figure>
+</div>
+<p>The forward context contains, for example, the <code>AttentionMetadata.slot_mapping</code> object containing <strong>pointers to the KV cache</strong>. If these pointers are incorrect, the KV cache will be corrupted at runtime, and your outputs will be garbage. Saving to the KV cache happens concretely in the function <code>reshape_and_cache_flash()</code> (FlashAttention code path: <a href="https://github.com/vllm-project/vllm/blob/13d8746c545576bcb6e0771ee4dc0b6fae694fa1/vllm/v1/attention/backends/flash_attn.py#L670">permalink</a>). The function directly takes this <code>slot_mapping</code> tensor as an input.</p>
+</section>
+<section id="performance-optimizations" class="level3">
+<h3 class="anchored" data-anchor-id="performance-optimizations">Performance Optimizations</h3>
+<p>The three biggest performance themes I ran into were: <strong>CUDA graphs</strong>, avoiding <strong>CPU–GPU synchronizations</strong>, and <strong>Triton kernels and Fusion</strong>.</p>
+<section id="cuda-graphs" class="level4">
+<h4 class="anchored" data-anchor-id="cuda-graphs">CUDA Graphs</h4>
+<p>CUDA graphs are a complex topic by themselves, but in short: they make the code within the graph run impressively fast. There is an introduction to CUDA graphs in the vLLM docs<sup>13</sup>. What’s important to understand is that CUDA graphs require the input and output tensors (<strong>buffers</strong>) to be allocated before running the code (i.e.&nbsp;no dynamic-shape allocation of PyTorch tensors during the graph’s execution). All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects. I found that if you run CUDA graphs, but don’t reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again. The forward context I mentioned earlier includes the <code>batch_descriptor</code> and <code>cudagraph_runtime_mode</code> objects, which together determine which <em>CUDA graph mode</em> the model will dispatch to. This is why you find comments like Listing&nbsp;2 everywhere in the codebase.</p>
+<div id="lst-use-persistent-buffers" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-use-persistent-buffers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Example Comment About CUDA Graphs
+</figcaption>
+<div aria-describedby="lst-use-persistent-buffers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-use-persistent-buffers" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-use-persistent-buffers-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Run the model.</span></span>
+<span id="lst-use-persistent-buffers-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Use persistent buffers for CUDA graphs.</span></span>
+<span id="lst-use-persistent-buffers-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> set_forward_context(...):</span></code></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="cpu-gpu-synchronizations" class="level4">
+<h4 class="anchored" data-anchor-id="cpu-gpu-synchronizations">CPU-GPU synchronizations</h4>
+<p>To write fast and efficient PyTorch code, it’s important to avoid CPU-GPU synchronizations. Synchronizations prevent the CPU from scheduling enough work for the GPU to keep it busy, leading to low GPU utilization. I wrote a full-length <a href="https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/">separate post</a> about them, which I recommend reading for a deeper explanation including PyTorch examples.</p>
+</section>
+<section id="triton-kernels" class="level4">
+<h4 class="anchored" data-anchor-id="triton-kernels">Triton Kernels</h4>
+<p>Preparing the input tokens for the speculative decoding draft model required a lot of small PyTorch operations. Launching many small kernels incurs unnecessary overhead (2-3µs per kernel). To fuse all these operations into a single one, I implemented a custom <a href="https://github.com/vllm-project/vllm/blob/1209b784f2ba976eff2ea24bc33c61f35c6eb213/vllm/v1/spec_decode/draft_model.py#L234">Triton kernel</a>. The kernel is quite simple, but it replaced around 8 calls to PyTorch functions, avoiding their launch overhead. If you are interested in learning about Triton kernels, I recommend looking at the <a href="https://triton-lang.org/main/getting-started/tutorials/index.html">tutorial examples</a>. The language is easy to learn and it gets you 85% of the way to speed-of-light performance.</p>
+</section>
+</section>
+</section>
+<section id="contributing-to-vllm" class="level2">
+<h2 class="anchored" data-anchor-id="contributing-to-vllm">Contributing to vLLM</h2>
+<p>In this section, I share some tips about how to approach the vLLM codebase as a new contributor.</p>
+<section id="sec-start-high-level" class="level3">
+<h3 class="anchored" data-anchor-id="sec-start-high-level">Start High-Level</h3>
+<p>Introduce one or more unit tests for your desired API (e.g., <code>method=draft_model</code> for speculative decoding). Think about how, as a user, you would observe the outputs to identify if the API is correct (e.g., <code>acceptance_rate=100%</code> in greedy decoding). Then go ahead and run the tests. You will find yourself waiting for vLLM to spin up and compile the model, so you want to deactivate all features that make you wait for your code to execute (e.g., pass <code>--enforce-eager</code>). The reason is that slow <strong>feedback loops</strong> sap your focus and kill your flow. You will obviously hit errors that prevent your feature from working, but that is the goal. You are working from the inside out, catching and solving problems locally one at a time without having to understand the whole codebase at once. Set a debugger and try to understand only one error at a time, interactively and with the local context. vLLM is a very complex system, and trying to understand the whole codebase at once would be overwhelming and lead to frustration. Reading about the big picture of the codebase can be useful after getting some exposure to the codebase, e.g., <a href="https://www.aleksagordic.com/blog/vllm">in this post</a> by Aleksa Gordić.</p>
+</section>
+<section id="use-the-debugger" class="level3">
+<h3 class="anchored" data-anchor-id="use-the-debugger">Use the Debugger</h3>
+<p>Most features require you to manipulate tensors and change their shape or content. This type of PyTorch code is often not simple to read or write, because it’s often more imperative than declarative. Good contributors comment their code to communicate the intent without repeating the code itself, and without making the code so verbose that it’s buried in noisy comments. For code regions heavy in PyTorch code, I suggest factoring out a pure Python function that you can test independently. Then you can create a unit test for it and easily set breakpoints in the function without having to restart the entire vLLM server (which is very slow).</p>
+</section>
+<section id="test-extensively" class="level3">
+<h3 class="anchored" data-anchor-id="test-extensively">Test Extensively</h3>
+<p>I mentioned that you speed up your feedback cycles by passing, e.g., <code>--enforce-eager</code>, but that leaves the most important paths of the codebase untested. In production, you never run in eager mode, so you want to test these paths as well. I recommend the <code>pytest.mark.parametrize</code> decorator to test your code with different inputs, e.g., as shown in Listing&nbsp;3 to test both eager and compiled mode. If you look at my <a href="https://github.com/vllm-project/vllm/pull/24322/changes#diff-51dd765a6984b59836ab7ec3c6c12c904afe4c325d72659fb82611b40521d008R658-R659">draft_model PR</a>, you will find that I used parametrizations almost obsessively to test many combinations. For example: Is the <em>target</em> model in FP8 or FP16? Is the <em>draft</em> model in FP8/FP16? Are we using greedy sampling or temperature &gt;= 0.0? Is the target model using tensor parallelism of 1 or more? What happens if we pass invalid combinations of these parameters? Obviously, these are specific cases for speculative decoding, and the code paths that are relevant to your feature will become apparent as you understand the code from the outside in.</p>
+<div id="lst-pytest-mark-parametrize" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pytest-mark-parametrize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Pytest Parametrization
+</figcaption>
+<div aria-describedby="lst-pytest-mark-parametrize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-pytest-mark-parametrize" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-pytest-mark-parametrize-1"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@pytest.mark.parametrize</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"enforce_eager"</span>, [<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>])</span>
+<span id="lst-pytest-mark-parametrize-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_draft_model_correctness(enforce_eager):</span>
+<span id="lst-pytest-mark-parametrize-3">  ...</span></code></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="code-evolution" class="level3">
+<h3 class="anchored" data-anchor-id="code-evolution">Code Evolution</h3>
+<p>The vLLM project has far more contributors than reviewers, so many PRs sit unreviewed for extended periods. My <a href="https://github.com/vllm-project/vllm/pull/24322">PR</a> was open from 2025-09-05 and merged on 2026-01-19, which is 136 days, or about <strong>4.5 months</strong>, despite having relatively engaged reviewers. With the vLLM codebase evolving so quickly, this long review cycle meant I had to resolve merge conflicts at least 10 times.</p>
+<p>After resolving several painful conflicts, I learned that certain types of changes and patterns are more likely to cause conflicts. For example, moving a function to a new file <em>and</em> changing its body creates painful merge conflicts, because the function continues to evolve on the main branch in its old location. The same applies to extracting a superclass or child class, changing its body, and then moving it to a new file.</p>
+<p>While we shouldn’t plan for PRs to stay open this long, we should be prepared for the main branch to evolve in parallel to our PR. One strategy is to modify functions and classes in-place (within the same file) and defer moving them to other files in a subsequent PR. This might sound counterintuitive to experienced engineers, but it proved effective to minimize merge conflicts.</p>
+</section>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>) and compared it against vanilla decoding and EAGLE-3. On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24×) without specialized training. Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes. The performance numbers are meant as a reference as of today (2026-01-25, commit <code>e1a34c3</code>), and can vary with model, workload, and deployment. Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.</p>
+</section>
+<section id="acknowledgments" class="level2">
+<h2 class="anchored" data-anchor-id="acknowledgments">Acknowledgments</h2>
+<p>I thank the reviewers and collaborators of the vLLM project who engaged with my PR and provided valuable feedback: <a href="https://www.linkedin.com/in/benjamin-chislett-05502818a/">Benjamin Chislett</a> from NVIDIA, <a href="https://www.linkedin.com/in/ekagra-ranjan/">Ekagra Ranjan</a> from Cohere, <a href="https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/">Lily Liu</a> from OpenAI, <a href="https://www.linkedin.com/in/yewentao/">Wentao Ye</a> from Red Hat, <a href="https://www.linkedin.com/in/harrymellor/">Harry Mellor</a> from Hugging Face.</p>
+</section>
+<section id="references" class="level2">
+
+
+
+
+</section>
+
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-li2025eagle" class="csl-entry">
+Li, Yuhui, Fangyun Wei, Chao Zhang, and Hongyang Zhang. 2025. <span>“<span>EAGLE</span>-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test.”</span> In <em>The Thirty-Ninth Annual Conference on Neural Information Processing Systems</em>. <a href="https://openreview.net/forum?id=4exx1hUffq">https://openreview.net/forum?id=4exx1hUffq</a>.
+</div>
+<div id="ref-tang2025efficientspeculativedecodingllama" class="csl-entry">
+Tang, Bangsheng, Carl Chengyan Fu, Fei Kou, Grigory Sizov, Haoci Zhang, Jason Park, Jiawen Liu, et al. 2025. <span>“Efficient Speculative Decoding for Llama at Scale: Challenges and Solutions.”</span> <a href="https://arxiv.org/abs/2508.08192">https://arxiv.org/abs/2508.08192</a>.
+</div>
+</div></section><section id="footnotes" class="footnotes footnotes-end-of-document"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p><a href="https://huggingface.co/Qwen/Qwen3-32B" class="uri">https://huggingface.co/Qwen/Qwen3-32B</a>↩︎</p></li>
+<li id="fn2"><p><a href="https://huggingface.co/Qwen/Qwen3-1.7B" class="uri">https://huggingface.co/Qwen/Qwen3-1.7B</a>↩︎</p></li>
+<li id="fn3"><p><a href="https://huggingface.co/Qwen/Qwen3-4B" class="uri">https://huggingface.co/Qwen/Qwen3-4B</a>↩︎</p></li>
+<li id="fn4"><p><a href="https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3" class="uri">https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3</a>↩︎</p></li>
+<li id="fn5"><p><a href="https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct" class="uri">https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct</a>↩︎</p></li>
+<li id="fn6"><p><a href="https://huggingface.co/meta-llama/Llama-3.2-1B" class="uri">https://huggingface.co/meta-llama/Llama-3.2-1B</a>↩︎</p></li>
+<li id="fn7"><p><a href="https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B" class="uri">https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B</a>↩︎</p></li>
+<li id="fn8"><p><a href="https://huggingface.co/datasets/philschmid/mt-bench" class="uri">https://huggingface.co/datasets/philschmid/mt-bench</a>↩︎</p></li>
+<li id="fn9"><p><a href="https://huggingface.co/datasets/likaixin/InstructCoder" class="uri">https://huggingface.co/datasets/likaixin/InstructCoder</a>↩︎</p></li>
+<li id="fn10"><p>On InstructCoder with LLaMa 70B the KV cache fills up completely at batch size 64, meaning some requests are put to wait. Increasing the batch size beyond doesn’t increase the parallelism, so I only benchmark up to 64 in this case.↩︎</p></li>
+<li id="fn11"><p><a href="https://github.com/sgl-project/sglang" class="uri">https://github.com/sgl-project/sglang</a>↩︎</p></li>
+<li id="fn12"><p><a href="https://github.com/vllm-project/speculators" class="uri">https://github.com/vllm-project/speculators</a>↩︎</p></li>
+<li id="fn13"><p><a href="https://docs.vllm.ai/en/stable/design/cuda_graphs/" class="uri">https://docs.vllm.ai/en/stable/design/cuda_graphs/</a>↩︎</p></li>
+</ol>
+</section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
+  author = {Ruiz, Tomas},
+  title = {Up to 3.55x {Faster:} {Contributing} {Speculative} {Decoding}
+    with {Draft} {Models} to {vLLM} {V1}},
+  date = {2026-01-28},
+  url = {https://tomasruizt.github.io/posts/06_vllm-spec-decode/},
+  langid = {en}
+}
+</code></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2026" class="csl-entry quarto-appendix-citeas">
+Ruiz, Tomas. 2026. <span>“Up to 3.55x Faster: Contributing Speculative
+Decoding with Draft Models to vLLM V1.”</span> January 28, 2026. <a href="https://tomasruizt.github.io/posts/06_vllm-spec-decode/">https://tomasruizt.github.io/posts/06_vllm-spec-decode/</a>.
+</div></div></section></div> ]]></description>
+  <category>vLLM</category>
+  <category>PyTorch</category>
+  <category>Triton</category>
+  <category>Transformers</category>
+  <guid>https://tomasruizt.github.io/posts/06_vllm-spec-decode/</guid>
+  <pubDate>Tue, 27 Jan 2026 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>PyTorch and CPU-GPU Synchronizations</title>
   <dc:creator>Tomas Ruiz</dc:creator>
@@ -330,7 +948,7 @@ January 7, 2026. <a href="https://tomasruizt.github.io/posts/08_cpu_gpu_synchron
   <category>PyTorch</category>
   <category>Triton</category>
   <guid>https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/</guid>
-  <pubDate>Wed, 07 Jan 2026 05:00:00 GMT</pubDate>
+  <pubDate>Tue, 06 Jan 2026 23:00:00 GMT</pubDate>
   <media:content url="https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/imgs/example-code-do-print-annotated.jpg" medium="image" type="image/jpeg"/>
 </item>
 <item>
@@ -439,7 +1057,7 @@ font-style: inherit;">"</span>}}</span>
 <section id="prefill-decode-ratio" class="level1">
 <h1>Prefill-Decode Ratio</h1>
 <p>We processed over 552 million input tokens, and generated over 9 million output tokens. Per request, we processed 15.8k input tokens and produced over 250 output tokens, on average. The ratio of input tokens to output tokens is very skewed (61 to 1). It means that most compute in our workload was not spent decoding long answers, but rather processing the many input tokens. The workload is therefore called “prefill-heavy”. This contrasts to “decode-heavy” workloads, like those involved in solving mathematical problems that generate a long answer including reasoning. The prefill step is generally speaking compute-bound rather than memory-bound, so our workload likely exploits the full compute capacity of the GPUs. Figure&nbsp;1 and Figure&nbsp;2 show the distribution of input and output tokens for the entire workload.</p>
-<div id="fig-input-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Number of input tokens">
+<div id="fig-input-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of input tokens" data-text-align="left">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-input-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="imgs/input_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: Distribution of Input Tokens. The distribution is skewed to the left, and most requests required between 5k and 20k input tokens. There were a few outliers with as much as 123k input tokens."><img src="https://tomasruizt.github.io/posts/05_mm-inference-on-vllm/imgs/input_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of input tokens"></a>
@@ -449,7 +1067,7 @@ Figure&nbsp;1: <strong>Distribution of Input Tokens</strong>. The distribution i
 </figcaption>
 </figure>
 </div>
-<div id="fig-output-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Number of output tokens">
+<div id="fig-output-tokens" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Number of output tokens" data-text-align="left">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-output-tokens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="imgs/output_tokens.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure&nbsp;2: Distribution of Output Tokens. It’s important to note that the x-scale is 100 times smaller than for input tokens. Most requests produced between 50 and 600 output tokens. The bimodal shape is likely caused by our prompt, which instructed the model to respond to follow-up questions only in specific cases."><img src="https://tomasruizt.github.io/posts/05_mm-inference-on-vllm/imgs/output_tokens.png" class="img-fluid figure-img" style="width:80.0%" data-text-align="left" alt="Number of output tokens"></a>
@@ -678,7 +1296,7 @@ Multimodal LLM on the vLLM Engine.”</span> September 22, 2025. <a href="https:
   <category>vLLM</category>
   <category>Transformers</category>
   <guid>https://tomasruizt.github.io/posts/05_mm-inference-on-vllm/</guid>
-  <pubDate>Mon, 22 Sep 2025 05:00:00 GMT</pubDate>
+  <pubDate>Sun, 21 Sep 2025 22:00:00 GMT</pubDate>
   <media:content url="https://tomasruizt.github.io/posts/05_mm-inference-on-vllm/imgs/parallelism-strategies-square.png" medium="image" type="image/png" height="140" width="144"/>
 </item>
 <item>
@@ -930,7 +1548,7 @@ Attention.”</span> February 1, 2025. <a href="https://tomasruizt.github.io/pos
   <category>Transformers</category>
   <category>Attention</category>
   <guid>https://tomasruizt.github.io/posts/04_multimodal-attn/</guid>
-  <pubDate>Sat, 01 Feb 2025 05:00:00 GMT</pubDate>
+  <pubDate>Fri, 31 Jan 2025 23:00:00 GMT</pubDate>
 </item>
 <item>
   <title>How Does Tiling Speed Up Matrix Multiplications on GPUs?</title>
@@ -1444,7 +2062,7 @@ Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruiz
   <category>Mathematics</category>
   <category>GPUs</category>
   <guid>https://tomasruizt.github.io/posts/03_tiling-for-matrix-mult/</guid>
-  <pubDate>Mon, 23 Dec 2024 05:00:00 GMT</pubDate>
+  <pubDate>Sun, 22 Dec 2024 23:00:00 GMT</pubDate>
   <media:content url="https://tomasruizt.github.io/posts/03_tiling-for-matrix-mult/tiled-matrix-multiplication-squared.jpg" medium="image" type="image/jpeg"/>
 </item>
 <item>
@@ -1476,7 +2094,7 @@ Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruiz
 
 </div>
 <script type="pyodide-1-contents">
-eyJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSIsImF0dHIiOnsiZXZhbCI6dHJ1ZSwiZWRpdCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZX19
+eyJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSIsImF0dHIiOnsicnVuYnV0dG9uIjpmYWxzZSwiZXZhbCI6dHJ1ZSwiZWRpdCI6dHJ1ZX19
 </script>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -1503,7 +2121,7 @@ Note
 
 </div>
 <script type="pyodide-2-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSIsImF0dHIiOnsiZXZhbCI6dHJ1ZSwiZWRpdCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZX19
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSIsImF0dHIiOnsicnVuYnV0dG9uIjpmYWxzZSwiZXZhbCI6dHJ1ZSwiZWRpdCI6dHJ1ZX19
 </script>
 </div>
 </section>
@@ -1514,14 +2132,14 @@ eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0g
 <p><img src="https://latex.codecogs.com/png.latex?%E2%9F%A8%20f,%20g%20%E2%9F%A9%20=%20%5Cint%20f(x)%20g(x)%20dx"> Using this definition, the inequality holds for functions as well: <img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A%E2%9F%A8%20f,%20g%20%E2%9F%A9%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(%E2%9F%A8%20f,%20f%20%E2%9F%A9%20+%20%E2%9F%A8%20g,%20g%20%E2%9F%A9)%20%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Cint%20f(x)%5E2%20dx%20+%20%5Cint%20g(x)%5E2%20dx%20%5Cright)%0A%5Cend%7Balign%7D%0A"></p>
 <p>Let’s take two concrete functions <img src="https://latex.codecogs.com/png.latex?f(x)%20=%20%5Ccos(x)"> and <img src="https://latex.codecogs.com/png.latex?g(x)%20=%20%5Csin(4x)">. I choose these arbitrarily because plotting them looks nice. Feel free to use different functions <code>f</code> and <code>g</code> in the code.</p>
 <script type="exercise-setup-ex_funcs-contents">
-eyJjb2RlIjoiaW1wb3J0IG1hdHBsb3RsaWIucHlwbG90IGFzIHBsdFxuXG5kZWYgcGxvdCh4LCBmLCBnKTpcbiAgICBwbHQucGxvdCh4LCBmKmcsIGxhYmVsPVwiJGYgXFxcXGNkb3QgZyRcIiwgY29sb3I9XCJncmVlblwiKVxuICAgIHBsdC5wbG90KHgsIGYqZiwgbGFiZWw9XCIkZl4yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIGcqZywgbGFiZWw9XCIkZ14yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIDAuNSAqIChmKmYgKyBnKmcpLCBsYWJlbD1cIiQwLjUgKGZeMiArIGdeMikkXCIsIGNvbG9yPVwicmVkXCIpXG4gICAgcGx0LnRpdGxlKFwiVXBwZXIgYm91bmQgZm9yICRcXFxcbGFuZ2xlIGYsIGcgXFxcXHJhbmdsZSRcIilcbiAgICBwbHQubGVnZW5kKClcbiAgICBwbHQuZ3JpZCgpXG4gICAgcGx0LnNob3coKSIsImF0dHIiOnsiZXZhbCI6dHJ1ZSwiZWRpdCI6dHJ1ZSwic2V0dXAiOnRydWUsImV4ZXJjaXNlIjoiZXhfZnVuY3MifX0=
+eyJjb2RlIjoiaW1wb3J0IG1hdHBsb3RsaWIucHlwbG90IGFzIHBsdFxuXG5kZWYgcGxvdCh4LCBmLCBnKTpcbiAgICBwbHQucGxvdCh4LCBmKmcsIGxhYmVsPVwiJGYgXFxcXGNkb3QgZyRcIiwgY29sb3I9XCJncmVlblwiKVxuICAgIHBsdC5wbG90KHgsIGYqZiwgbGFiZWw9XCIkZl4yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIGcqZywgbGFiZWw9XCIkZ14yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIDAuNSAqIChmKmYgKyBnKmcpLCBsYWJlbD1cIiQwLjUgKGZeMiArIGdeMikkXCIsIGNvbG9yPVwicmVkXCIpXG4gICAgcGx0LnRpdGxlKFwiVXBwZXIgYm91bmQgZm9yICRcXFxcbGFuZ2xlIGYsIGcgXFxcXHJhbmdsZSRcIilcbiAgICBwbHQubGVnZW5kKClcbiAgICBwbHQuZ3JpZCgpXG4gICAgcGx0LnNob3coKSIsImF0dHIiOnsic2V0dXAiOnRydWUsImVkaXQiOnRydWUsImV2YWwiOnRydWUsImV4ZXJjaXNlIjoiZXhfZnVuY3MifX0=
 </script>
 <div>
 <div id="pyodide-4" class="exercise-cell">
 
 </div>
 <script type="pyodide-4-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcbnBsb3QoeCwgZiwgZykiLCJhdHRyIjp7ImV2YWwiOnRydWUsImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJydW5idXR0b24iOmZhbHNlLCJhdXRvcnVuIjp0cnVlLCJlZGl0Ijp0cnVlfX0=
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcbnBsb3QoeCwgZiwgZykiLCJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJhdXRvcnVuIjp0cnVlLCJldmFsIjp0cnVlLCJlZGl0Ijp0cnVlfX0=
 </script>
 </div>
 <p>In the plot above, the individual functions <img src="https://latex.codecogs.com/png.latex?f%5E2"> and <img src="https://latex.codecogs.com/png.latex?g%5E2"> are plotted with light-blue lines. Their average is the red line, and the product <img src="https://latex.codecogs.com/png.latex?f%20%E2%8B%85%20g"> is the green line. The red line is an upper bound for the green one. We see that the green line crosses over the two blue lines at different points but never crosses over the red line.</p>
@@ -1531,7 +2149,7 @@ eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5m
 
 </div>
 <script type="pyodide-5-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikiLCJhdHRyIjp7ImV2YWwiOnRydWUsImVkaXQiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2V9fQ==
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikiLCJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImV2YWwiOnRydWUsImVkaXQiOnRydWV9fQ==
 </script>
 </div>
 </section>
@@ -1561,7 +2179,7 @@ Warning
 
 </div>
 <script type="pyodide-6-contents">
-eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIiwiYXR0ciI6eyJldmFsIjp0cnVlLCJlZGl0Ijp0cnVlLCJydW5idXR0b24iOmZhbHNlfX0=
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIiwiYXR0ciI6eyJydW5idXR0b24iOmZhbHNlLCJldmFsIjp0cnVlLCJlZGl0Ijp0cnVlfX0=
 </script>
 </div>
 <p>The inequality holds, but I have no geometric intuition about the trace of a matrix, or how this inequality could be visualized for matrices. If you have an idea, please let me know! 🙏</p>
@@ -1572,10 +2190,10 @@ eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4o
 
 
 <script type="pyodide-data">
-eyJvcHRpb25zIjp7ImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjguMS9mdWxsLyIsImVudiI6eyJQTE9UTFlfUkVOREVSRVIiOiJwbG90bHlfbWltZXR5cGUifX0sInBhY2thZ2VzIjp7InBrZ3MiOlsicHlvZGlkZV9odHRwIiwibWljcm9waXAiLCJpcHl0aG9uIl19fQ==
+eyJvcHRpb25zIjp7ImVudiI6eyJQTE9UTFlfUkVOREVSRVIiOiJwbG90bHlfbWltZXR5cGUifSwiaW5kZXhVUkwiOiJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvcHlvZGlkZS92MC4yOC4xL2Z1bGwvIn0sInBhY2thZ2VzIjp7InBrZ3MiOlsicHlvZGlkZV9odHRwIiwibWljcm9waXAiLCJpcHl0aG9uIl19fQ==
 </script>
 <script type="ojs-module-contents">
-eyJjb250ZW50cyI6W3sic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiIsImNlbGxOYW1lIjoicHlvZGlkZS02IiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImlubGluZSI6ZmFsc2V9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiIsImNlbGxOYW1lIjoicHlvZGlkZS01IiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImlubGluZSI6ZmFsc2V9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBjYXB0aW9uOiAnRXhlcmNpc2UnLFxuICAgIH0sXG4gICAgYmxvY2suYXR0clxuICApO1xuXG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IocHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSwgYmxvY2suY29kZSwgb3B0aW9ucyk7XG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxudmlld29mIF9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbl9weW9kaWRlX2ZlZWRiYWNrXzQgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUdyYWRlciB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcbiAgY29uc3QgZW1wdHlGZWVkYmFjayA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO1xuXG4gIGNvbnN0IGdyYWRlciA9IG5ldyBQeW9kaWRlR3JhZGVyKF9weW9kaWRlX3ZhbHVlXzQuZXZhbHVhdG9yKTtcbiAgY29uc3QgZmVlZGJhY2sgPSBhd2FpdCBncmFkZXIuZ3JhZGVFeGVyY2lzZSgpO1xuICBpZiAoIWZlZWRiYWNrKSByZXR1cm4gZW1wdHlGZWVkYmFjaztcbiAgcmV0dXJuIGZlZWRiYWNrO1xufVxuIiwiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0IiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzIgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTItY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0yLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMiwge30pO1xuIiwiY2VsbE5hbWUiOiJweW9kaWRlLTIiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0IiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzEgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0xLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMSwge30pO1xuIiwiY2VsbE5hbWUiOiJweW9kaWRlLTEiLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0IiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJweW9kaWRlT2pzID0ge1xuICBjb25zdCB7XG4gICAgUHlvZGlkZUV2YWx1YXRvcixcbiAgICBQeW9kaWRlRW52aXJvbm1lbnRNYW5hZ2VyLFxuICAgIHNldHVwUHl0aG9uLFxuICAgIHN0YXJ0UHlvZGlkZVdvcmtlcixcbiAgICBiNjREZWNvZGUsXG4gICAgY29sbGFwc2VQYXRoLFxuICB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzdGF0dXNDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctc3RhdHVzXCIpO1xuICBjb25zdCBpbmRpY2F0b3JDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpbmRpY2F0b3JDb250YWluZXIuY2xhc3NMaXN0LnJlbW92ZShcImQtbm9uZVwiKTtcblxuICBsZXQgc3RhdHVzVGV4dCA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIilcbiAgc3RhdHVzVGV4dC5jbGFzc0xpc3QgPSBcImV4ZXJjaXNlLWxvYWRpbmctZGV0YWlsc1wiO1xuICBzdGF0dXNUZXh0ID0gc3RhdHVzQ29udGFpbmVyLmFwcGVuZENoaWxkKHN0YXR1c1RleHQpO1xuICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYEluaXRpYWxpc2VgO1xuXG4gIC8vIEhvaXN0IGluZGljYXRvciBvdXQgZnJvbSBmaW5hbCBzbGlkZSB3aGVuIHJ1bm5pbmcgdW5kZXIgcmV2ZWFsXG4gIGNvbnN0IHJldmVhbFN0YXR1cyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsIC5leGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaWYgKHJldmVhbFN0YXR1cykge1xuICAgIHJldmVhbFN0YXR1cy5yZW1vdmUoKTtcbiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCA+IC5zbGlkZXNcIikuYXBwZW5kQ2hpbGQocmV2ZWFsU3RhdHVzKTtcbiAgfVxuXG4gIC8vIE1ha2UgYW55IHJldmVhbCBzbGlkZXMgd2l0aCBsaXZlIGNlbGxzIHNjcm9sbGFibGVcbiAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbChcIi5yZXZlYWwgLmV4ZXJjaXNlLWNlbGxcIikuZm9yRWFjaCgoZWwpID0+IHtcbiAgICBlbC5jbG9zZXN0KCdzZWN0aW9uLnNsaWRlJykuY2xhc3NMaXN0LmFkZChcInNjcm9sbGFibGVcIik7XG4gIH0pXG5cbiAgLy8gUHlvZGlkZSBzdXBwbGVtZW50YWwgZGF0YSBhbmQgb3B0aW9uc1xuICBjb25zdCBkYXRhQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLWRhdGFcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBkYXRhID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZGF0YUNvbnRlbnQpKTtcblxuICAvLyBHcmFiIGxpc3Qgb2YgcmVzb3VyY2VzIHRvIGJlIGRvd25sb2FkZWRcbiAgY29uc3QgZmlsZXNDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInZmcy1maWxlXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZmlsZXMgPSBKU09OLnBhcnNlKGI2NERlY29kZShmaWxlc0NvbnRlbnQpKTtcblxuICBsZXQgcHlvZGlkZVByb21pc2UgPSAoYXN5bmMgKCkgPT4ge1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgUHlvZGlkZWA7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHN0YXJ0UHlvZGlkZVdvcmtlcihkYXRhLm9wdGlvbnMpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiBtaWNyb3BpcGA7XG4gICAgYXdhaXQgcHlvZGlkZS5sb2FkUGFja2FnZShcIm1pY3JvcGlwXCIpO1xuICAgIGNvbnN0IG1pY3JvcGlwID0gYXdhaXQgcHlvZGlkZS5weWltcG9ydChcIm1pY3JvcGlwXCIpO1xuICAgIGF3YWl0IGRhdGEucGFja2FnZXMucGtncy5tYXAoKHBrZykgPT4gKCkgPT4ge1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiAke3BrZ31gO1xuICAgICAgcmV0dXJuIG1pY3JvcGlwLmluc3RhbGwocGtnKTtcbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcbiAgICBhd2FpdCBtaWNyb3BpcC5kZXN0cm95KCk7XG5cbiAgICAvLyBEb3dubG9hZCBhbmQgaW5zdGFsbCByZXNvdXJjZXNcbiAgICBhd2FpdCBmaWxlcy5tYXAoKGZpbGUpID0+IGFzeW5jICgpID0+IHtcbiAgICAgIGNvbnN0IG5hbWUgPSBmaWxlLnN1YnN0cmluZyhmaWxlLmxhc3RJbmRleE9mKCcvJykgKyAxKTtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcmVzb3VyY2U6ICR7bmFtZX1gO1xuICAgICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChmaWxlKTtcbiAgICAgIGlmICghcmVzcG9uc2Uub2spIHtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBDYW4ndCBkb3dubG9hZCBcXGAke2ZpbGV9XFxgLiBFcnJvciAke3Jlc3BvbnNlLnN0YXR1c306IFwiJHtyZXNwb25zZS5zdGF0dXNUZXh0fVwiLmApO1xuICAgICAgfVxuICAgICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmFycmF5QnVmZmVyKCk7XG5cbiAgICAgIC8vIFN0b3JlIFVSTHMgaW4gdGhlIGN3ZCB3aXRob3V0IGFueSBzdWJkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBpZiAoZmlsZS5pbmNsdWRlcyhcIjovL1wiKSkge1xuICAgICAgICBmaWxlID0gbmFtZTtcbiAgICAgIH1cblxuICAgICAgLy8gQ29sbGFwc2UgaGlnaGVyIGRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGZpbGUgPSBjb2xsYXBzZVBhdGgoZmlsZSk7XG5cbiAgICAgIC8vIENyZWF0ZSBkaXJlY3RvcnkgdHJlZSwgaWdub3JpbmcgXCJkaXJlY3RvcnkgZXhpc3RzXCIgVkZTIGVycm9yc1xuICAgICAgY29uc3QgcGFydHMgPSBmaWxlLnNwbGl0KCcvJykuc2xpY2UoMCwgLTEpO1xuICAgICAgbGV0IHBhdGggPSAnJztcbiAgICAgIHdoaWxlIChwYXJ0cy5sZW5ndGggPiAwKSB7XG4gICAgICAgIHBhdGggKz0gcGFydHMuc2hpZnQoKSArICcvJztcbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICBhd2FpdCBweW9kaWRlLkZTLm1rZGlyKHBhdGgpO1xuICAgICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgICAgaWYgKGUuZXJybm8gIT09IDIwKSB7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgLy8gV3JpdGUgdGhpcyBmaWxlIHRvIHRoZSBWRlNcbiAgICAgIHRyeSB7XG4gICAgICAgIHJldHVybiBhd2FpdCBweW9kaWRlLkZTLndyaXRlRmlsZShmaWxlLCBuZXcgVWludDhBcnJheShkYXRhKSk7XG4gICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICB9XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYFB5b2RpZGUgZW52aXJvbm1lbnQgc2V0dXBgO1xuICAgIGF3YWl0IHNldHVwUHl0aG9uKHB5b2RpZGUpO1xuXG4gICAgc3RhdHVzVGV4dC5yZW1vdmUoKTtcbiAgICBpZiAoc3RhdHVzQ29udGFpbmVyLmNoaWxkcmVuLmxlbmd0aCA9PSAwKSB7XG4gICAgICBzdGF0dXNDb250YWluZXIucGFyZW50Tm9kZS5yZW1vdmUoKTtcbiAgICB9XG4gICAgcmV0dXJuIHB5b2RpZGU7XG4gIH0pKCkuY2F0Y2goKGVycikgPT4ge1xuICAgIHN0YXR1c1RleHQuc3R5bGUuY29sb3IgPSBcInZhcigtLWV4ZXJjaXNlLWVkaXRvci1obC1lciwgI0FEMDAwMClcIjtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gZXJyLm1lc3NhZ2U7XG4gICAgLy9pbmRpY2F0b3JDb250YWluZXIucXVlcnlTZWxlY3RvcihcIi5zcGlubmVyLWdyb3dcIikuY2xhc3NMaXN0LmFkZChcImQtbm9uZVwiKTtcbiAgICB0aHJvdyBlcnI7XG4gIH0pO1xuXG4gIC8vIEtlZXAgdHJhY2sgb2YgaW5pdGlhbCBPSlMgYmxvY2sgcmVuZGVyXG4gIGNvbnN0IHJlbmRlcmVkT2pzID0ge307XG5cbiAgY29uc3QgcHJvY2VzcyA9IGFzeW5jIChjb250ZXh0LCBpbnB1dHMpID0+IHtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgcHlvZGlkZVByb21pc2U7XG4gICAgY29uc3QgZXZhbHVhdG9yID0gbmV3IFB5b2RpZGVFdmFsdWF0b3IocHlvZGlkZSwgY29udGV4dCk7XG4gICAgYXdhaXQgZXZhbHVhdG9yLnByb2Nlc3MoaW5wdXRzKTtcbiAgICByZXR1cm4gZXZhbHVhdG9yLmNvbnRhaW5lcjtcbiAgfVxuXG4gIHJldHVybiB7XG4gICAgcHlvZGlkZVByb21pc2UsXG4gICAgcmVuZGVyZWRPanMsXG4gICAgcHJvY2VzcyxcbiAgfTtcbn1cbiIsImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0IiwiaW5saW5lIjpmYWxzZX1dfQ==
+eyJjb250ZW50cyI6W3sic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJjZWxsTmFtZSI6InB5b2RpZGUtNiIsImlubGluZSI6ZmFsc2V9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJjZWxsTmFtZSI6InB5b2RpZGUtNSIsImlubGluZSI6ZmFsc2V9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBjYXB0aW9uOiAnRXhlcmNpc2UnLFxuICAgIH0sXG4gICAgYmxvY2suYXR0clxuICApO1xuXG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IocHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSwgYmxvY2suY29kZSwgb3B0aW9ucyk7XG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxudmlld29mIF9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbl9weW9kaWRlX2ZlZWRiYWNrXzQgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUdyYWRlciB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcbiAgY29uc3QgZW1wdHlGZWVkYmFjayA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO1xuXG4gIGNvbnN0IGdyYWRlciA9IG5ldyBQeW9kaWRlR3JhZGVyKF9weW9kaWRlX3ZhbHVlXzQuZXZhbHVhdG9yKTtcbiAgY29uc3QgZmVlZGJhY2sgPSBhd2FpdCBncmFkZXIuZ3JhZGVFeGVyY2lzZSgpO1xuICBpZiAoIWZlZWRiYWNrKSByZXR1cm4gZW1wdHlGZWVkYmFjaztcbiAgcmV0dXJuIGZlZWRiYWNrO1xufVxuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoicHlvZGlkZS00IiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzIgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTItY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0yLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMiwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoicHlvZGlkZS0yIiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzEgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0xLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMSwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoicHlvZGlkZS0xIiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJweW9kaWRlT2pzID0ge1xuICBjb25zdCB7XG4gICAgUHlvZGlkZUV2YWx1YXRvcixcbiAgICBQeW9kaWRlRW52aXJvbm1lbnRNYW5hZ2VyLFxuICAgIHNldHVwUHl0aG9uLFxuICAgIHN0YXJ0UHlvZGlkZVdvcmtlcixcbiAgICBiNjREZWNvZGUsXG4gICAgY29sbGFwc2VQYXRoLFxuICB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzdGF0dXNDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctc3RhdHVzXCIpO1xuICBjb25zdCBpbmRpY2F0b3JDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpbmRpY2F0b3JDb250YWluZXIuY2xhc3NMaXN0LnJlbW92ZShcImQtbm9uZVwiKTtcblxuICBsZXQgc3RhdHVzVGV4dCA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIilcbiAgc3RhdHVzVGV4dC5jbGFzc0xpc3QgPSBcImV4ZXJjaXNlLWxvYWRpbmctZGV0YWlsc1wiO1xuICBzdGF0dXNUZXh0ID0gc3RhdHVzQ29udGFpbmVyLmFwcGVuZENoaWxkKHN0YXR1c1RleHQpO1xuICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYEluaXRpYWxpc2VgO1xuXG4gIC8vIEhvaXN0IGluZGljYXRvciBvdXQgZnJvbSBmaW5hbCBzbGlkZSB3aGVuIHJ1bm5pbmcgdW5kZXIgcmV2ZWFsXG4gIGNvbnN0IHJldmVhbFN0YXR1cyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsIC5leGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaWYgKHJldmVhbFN0YXR1cykge1xuICAgIHJldmVhbFN0YXR1cy5yZW1vdmUoKTtcbiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCA+IC5zbGlkZXNcIikuYXBwZW5kQ2hpbGQocmV2ZWFsU3RhdHVzKTtcbiAgfVxuXG4gIC8vIE1ha2UgYW55IHJldmVhbCBzbGlkZXMgd2l0aCBsaXZlIGNlbGxzIHNjcm9sbGFibGVcbiAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbChcIi5yZXZlYWwgLmV4ZXJjaXNlLWNlbGxcIikuZm9yRWFjaCgoZWwpID0+IHtcbiAgICBlbC5jbG9zZXN0KCdzZWN0aW9uLnNsaWRlJykuY2xhc3NMaXN0LmFkZChcInNjcm9sbGFibGVcIik7XG4gIH0pXG5cbiAgLy8gUHlvZGlkZSBzdXBwbGVtZW50YWwgZGF0YSBhbmQgb3B0aW9uc1xuICBjb25zdCBkYXRhQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLWRhdGFcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBkYXRhID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZGF0YUNvbnRlbnQpKTtcblxuICAvLyBHcmFiIGxpc3Qgb2YgcmVzb3VyY2VzIHRvIGJlIGRvd25sb2FkZWRcbiAgY29uc3QgZmlsZXNDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInZmcy1maWxlXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZmlsZXMgPSBKU09OLnBhcnNlKGI2NERlY29kZShmaWxlc0NvbnRlbnQpKTtcblxuICBsZXQgcHlvZGlkZVByb21pc2UgPSAoYXN5bmMgKCkgPT4ge1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgUHlvZGlkZWA7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHN0YXJ0UHlvZGlkZVdvcmtlcihkYXRhLm9wdGlvbnMpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiBtaWNyb3BpcGA7XG4gICAgYXdhaXQgcHlvZGlkZS5sb2FkUGFja2FnZShcIm1pY3JvcGlwXCIpO1xuICAgIGNvbnN0IG1pY3JvcGlwID0gYXdhaXQgcHlvZGlkZS5weWltcG9ydChcIm1pY3JvcGlwXCIpO1xuICAgIGF3YWl0IGRhdGEucGFja2FnZXMucGtncy5tYXAoKHBrZykgPT4gKCkgPT4ge1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiAke3BrZ31gO1xuICAgICAgcmV0dXJuIG1pY3JvcGlwLmluc3RhbGwocGtnKTtcbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcbiAgICBhd2FpdCBtaWNyb3BpcC5kZXN0cm95KCk7XG5cbiAgICAvLyBEb3dubG9hZCBhbmQgaW5zdGFsbCByZXNvdXJjZXNcbiAgICBhd2FpdCBmaWxlcy5tYXAoKGZpbGUpID0+IGFzeW5jICgpID0+IHtcbiAgICAgIGNvbnN0IG5hbWUgPSBmaWxlLnN1YnN0cmluZyhmaWxlLmxhc3RJbmRleE9mKCcvJykgKyAxKTtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcmVzb3VyY2U6ICR7bmFtZX1gO1xuICAgICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChmaWxlKTtcbiAgICAgIGlmICghcmVzcG9uc2Uub2spIHtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBDYW4ndCBkb3dubG9hZCBcXGAke2ZpbGV9XFxgLiBFcnJvciAke3Jlc3BvbnNlLnN0YXR1c306IFwiJHtyZXNwb25zZS5zdGF0dXNUZXh0fVwiLmApO1xuICAgICAgfVxuICAgICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmFycmF5QnVmZmVyKCk7XG5cbiAgICAgIC8vIFN0b3JlIFVSTHMgaW4gdGhlIGN3ZCB3aXRob3V0IGFueSBzdWJkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBpZiAoZmlsZS5pbmNsdWRlcyhcIjovL1wiKSkge1xuICAgICAgICBmaWxlID0gbmFtZTtcbiAgICAgIH1cblxuICAgICAgLy8gQ29sbGFwc2UgaGlnaGVyIGRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGZpbGUgPSBjb2xsYXBzZVBhdGgoZmlsZSk7XG5cbiAgICAgIC8vIENyZWF0ZSBkaXJlY3RvcnkgdHJlZSwgaWdub3JpbmcgXCJkaXJlY3RvcnkgZXhpc3RzXCIgVkZTIGVycm9yc1xuICAgICAgY29uc3QgcGFydHMgPSBmaWxlLnNwbGl0KCcvJykuc2xpY2UoMCwgLTEpO1xuICAgICAgbGV0IHBhdGggPSAnJztcbiAgICAgIHdoaWxlIChwYXJ0cy5sZW5ndGggPiAwKSB7XG4gICAgICAgIHBhdGggKz0gcGFydHMuc2hpZnQoKSArICcvJztcbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICBhd2FpdCBweW9kaWRlLkZTLm1rZGlyKHBhdGgpO1xuICAgICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgICAgaWYgKGUuZXJybm8gIT09IDIwKSB7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgLy8gV3JpdGUgdGhpcyBmaWxlIHRvIHRoZSBWRlNcbiAgICAgIHRyeSB7XG4gICAgICAgIHJldHVybiBhd2FpdCBweW9kaWRlLkZTLndyaXRlRmlsZShmaWxlLCBuZXcgVWludDhBcnJheShkYXRhKSk7XG4gICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICB9XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYFB5b2RpZGUgZW52aXJvbm1lbnQgc2V0dXBgO1xuICAgIGF3YWl0IHNldHVwUHl0aG9uKHB5b2RpZGUpO1xuXG4gICAgc3RhdHVzVGV4dC5yZW1vdmUoKTtcbiAgICBpZiAoc3RhdHVzQ29udGFpbmVyLmNoaWxkcmVuLmxlbmd0aCA9PSAwKSB7XG4gICAgICBzdGF0dXNDb250YWluZXIucGFyZW50Tm9kZS5yZW1vdmUoKTtcbiAgICB9XG4gICAgcmV0dXJuIHB5b2RpZGU7XG4gIH0pKCkuY2F0Y2goKGVycikgPT4ge1xuICAgIHN0YXR1c1RleHQuc3R5bGUuY29sb3IgPSBcInZhcigtLWV4ZXJjaXNlLWVkaXRvci1obC1lciwgI0FEMDAwMClcIjtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gZXJyLm1lc3NhZ2U7XG4gICAgLy9pbmRpY2F0b3JDb250YWluZXIucXVlcnlTZWxlY3RvcihcIi5zcGlubmVyLWdyb3dcIikuY2xhc3NMaXN0LmFkZChcImQtbm9uZVwiKTtcbiAgICB0aHJvdyBlcnI7XG4gIH0pO1xuXG4gIC8vIEtlZXAgdHJhY2sgb2YgaW5pdGlhbCBPSlMgYmxvY2sgcmVuZGVyXG4gIGNvbnN0IHJlbmRlcmVkT2pzID0ge307XG5cbiAgY29uc3QgcHJvY2VzcyA9IGFzeW5jIChjb250ZXh0LCBpbnB1dHMpID0+IHtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgcHlvZGlkZVByb21pc2U7XG4gICAgY29uc3QgZXZhbHVhdG9yID0gbmV3IFB5b2RpZGVFdmFsdWF0b3IocHlvZGlkZSwgY29udGV4dCk7XG4gICAgYXdhaXQgZXZhbHVhdG9yLnByb2Nlc3MoaW5wdXRzKTtcbiAgICByZXR1cm4gZXZhbHVhdG9yLmNvbnRhaW5lcjtcbiAgfVxuXG4gIHJldHVybiB7XG4gICAgcHlvZGlkZVByb21pc2UsXG4gICAgcmVuZGVyZWRPanMsXG4gICAgcHJvY2VzcyxcbiAgfTtcbn1cbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwiaW5saW5lIjpmYWxzZX1dfQ==
 </script>
 <div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
 <div id="exercise-loading-status" class="d-flex gap-2">
@@ -1600,7 +2218,7 @@ W10=
   <category>Mathematics</category>
   <category>Python</category>
   <guid>https://tomasruizt.github.io/posts/02_viz-inequalities-inner-prod-wasm/</guid>
-  <pubDate>Thu, 12 Sep 2024 05:00:00 GMT</pubDate>
+  <pubDate>Wed, 11 Sep 2024 22:00:00 GMT</pubDate>
   <media:content url="https://tomasruizt.github.io/posts/02_viz-inequalities-inner-prod-wasm/upper-bound-img.png" medium="image" type="image/png" height="103" width="144"/>
 </item>
 <item>
@@ -1616,7 +2234,7 @@ W10=
 <section id="summary" class="level1">
 <h1>Summary</h1>
 <p>In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation <img src="https://latex.codecogs.com/png.latex?W"> is shown in figure 1 (green).</p>
-<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Learned Linear Transformation" data-text-align="center">
+<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="center" alt="Learned Linear Transformation">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="linear-adaptation/linear-adaptation.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."><img src="https://tomasruizt.github.io/posts/01_linear-adaptation/linear-adaptation/linear-adaptation.png" class="img-fluid figure-img" style="width:75.0%" data-text-align="center" alt="Learned Linear Transformation"></a>
@@ -1698,7 +2316,7 @@ Watkins, David S. 2004. <em>Fundamentals of Matrix Computations</em>. John Wiley
 </section></div> ]]></description>
   <category>Machine Learning</category>
   <guid>https://tomasruizt.github.io/posts/01_linear-adaptation/</guid>
-  <pubDate>Fri, 02 Aug 2024 05:00:00 GMT</pubDate>
+  <pubDate>Thu, 01 Aug 2024 22:00:00 GMT</pubDate>
   <media:content url="https://tomasruizt.github.io/posts/01_linear-adaptation/linear-adaptation/linear-adaptation.png" medium="image" type="image/png" height="128" width="144"/>
 </item>
 </channel>
