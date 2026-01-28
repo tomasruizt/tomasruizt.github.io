@@ -201,26 +201,15 @@ A speedup of 2× means speculative decoding finishes the workload in half the ti
 
 The results show several key patterns:
 
-- **Multi-GPU Setting**: The greatest speedups (3.55×) were achieved on the multi-GPU setting (LLaMa 70B).
-This was a surprise, because I thought that the intra-GPU communication overhead would slow down the draft model significantly.
-While this effect might still be present, it does not dominate performance.
-This shows that draft_model is compatible and effective with tensor parallelism > 1.
+- **Multi-GPU Setting**: The greatest speedups (3.55×) were achieved with LLaMa 70B on 2× H100s. Surprisingly, inter-GPU communication overhead doesn't dominate. draft_model works well with tensor parallelism > 1.
 
-- **Batch Size Dependency**: Speedup is maximal for small batch sizes (concurrency 1-4) and decays for larger batch sizes.
-At batch size 128 or larger, speculative decoding becomes slower than vanilla decoding.
-This aligns with research from the speculative decoding literature [@li2025eagle; @tang2025efficientspeculativedecodingllama], which shows that speculative decoding is most effective in the **memory-bound regime** (small batches and thin matrix multiplications).
-In the **compute-bound regime** (large batches and regular matrix multiplications), speculative decoding adds extra compute work to an already saturated system.
+- **Batch Size Dependency**: Speedups peak at small batch sizes (concurrency 1-4) and decay at larger ones. At batch size 128+, speculative decoding becomes slower than vanilla decoding. This aligns with the literature [@li2025eagle; @tang2025efficientspeculativedecodingllama]: speculative decoding helps most in the **memory-bound regime**, but adds overhead in the **compute-bound regime**.
 
-- **Saturation Effect**: Increasing $K$ beyond a certain value does not consistently improve speedups, indicating a saturation point.
-Saturation is reached around 3 or 4 for the Qwen3 family, and around 7 for the LLaMa 70B family.
+- **Saturation Effect**: Increasing $K$ beyond a threshold yields no further gains. Saturation occurs around $K=3$-$4$ for Qwen3 and $K=7$ for LLaMa 70B.
 
-- **Draft Model Size Trade-off**: Within the Qwen3 family, the smaller 1.7B model generally achieves higher speedups than the larger 4B model.
-The 4B model generates better draft tokens (higher acceptance rate @fig-acceptance-lengths-vs-num-spec-toks), but it is also slower, which limits the overall speedup.
+- **Draft Model Size Trade-off**: The smaller 1.7B draft model achieves higher speedups than the 4B, despite the 4B having better acceptance rates (@fig-acceptance-lengths-vs-num-spec-toks). The 4B's slower inference limits its overall speedup.
 
-- **Low $K$ Robustness**:
-In the Qwen3 family, the curve for $K=1$ is interesting.
-It achieves only modest speedups at small batch sizes, but in large batch sizes, it is more robust and speedups don't decay as much as for higher $K$ values.
-The effect is particularly visible in the InstructCoder dataset, with the 1.7B draft model.
+- **Low $K$ Robustness**: In InstructCoder (Qwen3), $K=1$ achieves modest speedups at small batch sizes, but degrades more gracefully at large batch sizes than higher $K$ values.
 
 ### Versus EAGLE-3
 
@@ -338,24 +327,12 @@ I might publish an analysis of long-context performance in the future.
 
 ### When to Use Draft Models vs. EAGLE-3
 
-In theory, EAGLE-3 should achieve higher speedups than draft_model.
-However, my benchmarks show that the higher acceptance lengths of draft_model dominate the speedups, making it a superior choice over EAGLE-3 in 2/3 tested settings.
-
-Advantages of draft_model:
-
-- *No training required*: You can use a smaller model from the same family without training a specialized draft model.
-This is particularly effective when the smaller model is trained by distillation from the larger model, meaning they were explicitly trained to mimic the logits of the larger model.
-- *Better acceptance rates*: Draft models from the same family tend to have higher acceptance lengths, as shown in @fig-acceptance-lengths-vs-num-spec-toks.
-
-Advantages of EAGLE-3:
-
-- *Lower computational overhead*: EAGLE-3's lightweight draft models add minimal overhead, allowing the method to achieve high speedups (assuming good enough acceptance lengths).
-
-My recommendation is to:
-
-* Prefer using draft_model over EAGLE-3 when you have access to a smaller model from the same family and want to get started quickly without training a specialized draft model.
-* If a corresponding EAGLE-3 drafter model already exists on Hugging Face, I still recommend comparing the performance of both methods on your workload, just to be sure.
-* If you want to train your own EAGLE-3 drafter, you can use the vLLM speculators library^[<https://github.com/vllm-project/speculators>].
+My benchmarks show that draft_model outperforms EAGLE-3 in 2 of 3 tested settings, primarily due to higher acceptance lengths (@fig-acceptance-lengths-vs-num-spec-toks).
+**Prefer draft_model** when a smaller model from the same family is available, no training required.
+Distilled models (trained to mimic the larger model's logits) work especially well.
+**Consider EAGLE-3** when a pre-trained EAGLE-3 drafter exists on Hugging Face and you want the lowest possible overhead.
+When in doubt, benchmark both methods on your workload.
+You can also train your own using the vLLM speculators library^[<https://github.com/vllm-project/speculators>].
 
 ## Key Learnings
 
