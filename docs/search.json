@@ -224,6 +224,48 @@
     "text": "Footnotes\n\n\nhttps://huggingface.co/Qwen/Qwen3-32B↩︎\nhttps://huggingface.co/Qwen/Qwen3-1.7B↩︎\nhttps://huggingface.co/Qwen/Qwen3-4B↩︎\nhttps://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3↩︎\nhttps://huggingface.co/meta-llama/Llama-3.3-70B-Instruct↩︎\nhttps://huggingface.co/meta-llama/Llama-3.2-1B↩︎\nhttps://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B↩︎\nhttps://huggingface.co/datasets/philschmid/mt-bench↩︎\nhttps://huggingface.co/datasets/likaixin/InstructCoder↩︎\nOn InstructCoder with LLaMa 70B the KV cache fills up completely at batch size 64, meaning some requests are put to wait. Increasing the batch size beyond doesn’t increase the parallelism, so I only benchmark up to 64 in this case.↩︎\nhttps://github.com/sgl-project/sglang↩︎\nI had not expected AL variation with batch size. Perhaps batch invariance would solve this.↩︎\nhttps://github.com/vllm-project/speculators↩︎\nhttps://docs.vllm.ai/en/stable/design/cuda_graphs/↩︎"
   },
   {
+    "objectID": "posts/09_full-cuda-graphs-spec-decode/index.html",
+    "href": "posts/09_full-cuda-graphs-spec-decode/index.html",
+    "title": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding",
+    "section": "",
+    "text": "In a previous post, I benchmarked speculative decoding with draft models in vLLM V1. This follow-up analyzes the potential performance gains from supporting full CUDA graphs (Full CG) for draft-model speculative decoding. My results suggest that the speedup ratio over vanilla decoding would improve by ~5%, growing from from 2.26× to 2.37 (Qwen3-32B on MT-Bench)."
+  },
+  {
+    "objectID": "posts/09_full-cuda-graphs-spec-decode/index.html#background",
+    "href": "posts/09_full-cuda-graphs-spec-decode/index.html#background",
+    "title": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding",
+    "section": "Background",
+    "text": "Background\nCurrently, vLLM supports two CG modes: Piecewise CG and Full CG. The Full CG mode is typically fastest, but it comes with stricter constraints and isn’t compatible with all execution paths. At the moment, draft models (both EAGLE-3 and draft_model) use Piecewise CG."
+  },
+  {
+    "objectID": "posts/09_full-cuda-graphs-spec-decode/index.html#method",
+    "href": "posts/09_full-cuda-graphs-spec-decode/index.html#method",
+    "title": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding",
+    "section": "Method",
+    "text": "Method\nWhat speedups could we achieve by supporting Full CG for speculative decoding? I measure the similar work under both Piecewise CG and Full CG, and compare the results.\n\nStandalone (Full CG): I disable speculative decoding, run each model (Qwen3-32B and Qwen3-1.7B) separately on a single InstructCoder request with 1000 output tokens, and measure ITL. This estimates the per-token runtime under Full CG.\nWithin speculative decoding (Piecewise CG): I enable speculative decoding (draft_model), run draft + target, and measure ITL while varying the number of speculative tokens (K). Because each additional speculative token triggers one extra draft forward pass, a linear fit of ITL vs K is a good approximation. The regression in Figure 1 can be interpreted as follows:\n\nThe Intercept: the target-model cost inside the SD loop\nThe Slope: the incremental draft-model cost per additional speculative token\n\n\n\n\n\n\n\n\nFigure 1: Regression of ITL over number of speculative tokens. The linear fit is good.\n\n\n\nWith those two measurements, we can compare per-token runtimes across graph modes in Table 1. “SD Runtime” comes from the ITL regression (Piecewise CG, inside SD), and “Standalone Runtime” is the median ITL from vllm bench serve without SD (Full CG). For this setup, the draft model is 9.10% faster under full graphs, while the target model is 2.91% faster.\n\n\n\nTable 1: Table: Speed comparison of Full CG and Piecewise CG.\n\n\n\n\n\n\n\n\n\n\n\nModel\nSD Runtime (Piecewise CG)\nStandalone Runtime (Full CG)\nRuntime Reduction\n\n\n\n\nQwen3-1.7B\n2.50 ms\n2.27 ms\n9.10 %\n\n\nQwen3-32B\n24.36 ms\n23.65 ms\n2.91 %"
+  },
+  {
+    "objectID": "posts/09_full-cuda-graphs-spec-decode/index.html#forecasted-end-to-end-impact",
+    "href": "posts/09_full-cuda-graphs-spec-decode/index.html#forecasted-end-to-end-impact",
+    "title": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding",
+    "section": "Forecasted End-to-end Impact",
+    "text": "Forecasted End-to-end Impact\nAssuming we could realize those per-token reductions inside speculative decoding, what does that translate to in terms of TPOT? I use the formula below to forecast the speedups for full CUDA graphs. \\[\n\\text{TPOT} = \\frac{\\text{ITL}}{\\text{AL}} = \\frac{T_{d} \\cdot K + T_{t}}{\\text{AL}}\n\\]\nwhere \\(T_{d}\\) is the runtime of the draft model, \\(T_{t}\\) is the runtime of the target model, \\(K\\) is the number of speculative tokens, and \\(\\text{AL}\\) is the acceptance length. Figure 2 shows the TPOT values under Piecewise CG (Current), and Full CG (Expected). The minimum (best) TPOT values for each curve are marked with a cross. At \\(K=5\\)1, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement). The speedup ratios over vanilla decoding grow from 2.26× to 2.37× for Qwen3-32B (1.7B drafter) on MT-Bench.\n\n\n\n\n\n\nFigure 2: TPOT Comparison between Piecewise CG and Full CG (forecast)."
+  },
+  {
+    "objectID": "posts/09_full-cuda-graphs-spec-decode/index.html#summary",
+    "href": "posts/09_full-cuda-graphs-spec-decode/index.html#summary",
+    "title": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding",
+    "section": "Summary",
+    "text": "Summary\nSupporting Full CG for speculative decoding could improve speedup ratios by ~5% from 2.26× to 2.37× over vanilla decoding. When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains. Nevertheless, this improvement would positively impact the performance of draft_model across all workloads. The same method could be applied to estimate the performance gains for other combinations of draft, target models, and datasets."
+  },
+  {
+    "objectID": "posts/09_full-cuda-graphs-spec-decode/index.html#footnotes",
+    "href": "posts/09_full-cuda-graphs-spec-decode/index.html#footnotes",
+    "title": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding",
+    "section": "Footnotes",
+    "text": "Footnotes\n\n\nIn this experiment, I used only a single request from the InstructCoder dataset, with --output-len=1000. The best TPOT values were achieved at \\(K=5\\) rather than the \\(K=4\\) for the larger benchmark, but the TPOT differences are insignificant. The code for this analysis is available on Github↩︎"
+  },
+  {
     "objectID": "posts/08_cpu_gpu_synchronization/index.html",
     "href": "posts/08_cpu_gpu_synchronization/index.html",
     "title": "PyTorch and CPU-GPU Synchronizations",
@@ -263,6 +305,6 @@
     "href": "index.html",
     "title": "Posts",
     "section": "",
-    "text": "Up to 3.55x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1\n\n\nBenchmarks and Key Learnings\n\n\n\nvLLM\n\n\nPyTorch\n\n\nTriton\n\n\nTransformers\n\n\n\n\n\n\n\n\n\nJan 28, 2026\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nPyTorch and CPU-GPU Synchronizations\n\n\nWriting Fast PyTorch Code\n\n\n\nGPUs\n\n\nPyTorch\n\n\nTriton\n\n\n\n\n\n\n\n\n\nJan 7, 2026\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nA Guide to Classify 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine\n\n\n\n\n\n\nGPUs\n\n\nvLLM\n\n\nTransformers\n\n\n\n\n\n\n\n\n\nSep 22, 2025\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nDrilling Down into Multimodal Attention\n\n\n\n\n\n\nTransformers\n\n\nAttention\n\n\n\n\n\n\n\n\n\nFeb 1, 2025\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nHow Does Tiling Speed Up Matrix Multiplications on GPUs?\n\n\n\n\n\n\nMathematics\n\n\nGPUs\n\n\n\n\n\n\n\n\n\nDec 23, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nGrokking an Inner Product Inequality With Python on WebAssembly\n\n\n\n\n\n\nMathematics\n\n\nPython\n\n\n\n\n\n\n\n\n\nSep 12, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nA Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification\n\n\n\n\n\n\nMachine Learning\n\n\n\n\n\n\n\n\n\nAug 2, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\nNo matching items"
+    "text": "Forecasting the Performance of Full CUDA Graphs for Speculative Decoding\n\n\nEstimating Speedups from Piecewise to Full CUDA Graphs\n\n\n\nvLLM\n\n\nCUDA\n\n\nPerformance\n\n\n\n\n\n\n\n\n\nJan 29, 2026\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nUp to 3.55x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1\n\n\nBenchmarks and Key Learnings\n\n\n\nvLLM\n\n\nPyTorch\n\n\nTriton\n\n\nTransformers\n\n\n\n\n\n\n\n\n\nJan 28, 2026\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nPyTorch and CPU-GPU Synchronizations\n\n\nWriting Fast PyTorch Code\n\n\n\nGPUs\n\n\nPyTorch\n\n\nTriton\n\n\n\n\n\n\n\n\n\nJan 7, 2026\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nA Guide to Classify 35,000 Videos with a 72B Multimodal LLM on the vLLM Engine\n\n\n\n\n\n\nGPUs\n\n\nvLLM\n\n\nTransformers\n\n\n\n\n\n\n\n\n\nSep 22, 2025\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nDrilling Down into Multimodal Attention\n\n\n\n\n\n\nTransformers\n\n\nAttention\n\n\n\n\n\n\n\n\n\nFeb 1, 2025\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nHow Does Tiling Speed Up Matrix Multiplications on GPUs?\n\n\n\n\n\n\nMathematics\n\n\nGPUs\n\n\n\n\n\n\n\n\n\nDec 23, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nGrokking an Inner Product Inequality With Python on WebAssembly\n\n\n\n\n\n\nMathematics\n\n\nPython\n\n\n\n\n\n\n\n\n\nSep 12, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\n\n\n\n\n\n\nA Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification\n\n\n\n\n\n\nMachine Learning\n\n\n\n\n\n\n\n\n\nAug 2, 2024\n\n\nTomas Ruiz\n\n\n\n\n\n\nNo matching items"
   }
 ]
