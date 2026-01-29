@@ -5,55 +5,55 @@ author:
   - name: Tomas Ruiz
     email: t.ruiz@lmu.de
     affiliations: Ludwig-Maximilians-Universität München
-date: "2026-01-28"
+date: "2026-01-29"
 categories: [vLLM, CUDA, Performance]
 format:
   html:
     toc: true
 editor:
     render-on-save: true
-draft: true
+# draft: true
 ---
 
 In a [previous post](../06_vllm-spec-decode/index.qmd), I benchmarked speculative decoding with draft models in vLLM V1.
-This follow-up analyzes the potential performance gains from supporting full CUDA graphs for draft-model speculative decoding.
-My results suggest that the speedup ratio over vanilla decoding would improve by ~5%, growing from **from 2.26× to 2.37×**.
+This follow-up analyzes the potential performance gains from supporting full CUDA graphs (Full CG) for draft-model speculative decoding.
+My results suggest that the speedup ratio over vanilla decoding would **improve by ~5%**, growing from from 2.26× to 2.37 (Qwen3-32B on MT-Bench).
 
 ## Background
 
-Currently, vLLM supports two CUDA graph modes: `piecewise` and `full`.
-The `full` mode is typically fastest, but it comes with stricter constraints and isn't compatible with all execution paths.
-At the moment, draft models (both EAGLE-3 and `draft_model`) use `piecewise`.
-In this post, I estimate the end-to-end speedups we could achieve by supporting `full` CUDA graphs for draft-model speculative decoding.
+Currently, vLLM supports two CG modes: **Piecewise CG** and **Full CG**.
+The Full CG mode is typically fastest, but it comes with stricter constraints and isn't compatible with all execution paths.
+At the moment, draft models (both EAGLE-3 and draft_model) use Piecewise CG.
 
 ## Method
 
-I break the question into two measurements:
+What speedups could we achieve by supporting Full CG for speculative decoding?
+I measure the similar work under both Piecewise CG and Full CG, and compare the results.
 
-1. **Standalone (full CUDA graphs):**
+1. **Standalone (Full CG):**
    I disable speculative decoding, run each model (Qwen3-32B and Qwen3-1.7B) separately on a single InstructCoder request with 1000 output tokens, and measure ITL.
-   This estimates the per-token runtime under full graphs.
+   This estimates the per-token runtime under Full CG.
 
-2. **Within speculative decoding (piecewise CUDA graphs):**
+2. **Within speculative decoding (Piecewise CG):**
    I enable speculative decoding (`draft_model`), run draft + target, and measure ITL while varying the number of speculative tokens \(K\).
    Because each additional speculative token triggers one extra draft forward pass, a linear fit of ITL vs K is a good approximation.
    The regression in @fig-itl-vs-num-spec-toks can be interpreted as follows:
 
-   - *The Intercept*: the target-model cost inside the SD loop (piecewise).
-   - *The Slope*: the incremental draft-model cost per additional speculative token (piecewise).
+   - *The Intercept*: the target-model cost inside the SD loop
+   - *The Slope*: the incremental draft-model cost per additional speculative token
 
 ![Regression of ITL over number of speculative tokens. The linear fit is good.](imgs/itl_k_comparison.png){width="50%" text-align="left" fig-alt="Regression of ITL over number of speculative tokens." #fig-itl-vs-num-spec-toks}
 
 With those two measurements, we can compare per-token runtimes across graph modes in @tbl-speed-comparison-full-vs-piecewise.
-"SD Runtime" comes from the ITL regression (piecewise, inside SD), and "Standalone Runtime" is the median ITL from `vllm bench serve` without SD (full graphs).
+"SD Runtime" comes from the ITL regression (Piecewise CG, inside SD), and "Standalone Runtime" is the median ITL from `vllm bench serve` without SD (Full CG).
 For this setup, the draft model is **9.10% faster** under full graphs, while the target model is **2.91% faster**.
 
-| Model        | SD Runtime (piecewise CG) | Standalone Runtime (full CG) | Runtime Reduction |
+| Model        | SD Runtime (Piecewise CG) | Standalone Runtime (Full CG) | Runtime Reduction |
 |--------------|------------------|----------------|----------------|
 | Qwen3-1.7B  | 2.50 ms | 2.27 ms | 9.10 % |
 | Qwen3-32B   | 24.36 ms | 23.65 ms | 2.91 % |  
 
-:Table: Speed comparison of full and piecewise CUDA graphs. {#tbl-speed-comparison-full-vs-piecewise}
+:Table: Speed comparison of Full CG and Piecewise CG. {#tbl-speed-comparison-full-vs-piecewise}
 
 ## Forecasted End-to-end Impact
 
@@ -64,24 +64,19 @@ $$
 $$
 
 where $T_{d}$ is the runtime of the draft model, $T_{t}$ is the runtime of the target model, $K$ is the number of speculative tokens, and $\text{AL}$ is the acceptance length.
-@fig-tpot-comparison-full-vs-piecewise shows the TPOT values under piecewise CUDA graphs (Current), and full CUDA graphs (Expected).
+@fig-tpot-comparison-full-vs-piecewise shows the TPOT values under Piecewise CG (Current), and Full CG (Expected).
 The minimum (best) TPOT values for each curve are marked with a cross.
-At $K=5$, the TPOT improves from 10.43ms to 9.91ms (4.9% improvement).
-**The speedup ratios over vanilla decoding grow from 2.26× to 2.37×.**
-When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains.
-Nevertheless, this improvement would positively impact the performance of draft_model across all workloads.
-
-![TPOT Comparison between piecewise and full CUDA graphs (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
-
-::: {.callout-note}
-In this experiment, I used only a single request from the InstructCoder dataset, with `--output-len=1000`.
+At $K=5$^[In this experiment, I used only a single request from the InstructCoder dataset, with `--output-len=1000`.
 The best TPOT values were achieved at $K=5$ rather than the $K=4$ for the larger benchmark,
 but the TPOT differences are insignificant.
-The code for this analysis is available on [Github](https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb)
-:::
+The code for this analysis is available on [Github](https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb)], the TPOT improves from 10.43ms to 9.91ms **(4.9% improvement)**.
+The speedup ratios over vanilla decoding grow from 2.26× to 2.37× for Qwen3-32B (1.7B drafter) on MT-Bench.
+
+![TPOT Comparison between Piecewise CG and Full CG (forecast).](imgs/tpot_k_comparison.png){width="50%" text-align="left" fig-alt="TPOT calculation" #fig-tpot-comparison-full-vs-piecewise}
 
 ## Summary
 
-Supporting full CUDA graphs for speculative decoding could improve speedup ratios from 2.26× to 2.37× over vanilla decoding—a modest but meaningful gain.
-The improvement is limited because the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT improvements.
-The same method could be applied to estimate the performance gains for other combinations of draft and target models.
+Supporting Full CG for speculative decoding could improve speedup ratios by ~5% from 2.26× to 2.37× over vanilla decoding.
+When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains.
+Nevertheless, this improvement would positively impact the performance of draft_model across all workloads.
+The same method could be applied to estimate the performance gains for other combinations of draft, target models, and datasets.
