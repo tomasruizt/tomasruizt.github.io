@@ -1,0 +1,12 @@
+**New post: PyTorch and CPU–GPU Synchronizations (Writing Fast PyTorch Code) 🚀**
+
+PyTorch GPU execution is mostly asynchronous. Performance issues often come from implicit CPU-GPU synchronizations: In this case, the CPU becomes blocked and stops scheduling new PyTorch operations for the GPU.
+
+In this post I cover:
+* What syncs look like in Nsight Systems: long CPU-side CUDA API calls like `cudaStreamSynchronize`, or blocking device-to-host transfers.
+* Subtle sync triggers in real code: Dynamic-shape patterns where output sizes depend on GPU data (e.g. boolean indexing / data-dependent slicing).
+* How to unit test for syncs: `torch.cuda.set_sync_debug_mode()` to surface sync points as warnings/errors in tests.
+
+Post: https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/
+
+#PyTorch #CUDA #performance #nsight #GPUs
