@@ -291,6 +291,15 @@ $endif$
 	}
 }
 
+\newcommand{\cvsidebarsection}[1] {
+	\vspace{6pt}
+	\settowidth{\barw}{\textbf{\large #1}}
+	\cvtext{
+		\textbf{\large{\textcolor{darkcol}{#1}}}\\[-4pt]
+		\textcolor{accentcol}{ \rule{\barw}{1.5pt} } \\
+	}
+}
+
 \newcommand{\cvsubsection}[1] {
 	\vspace{14pt}
 	\settowidth{\barw}{\textbf{\Large #1}}
@@ -466,8 +475,8 @@ $endif$
 
 
 % LEBENSLAUF HIERE
-\AtBeginShipoutFirst{\Header{CV}\Footer{1}}
-\AtBeginShipout{\AtBeginShipoutAddToBox{\Header{CV}\Footer{2}}}
+\AtBeginShipoutFirst{\Header{Resume}\Footer{1}}
+\AtBeginShipout{\AtBeginShipoutAddToBox{\Header{Resume}\Footer{2}}}
 
 \newpage
 
@@ -497,7 +506,7 @@ $endif$
 
 		$for(sidebar.sections)$
 
-		\cvsection{$sidebar.sections.name$}
+		\cvsidebarsection{$sidebar.sections.name$}
 
 		$for(sidebar.sections.items)$
 		$if(sidebar.sections.items.exp)$
