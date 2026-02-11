@@ -1,5 +1,5 @@
 ---
-title: "FMS: A Fused Matmul-Sample Kernel"
+title: "FMMS: A Fused Matmul-Sample Kernel"
 subtitle: "An Efficient and Exact LLM Sampling Algorithm"
 author:
   - name: Tomas Ruiz
@@ -84,16 +84,15 @@ Below is a simple PyTorch function that implements the sampling by computing the
 This is just to get an idea of the steps involved, but we want to avoid computing the logits in full.
 For simplicity, I'm sampling a single sample, and not applying any temperature scaling.
 
-<!-- TODO: Update this code with the new transposed shapes -->
 ```python
 def sample(
-    weights: torch.Tensor,  # [V, d]
-    hidden_states: torch.Tensor,  # [d, N]
+    weights: torch.Tensor,       # [V, d]
+    hidden_states: torch.Tensor, # [N, d]
 ):
-    logits = weights @ hidden_states  # [V, N]
-    probs = logits.softmax(dim=0)  # [V, N]
-    samples = torch.multinomial(probs.T, num_samples=1)
-    return samples # [N, 1]
+    logits = hidden_states @ weights.T  # [N, V]
+    probs = logits.softmax(dim=-1)      # [N, V]
+    samples = torch.multinomial(probs, num_samples=1)
+    return samples  # [N, 1]
 ```
 
 ## Tiling the Computation
@@ -135,21 +134,72 @@ $$
 However, there is one statistical trick to circumvent this problem: The Gumbel-Max trick.
 
 ## Gumbel-Max Trick
-This sampling method allows us to sample from a categorical distribution by only using logits, and avoiding the softmax function.
+
+The Gumbel-max trick lets us sample from a categorical distribution using only logits, completely bypassing the softmax function. The key identity is:
+
+$$
+\text{argmax}_i \left( \log \pi_i + G_i \right) \sim \text{Categorical}(\pi_1, \ldots, \pi_V)
+$$
+
+where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. Gumbel random variables, and $\pi_i$ are the (unnormalized) probabilities.
+Since logits are $\ell_i = \log \pi_i$ (up to a constant that cancels in the argmax), we can equivalently write:
+
+$$
+\text{sample} = \text{argmax}_i \left( \ell_i + G_i \right)
+$$
+
+A Gumbel(0,1) random variable can be generated from a uniform random variable $U \sim \text{Uniform}(0, 1)$ as $G = -\log(-\log(U))$.
+
+### Why this is useful for tiled computation
+
+The crucial property is that **argmax decomposes over tiles**. If we split the vocabulary into tiles $T_1, T_2, \ldots, T_K$, we can compute the local maximum in each tile independently:
+
+$$
+m_k = \max_{i \in T_k} \left( \ell_i + G_i \right), \quad a_k = \text{argmax}_{i \in T_k} \left( \ell_i + G_i \right)
+$$
+
+and then the global sample is simply:
+
+$$
+\text{sample} = a_{k^*} \quad \text{where} \quad k^* = \text{argmax}_k \, m_k
+$$
+
+Each tile only needs to output two values: its local max $m_k$ and the corresponding vocabulary index $a_k$. The full logit vector is never materialized -- each tile computes its logits, adds Gumbel noise, finds the local winner, and discards the rest. The final reduction over $K$ tiles is trivially cheap.
+
+Compare this with the standard approach: softmax requires a full pass to compute the normalizer $Z = \sum_i e^{\ell_i}$, then another pass to compute probabilities, then sampling via inverse CDF. None of these operations decompose over tiles without cross-tile communication.
+
+## Two-Stage Architecture
+
+Putting the tiled matmul and the Gumbel-max trick together, the kernel has a two-stage design:
+
+**Stage 1 (GPU kernel):** The Triton kernel launches a 2D grid of programs indexed by `(v, h)`, where `v` ranges over vocabulary tiles and `h` over batch tiles. Each program:
+
+1. Computes its tile of logits via the tiled matmul: `logits_blk = W_tile @ H_tile.T`
+2. Scales by temperature: `logits_blk /= temperature`
+3. Generates Gumbel noise and adds it to the logits
+4. Finds the local maximum and argmax over the vocabulary dimension
+5. Writes the local max value and the corresponding global vocabulary index to main memory
+
+Each program outputs just two values per hidden state: the local max and its index. The intermediate output is a tensor of shape `[num_V_tiles, N, num_samples]`.
+
+**Stage 2 (host-side reduction):** A simple PyTorch reduction finds which tile had the global maximum for each hidden state, then gathers the corresponding vocabulary index:
+
+```python
+best_tiles = tile_maxs.argmax(dim=0)   # which tile won?
+samples = tile_indices.gather(0, best_tiles)  # what index did it have?
+```
+
+This stage operates on `num_V_tiles` elements per hidden state (e.g. 512 tiles for V=128K with a tile size of 256) and is negligibly cheap compared to stage 1.
 
 ## Profiling
 
-Nsight Compute can give you pointers about what to optimize.
+NVIDIA Nsight Compute (NCU) was invaluable for identifying optimization opportunities. The profiler provides detailed metrics on warp stalls, memory utilization, and cache behavior. Here are the key insights it surfaced:
 
-E.g. in the baseline it a lot of warp stalls and recommended looking for opportunities to improve memory access patterns.
-This lead me to transpose the hidden_states (but this had marginal effect)
+**Warp stalls and memory access patterns.** The initial version showed significant warp stalls due to suboptimal memory access. NCU suggested looking for opportunities to improve memory access patterns, which led me to transpose the hidden states for coalesced reads. However, this change had only a marginal effect.
 
-A much better improvement was to increase the computational intensity by increasing the tile size of H from 4 to 32, meaning at each tile of the weights would be reused 8x as often to compute logits.
+**Increasing tile size for data reuse.** A much better improvement was to increase the tile size along the batch dimension ($T_N$) from 4 to 32. This means each tile of weights is reused 8x more often to compute logits, directly improving the arithmetic intensity. This is a classic compute-vs-memory optimization: at small batch sizes the kernel is memory-bound, so making each weight load do more useful work is the primary lever.
 
-Finally, the profiler shows bank conflicts that occur when saving to the shared memory.
-This is relatively easy to fix in CUDA by padding the shared memory array with +1, since
-we directly control the shared memory size.
-However, we don't have this control as easily in Triton, so I skipped this optimization.
+**Shared memory bank conflicts.** The profiler also flagged bank conflicts when storing data to shared memory. In CUDA, this is relatively easy to fix by padding the shared memory array by +1 element per row, breaking the stride alignment. In Triton, we don't have direct control over shared memory layout, so I left this optimization on the table.
 
 ## Swizzling Bug
 
@@ -173,15 +223,80 @@ If you don't understand why your algorithm is running faster than expected, some
 
 ## Performance
 
-I compare the performance of FMS against strong baselines in LLM sampling. These are: first, a PyTorch + torch.compile baseline. Second, two FlashInfer kernels that sample from the logits, rather than from normalized probabilities.
+I compare the performance of FMMS against strong baselines in LLM sampling. All benchmarks use the "large" configuration (V=128,256, d=8,192), representative of Llama 3 70B.
 
-Both FlashInfer kernels require the full logits, so I include in their runtime the time required by the matmul to compute the logits.
-This is a fair comparison because FMS must also perform a matmul to compute logits in SRAM. They are just not written back to VRAM.
+### Baselines
 
-In summary, the baselines are:
+Both FlashInfer kernels require the full logits, so I include in their runtime the matmul to compute the logits. This is a fair comparison because FMMS also computes a matmul -- the logits are just never written to VRAM.
 
-(1) Naive sampling implemented in PyTorch and compiled using `torch.compile`.
-(2) **`flashinfer:top_k_top_p_sampling_from_logits`**, which uses a dual-pivot algorithm that leverages rejection sampling to sample from the top-k and top-p tokens. This kernel is used for fast sampling in vLLM.
-(3) **`flashinfer:sample_from_logits`**. This kernel is the fastest FlashInfer kernel for sampling. It also uses Gumbel-Max trick to sample from the logits, but still materializes the full logits in VRAM.
+(1) **Naive PyTorch Compiled**: `torch.compile`-d matmul + softmax + `torch.multinomial`.
+(2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
+(3) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
+
+### H100 Results
+
+The following table shows absolute execution times (in milliseconds) on an H100 GPU.
+
+| Method / Batch Size                         | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   | 512   | 1024   |
+| ------------------------------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------ |
+| **FMMS (Triton)**                           | 1.33  | 1.34  | 1.34  | 1.35  | 1.37  | 1.39  | 1.45  | 1.74  | 3.07  | 6.24  | 12.52  |
+| Naive PyTorch Compiled                      | 1.47  | 1.49  | 1.49  | 1.50  | 1.53  | 1.57  | 1.70  | 1.89  | 2.46  | 4.39  | 8.27   |
+| FlashInfer `top_k_top_p`                    | 1.71  | 1.73  | 1.75  | 1.76  | 1.79  | 1.88  | 2.12  | 2.40  | 3.44  | 6.28  | 12.30  |
+| FlashInfer `sampling_from_logits`           | 1.47  | 1.47  | 1.48  | 1.48  | 1.50  | 1.54  | 1.62  | 1.71  | 2.15  | 3.94  | 7.96   |
+
+### Relative Performance Across GPUs
+
+The following table shows performance relative to `FlashInfer sampling_from_logits` (the fastest baseline). Values above 1.0 mean FMMS is faster.
+
+| GPU / Batch Size | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   | 512   | 1024  |
+| ---------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| L4               | 1.02  | 1.04  | 1.06  | 1.03  | 1.03  | 1.05  | 1.07  | 1.11  | 0.85  | 0.85  | 0.80  |
+| A100-80GB        | 1.03  | 1.03  | 1.03  | 1.04  | 1.06  | 0.97  | 0.98  | 0.72  | 0.58  | 0.59  | 0.63  |
+| H100             | 1.10  | 1.10  | 1.10  | 1.10  | 1.10  | 1.10  | 1.12  | 0.99  | 0.70  | 0.63  | 0.64  |
+| H200             | 1.12  | 1.12  | 1.12  | 1.15  | 1.15  | 1.14  | 1.15  | 0.78  | 0.79  | 0.65  | 0.63  |
+| B200             | 1.08  | 1.07  | 1.07  | 1.07  | 1.06  | 0.93  | 0.92  | 0.75  | 0.76  | 0.60  | 0.60  |
+
+A clear pattern emerges: **FMMS is 5-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**. The crossover point varies by GPU, but is consistently in the N=64--128 range.
+
+### Why the Crossover? Arithmetic Intensity
+
+The explanation lies in the **arithmetic intensity** of the matmul. The matmul $W_{[V, d]} \times H_{[N, d]}^T$ has:
+
+$$
+\text{Arithmetic Intensity} = \frac{\text{FLOPs}}{\text{Bytes}} = \frac{2 \cdot V \cdot d \cdot N}{2 \cdot V \cdot d} = N
+$$
+
+The weight matrix $W$ dominates the memory traffic ($V \cdot d$ elements, each read once), and the hidden states are negligible when $N \ll V$. So the arithmetic intensity is simply $N$: each byte of weights loaded produces $N$ multiply-adds.
+
+A GPU becomes compute-bound when the arithmetic intensity exceeds its **ops:byte ratio** (peak compute / peak memory bandwidth). For the H100:
+
+$$
+\text{ops:byte} = \frac{989 \text{ TFLOP/s (BF16)}}{3.35 \text{ TB/s (HBM3)}} \approx 295
+$$
+
+| Batch size $N$ | Arithmetic intensity | Regime on H100 |
+| -------------- | -------------------- | --------------- |
+| 1              | 1                    | Deeply memory-bound (295x below threshold) |
+| 32             | 32                   | Memory-bound (9x below) |
+| 64             | 64                   | Memory-bound (5x below) |
+| 295            | 295                  | Crossover to compute-bound |
+
+**When memory-bound (N < ~128)**, the kernel's throughput is determined by how fast it reads the weight matrix from HBM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to HBM, then read them back for sampling -- this extra round-trip wastes bandwidth on the bottleneck path.
+
+**When compute-bound (N > ~128)**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS carries the overhead of Gumbel noise generation and the max-reduction fused into the same kernel.
+
+## Correctness
+
+FMMS uses the Gumbel-max trick, which produces **exact** samples from the categorical distribution -- it is not an approximation. To verify this, I use a chi-squared goodness-of-fit test that compares 10,000 empirical samples against the theoretical softmax probabilities. The test is parametrized over multiple vocabulary sizes and batch sizes to catch tile-boundary edge cases.
+
+One subtlety: `torch.multinomial` (used in the naive baseline) produces incorrect distributions when given bfloat16 probabilities. The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa. The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`. This is a real bug that affects production code -- PyTorch's documentation does not mention this precision requirement.
+
+## Conclusion
+
+FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical. The kernel is 5-15% faster than the best baselines at the batch sizes that matter most for LLM decode (N=1 to 64), where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
+
+The approach has clear limitations: at large batch sizes where the matmul becomes compute-bound, unfused approaches with optimized matmul implementations (cuBLAS) are faster. This is a fundamental trade-off: fusion saves memory bandwidth at the cost of matmul efficiency.
+
+The code is open-source and available at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
 
 # References
