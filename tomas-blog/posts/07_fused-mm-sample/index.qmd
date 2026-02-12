@@ -237,26 +237,28 @@ Both FlashInfer kernels require the full logits, so I include in their runtime t
 
 The following table shows absolute execution times (in milliseconds) on an H100 GPU.
 
-| Method / Batch Size                         | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   | 512   | 1024   |
-| ------------------------------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ------ |
-| **FMMS (Triton)**                           | 1.33  | 1.34  | 1.34  | 1.35  | 1.37  | 1.39  | 1.45  | 1.74  | 3.07  | 6.24  | 12.52  |
-| Naive PyTorch Compiled                      | 1.47  | 1.49  | 1.49  | 1.50  | 1.53  | 1.57  | 1.70  | 1.89  | 2.46  | 4.39  | 8.27   |
-| FlashInfer `top_k_top_p`                    | 1.71  | 1.73  | 1.75  | 1.76  | 1.79  | 1.88  | 2.12  | 2.40  | 3.44  | 6.28  | 12.30  |
-| FlashInfer `sampling_from_logits`           | 1.47  | 1.47  | 1.48  | 1.48  | 1.50  | 1.54  | 1.62  | 1.71  | 2.15  | 3.94  | 7.96   |
+| Method / Batch Size                         | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   |
+| ------------------------------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| **FMMS (Triton)**                           | 0.709 | 0.711 | 0.719 | 0.722 | 0.730 | 0.744 | 0.781 | 0.960 | 1.550 |
+| Naive PyTorch Compiled                      | 0.864 | 0.859 | 0.861 | 0.866 | 0.877 | 0.903 | 0.993 | 1.120 | 1.402 |
+| FlashInfer `top_k_top_p`                    | 0.851 | 0.857 | 0.857 | 0.860 | 0.873 | 0.882 | 0.930 | 0.993 | 1.268 |
+| FlashInfer `sampling_from_logits`           | 0.803 | 0.803 | 0.804 | 0.806 | 0.811 | 0.821 | 0.862 | 0.897 | 1.086 |
+
+*All benchmarks: PyTorch 2.10.0, CUDA 13.0, run on Modal. Data as of 2026-02-11.*
 
 ### Relative Performance Across GPUs
 
 The following table shows performance relative to `FlashInfer sampling_from_logits` (the fastest baseline). Values above 1.0 mean FMMS is faster.
 
-| GPU / Batch Size | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   | 512   | 1024  |
-| ---------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| L4               | 1.02  | 1.04  | 1.06  | 1.03  | 1.03  | 1.05  | 1.07  | 1.11  | 0.85  | 0.85  | 0.80  |
-| A100-80GB        | 1.03  | 1.03  | 1.03  | 1.04  | 1.06  | 0.97  | 0.98  | 0.72  | 0.58  | 0.59  | 0.63  |
-| H100             | 1.10  | 1.10  | 1.10  | 1.10  | 1.10  | 1.10  | 1.12  | 0.99  | 0.70  | 0.63  | 0.64  |
-| H200             | 1.12  | 1.12  | 1.12  | 1.15  | 1.15  | 1.14  | 1.15  | 0.78  | 0.79  | 0.65  | 0.63  |
-| B200             | 1.08  | 1.07  | 1.07  | 1.07  | 1.06  | 0.93  | 0.92  | 0.75  | 0.76  | 0.60  | 0.60  |
+| GPU / Batch Size | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   |
+| ---------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| A100-80GB        | 1.119 | 1.037 | 1.033 | 1.038 | 1.047 | 1.106 | 1.097 | 0.814 | 0.714 |
+| H100             | 1.134 | 1.129 | 1.118 | 1.117 | 1.111 | 1.103 | 1.104 | 0.934 | 0.700 |
+| H200             | 1.103 | 1.100 | 1.083 | 1.083 | 1.080 | 1.092 | 1.075 | 0.724 | 0.622 |
+| B200             | 1.151 | 1.147 | 1.082 | 1.069 | 1.063 | 1.054 | 1.024 | 0.736 | 0.572 |
+| B300             | 1.143 | 1.141 | 1.079 | 1.079 | 1.073 | 1.069 | 1.035 | 0.746 | 0.553 |
 
-A clear pattern emerges: **FMMS is 5-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**. The crossover point varies by GPU, but is consistently in the N=64--128 range.
+A clear pattern emerges: **FMMS is 3-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**. The crossover point varies by GPU, but is consistently in the N=64--128 range.
 
 ### Why the Crossover? Arithmetic Intensity
 
@@ -293,7 +295,7 @@ One subtlety: `torch.multinomial` (used in the naive baseline) produces incorrec
 
 ## Conclusion
 
-FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical. The kernel is 5-15% faster than the best baselines at the batch sizes that matter most for LLM decode (N=1 to 64), where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
+FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical. The kernel is 3-15% faster than the best baselines at the batch sizes that matter most for LLM decode (N=1 to 64), where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
 
 The approach has clear limitations: at large batch sizes where the matmul becomes compute-bound, unfused approaches with optimized matmul implementations (cuBLAS) are faster. This is a fundamental trade-off: fusion saves memory bandwidth at the cost of matmul efficiency.
 
