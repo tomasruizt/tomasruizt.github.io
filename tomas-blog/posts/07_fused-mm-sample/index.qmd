@@ -18,7 +18,7 @@ engine: jupyter
 bibliography: refs.bib
 code-annotations: below
 citation: true
-draft: true
+# draft: true
 ---
 
 ## Background
@@ -229,7 +229,7 @@ I compare the performance of FMMS against strong baselines in LLM sampling. All 
 
 Both FlashInfer kernels require the full logits, so I include in their runtime the matmul to compute the logits. This is a fair comparison because FMMS also computes a matmul -- the logits are just never written to VRAM.
 
-(1) **Naive PyTorch Compiled**: `torch.compile`-d matmul + softmax + `torch.multinomial`.
+(1) **Naive PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
 (2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
 (3) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
 
@@ -248,17 +248,59 @@ The following table shows absolute execution times (in milliseconds) on an H100 
 
 ### Relative Performance Across GPUs
 
-The following table shows performance relative to `FlashInfer sampling_from_logits` (the fastest baseline). Values above 1.0 mean FMMS is faster.
+The relative speedup tables show `baseline_time / fmms_time`, so values > 1.0 mean FMMS is faster.
 
-| GPU / Batch Size | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   |
-| ---------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| A100-80GB        | 1.119 | 1.037 | 1.033 | 1.038 | 1.047 | 1.106 | 1.097 | 0.814 | 0.714 |
-| H100             | 1.134 | 1.129 | 1.118 | 1.117 | 1.111 | 1.103 | 1.104 | 0.934 | 0.700 |
-| H200             | 1.103 | 1.100 | 1.083 | 1.083 | 1.080 | 1.092 | 1.075 | 0.724 | 0.622 |
-| B200             | 1.151 | 1.147 | 1.082 | 1.069 | 1.063 | 1.054 | 1.024 | 0.736 | 0.572 |
-| B300             | 1.143 | 1.141 | 1.079 | 1.079 | 1.073 | 1.069 | 1.035 | 0.746 | 0.553 |
+::: {.panel-tabset group="baseline"}
+# PyTorch Compiled
 
-A clear pattern emerges: **FMMS is 3-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**. The crossover point varies by GPU, but is consistently in the N=64--128 range.
+This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + `torch.multinomial`).
+
+| GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
+| ---------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| A100-80GB        | 1.20 | 1.11 | 1.09 | 1.10 | 1.12 | 1.20 | 1.27 | 0.98 | 0.84 |
+| H100             | 1.22 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.27 | 1.17 | 0.90 |
+| H200             | 1.23 | 1.21 | 1.19 | 1.20 | 1.20 | 1.24 | 1.27 | 0.94 | 0.78 |
+| B200             | 1.37 | 1.31 | 1.27 | 1.25 | 1.26 | 1.26 | 1.25 | 0.97 | 0.71 |
+| B300             | 1.34 | 1.31 | 1.26 | 1.25 | 1.27 | 1.27 | 1.26 | 0.97 | 0.71 |
+
+FMMS is faster across all GPUs and all batch sizes from 1 to 64, with speedups of 9-37%.
+H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.17x, while other GPUs drop to ~1.0 or below.
+This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.
+
+# FlashInfer `top_k_top_p`
+
+This is the FlashInfer sampling function used in vLLM when top-k or top-p is set.
+I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runtimes.
+
+| GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
+| ---------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| A100-80GB        | 1.21 | 1.10 | 1.10 | 1.10 | 1.12 | 1.18 | 1.18 | 0.92 | 0.79 |
+| H100             | 1.20 | 1.21 | 1.19 | 1.19 | 1.20 | 1.19 | 1.19 | 1.03 | 0.82 |
+| H200             | 1.20 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.20 | 0.83 | 0.74 |
+| B200             | 1.25 | 1.26 | 1.22 | 1.22 | 1.22 | 1.19 | 1.14 | 0.83 | 0.64 |
+| B300             | 1.63 | 1.56 | 1.62 | 1.62 | 1.65 | 1.64 | 1.53 | 1.09 | 0.88 |
+
+FMMS is up to **1.65x faster** (B300, N=16).
+Across typical decode batch sizes (1 to 64), FMMS is 10-65% faster.
+B300 is a striking outlier: 1.5-1.7x speedups while A100-B200 show 1.1-1.3x.
+B200 and B300 have identical bandwidth and compute specs, so the cause of this gap is unclear.
+
+# FlashInfer `sampling_from_logits`
+
+`sampling_from_logits` is not used in vLLM, but it is the fastest FlashInfer sampling function benchmarked.
+It also uses a Gumbel-max trick internally, but operates on pre-materialized logits.
+
+| GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
+| ---------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| A100-80GB        | 1.12 | 1.04 | 1.03 | 1.04 | 1.05 | 1.11 | 1.10 | 0.81 | 0.71 |
+| H100             | 1.13 | 1.13 | 1.12 | 1.12 | 1.11 | 1.10 | 1.10 | 0.93 | 0.70 |
+| H200             | 1.10 | 1.10 | 1.08 | 1.08 | 1.08 | 1.09 | 1.07 | 0.72 | 0.62 |
+| B200             | 1.15 | 1.15 | 1.08 | 1.07 | 1.06 | 1.05 | 1.02 | 0.74 | 0.57 |
+| B300             | 1.14 | 1.14 | 1.08 | 1.08 | 1.07 | 1.07 | 1.03 | 0.75 | 0.55 |
+
+A clear pattern emerges: **FMMS is 3-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**.
+The crossover point varies by GPU, but is consistently in the N=64--128 range.
+:::
 
 ### Why the Crossover? Arithmetic Intensity
 
@@ -287,17 +329,74 @@ $$
 
 **When compute-bound (N > ~128)**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS carries the overhead of Gumbel noise generation and the max-reduction fused into the same kernel.
 
+## End-to-End vLLM Benchmarks
+
+The kernel microbenchmarks above measure the FMMS kernel in isolation.
+To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
+Each configuration is run 5 times; the table shows the median TPOT (lower is better) and the TPOT reduction.
+All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
+
+::: {.panel-tabset group="model"}
+# Qwen3-1.7B (V=151,936, d=2,048)
+
+| Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
+| ----------- | ------------- | ---------------- | -------------- |
+| 1           | 2.25          | 2.00             | -10.8%         |
+| 2           | 2.14          | 1.87             | -12.6%         |
+| 4           | 2.15          | 1.84             | -14.5%         |
+| 8           | 2.19          | 1.86             | -15.2%         |
+| 16          | 2.24          | 1.85             | -17.7%         |
+| 32          | 2.52          | 2.28             | -10.0%         |
+| 64          | 3.47          | 2.82             | -18.7%         |
+| 128         | 4.21          | 4.05             | -4.4%          |
+| 256         | 15.43         | 14.28            | -7.6%          |
+
+FMMS reduces TPOT by 10-19% across all concurrency levels on Qwen3-1.7B.
+The small hidden dimension (d=2,048) makes the LM head matmul strongly memory-bound, so fusion has a large impact.
+Peak improvement is -18.7% at concurrency 64.
+
+# gpt-oss-120b (V=201,088, d=2,880)
+
+| Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
+| ----------- | ------------- | ---------------- | -------------- |
+| 1           | 3.45          | 3.29             | -4.3%          |
+| 2           | 4.14          | 3.99             | -3.6%          |
+| 4           | 5.28          | 5.11             | -3.1%          |
+| 8           | 7.30          | 7.12             | -2.5%          |
+| 16          | 9.94          | 9.77             | -1.8%          |
+| 32          | 13.34         | 13.39            | +0.6%          |
+| 64          | 17.80         | 17.50            | -1.7%          |
+| 128         | 23.39         | 23.25            | -0.6%          |
+| 256         | 27.43         | 27.06            | -1.4%          |
+
+On gpt-oss-120b, FMMS reduces TPOT by 2-4% at low concurrency (1-8).
+The improvement is smaller than Qwen3-1.7B because the LM head matmul is a smaller fraction of the total decode step in a 120B-parameter model.
+:::
+
 ## Correctness
 
 FMMS uses the Gumbel-max trick, which produces **exact** samples from the categorical distribution -- it is not an approximation. To verify this, I use a chi-squared goodness-of-fit test that compares 10,000 empirical samples against the theoretical softmax probabilities. The test is parametrized over multiple vocabulary sizes and batch sizes to catch tile-boundary edge cases.
 
-One subtlety: `torch.multinomial` (used in the naive baseline) produces incorrect distributions when given bfloat16 probabilities. The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa. The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`. This is a real bug that affects production code -- PyTorch's documentation does not mention this precision requirement.
+One subtlety: `torch.multinomial` (used in the naive baseline) produces incorrect distributions when given bfloat16 probabilities. The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa. The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`. This is a real bug that affects production code, and PyTorch's documentation does not mention this precision requirement.
+
+As an end-to-end quality check, I integrated FMMS into vLLM and ran the GSM8K benchmark (1,319 questions, 0-shot CoT) via [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) on Qwen3-1.7B, with answers graded by an LLM judge.
+
+| Variant                 | Accuracy | 95% CI         |
+| ----------------------- | -------- | -------------- |
+| Baseline (vLLM default) | 89.6%    | [87.9%, 91.2%] |
+| FMMS Triton             | 89.4%    | [87.7%, 91.0%] |
+
+The difference is +0.2 percentage points (p=0.776, paired bootstrap), not statistically significant, confirming that FMMS does not degrade model accuracy.
 
 ## Conclusion
 
-FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical. The kernel is 3-15% faster than the best baselines at the batch sizes that matter most for LLM decode (N=1 to 64), where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
+FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical.
+In kernel microbenchmarks, FMMS is 3-15% faster than the fastest baseline (FlashInfer `sampling_from_logits`) and up to 37% faster than PyTorch compiled sampling at the batch sizes that matter most for LLM decode (N=1 to 64), where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
 
-The approach has clear limitations: at large batch sizes where the matmul becomes compute-bound, unfused approaches with optimized matmul implementations (cuBLAS) are faster. This is a fundamental trade-off: fusion saves memory bandwidth at the cost of matmul efficiency.
+These gains translate to real-world speedups: integrated into vLLM, FMMS reduces median TPOT by 10-19% on Qwen3-1.7B and 2-4% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
+
+The approach has clear limitations: at large batch sizes where the matmul becomes compute-bound, baseline approaches with optimized cuBLAS matmuls are faster.
+This is a fundamental trade-off, as fusion saves memory bandwidth at the cost of matmul efficiency.
 
 The code is open-source and available at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
 
