@@ -18,8 +18,28 @@ engine: jupyter
 bibliography: refs.bib
 code-annotations: below
 citation: true
-# draft: true
+draft: true
 ---
+
+<!-- TODO
+- Consider removing A100 from tables and GPU tabsets (was it removed from README?)
+- Add Qwen3-8B vLLM results once available
+- Verify B300 outlier in top_k_top_p comparison (identical specs to B200 but 1.5-1.7x vs 1.1-1.3x)
+- Update date before publishing
+- Make FMMS visually distinct from baselines in barplots (e.g. different color palette) so it's obvious which one is my algorithm
+- Introduce a "Learnings" section and move content there (e.g. swizzling bug, profiling insights, NCU tips)
+- Lead with strong benchmark results up front. Separate that from the longer story motivating the kernel (Background, Overview, Tiling the Computation, Incremental Sampling, Gumbel-Max Trick). Readers should see the payoff before the explanation.
+- Improve or remove the absolute performance plots (batch-scaling). They're hard to read and the point is unclear. The absolute runtime table also doesn't communicate much on its own. Needs better storytelling or should be cut in favor of the relative performance plots which tell a clearer story.
+- The method/explanation sections might be less informative than in the README. Compare and check.
+- Table columns seem sometimes too wide. See if they can be made narrower with markdown/Quarto styling.
+- The text says compute-bound starts at N=128, but roofline plots show the ridge at 153 to 295 depending on GPU. Reconcile the discussion with the actual per-GPU ridge points.
+- At low batch sizes FMMS reaches ~90% of peak memory bandwidth (H200, H100). Deserves a mention and explanation of what 100% would mean: load weights + hidden states from HBM, write back only the samples (a few ints) to GMEM. Almost no wasted traffic.
+- The roofline plot must be larger to be readable (currently width="60%").
+- The memory throughput plot says "Inference batch size" on the x-axis. Harmonize to "Batch Size" everywhere across all plots.
+- Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
+- The torch.multinomial bf16 subtlety might fit better in the Learnings section than in Correctness.
+- A side-by-side diagram comparing FMMS to the PyTorch baseline would be nice (show the fused single-pass vs the unfused matmul-write-read-sample pipeline).
+-->
 
 ## Background
 
@@ -235,14 +255,34 @@ Both FlashInfer kernels require the full logits, so I include in their runtime t
 
 ### H100 Results
 
+@fig-batch-scaling shows execution time (left) and throughput in samples/ms (right) across batch sizes.
+FMMS (blue) is the fastest method up to batch size 64, after which `sampling_from_logits` (red) takes the lead.
+
+::: {.panel-tabset group="gpu"}
+# B300
+![Batch scaling on B300 (V=128,256, d=8,192).](imgs/batch-scaling-large-b300.png){width="100%" #fig-batch-scaling}
+
+# B200
+![Batch scaling on B200.](imgs/batch-scaling-large-b200.png){width="100%"}
+
+# H200
+![Batch scaling on H200.](imgs/batch-scaling-large-h200.png){width="100%"}
+
+# H100
+![Batch scaling on H100.](imgs/batch-scaling-large-h100.png){width="100%"}
+
+# A100-80GB
+![Batch scaling on A100-80GB.](imgs/batch-scaling-large-a100.png){width="100%"}
+:::
+
 The following table shows absolute execution times (in milliseconds) on an H100 GPU.
 
 | Method / Batch Size                         | 1     | 2     | 4     | 8     | 16    | 32    | 64    | 128   | 256   |
 | ------------------------------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| **FMMS (Triton)**                           | 0.709 | 0.711 | 0.719 | 0.722 | 0.730 | 0.744 | 0.781 | 0.960 | 1.550 |
-| Naive PyTorch Compiled                      | 0.864 | 0.859 | 0.861 | 0.866 | 0.877 | 0.903 | 0.993 | 1.120 | 1.402 |
-| FlashInfer `top_k_top_p`                    | 0.851 | 0.857 | 0.857 | 0.860 | 0.873 | 0.882 | 0.930 | 0.993 | 1.268 |
-| FlashInfer `sampling_from_logits`           | 0.803 | 0.803 | 0.804 | 0.806 | 0.811 | 0.821 | 0.862 | 0.897 | 1.086 |
+| **FMMS (Triton)**                           | 0.71 | 0.71 | 0.72 | 0.72 | 0.73 | 0.74 | 0.78 | 0.96 | 1.55 |
+| Naive PyTorch Compiled                      | 0.86 | 0.86 | 0.86 | 0.87 | 0.88 | 0.90 | 0.99 | 1.12 | 1.40 |
+| FlashInfer `top_k_top_p`                    | 0.85 | 0.86 | 0.86 | 0.86 | 0.87 | 0.88 | 0.93 | 0.99 | 1.27 |
+| FlashInfer `sampling_from_logits`           | 0.80 | 0.80 | 0.80 | 0.81 | 0.81 | 0.82 | 0.86 | 0.90 | 1.09 |
 
 *All benchmarks: PyTorch 2.10.0, CUDA 13.0, run on Modal. Data as of 2026-02-11.*
 
@@ -250,18 +290,35 @@ The following table shows absolute execution times (in milliseconds) on an H100 
 
 The relative speedup tables show `baseline_time / fmms_time`, so values > 1.0 mean FMMS is faster.
 
-::: {.panel-tabset group="baseline"}
+:::: {.panel-tabset group="baseline"}
 # PyTorch Compiled
 
 This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + `torch.multinomial`).
 
+::: {.panel-tabset group="gpu-pytorch"}
+## B300
+![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-b300.png){width="80%" #fig-relative-perf-vs-pytorch}
+
+## B200
+![Relative performance vs PyTorch Compiled on B200.](imgs/relative-perf-vs-pytorch-b200.png){width="80%"}
+
+## H200
+![Relative performance vs PyTorch Compiled on H200.](imgs/relative-perf-vs-pytorch-h200.png){width="80%"}
+
+## H100
+![Relative performance vs PyTorch Compiled on H100.](imgs/relative-perf-vs-pytorch-h100.png){width="80%"}
+
+## A100-80GB
+![Relative performance vs PyTorch Compiled on A100-80GB.](imgs/relative-perf-vs-pytorch-a100-80gb.png){width="80%"}
+:::
+
 | GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
 | ---------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-| A100-80GB        | 1.20 | 1.11 | 1.09 | 1.10 | 1.12 | 1.20 | 1.27 | 0.98 | 0.84 |
-| H100             | 1.22 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.27 | 1.17 | 0.90 |
-| H200             | 1.23 | 1.21 | 1.19 | 1.20 | 1.20 | 1.24 | 1.27 | 0.94 | 0.78 |
-| B200             | 1.37 | 1.31 | 1.27 | 1.25 | 1.26 | 1.26 | 1.25 | 0.97 | 0.71 |
 | B300             | 1.34 | 1.31 | 1.26 | 1.25 | 1.27 | 1.27 | 1.26 | 0.97 | 0.71 |
+| B200             | 1.37 | 1.31 | 1.27 | 1.25 | 1.26 | 1.26 | 1.25 | 0.97 | 0.71 |
+| H200             | 1.23 | 1.21 | 1.19 | 1.20 | 1.20 | 1.24 | 1.27 | 0.94 | 0.78 |
+| H100             | 1.22 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.27 | 1.17 | 0.90 |
+| A100-80GB        | 1.20 | 1.11 | 1.09 | 1.10 | 1.12 | 1.20 | 1.27 | 0.98 | 0.84 |
 
 FMMS is faster across all GPUs and all batch sizes from 1 to 64, with speedups of 9-37%.
 H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.17x, while other GPUs drop to ~1.0 or below.
@@ -272,13 +329,30 @@ This is likely because H100 has the highest ops:byte ratio (295), keeping the ma
 This is the FlashInfer sampling function used in vLLM when top-k or top-p is set.
 I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runtimes.
 
+::: {.panel-tabset group="gpu-flashinfer"}
+## B300
+![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-b300.png){width="80%" #fig-relative-perf-vs-flashinfer}
+
+## B200
+![Relative performance vs FlashInfer baselines on B200.](imgs/relative-perf-vs-flashinfer-b200.png){width="80%"}
+
+## H200
+![Relative performance vs FlashInfer baselines on H200.](imgs/relative-perf-vs-flashinfer-h200.png){width="80%"}
+
+## H100
+![Relative performance vs FlashInfer baselines on H100.](imgs/relative-perf-vs-flashinfer-h100.png){width="80%"}
+
+## A100-80GB
+![Relative performance vs FlashInfer baselines on A100-80GB.](imgs/relative-perf-vs-flashinfer-a100-80gb.png){width="80%"}
+:::
+
 | GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
 | ---------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-| A100-80GB        | 1.21 | 1.10 | 1.10 | 1.10 | 1.12 | 1.18 | 1.18 | 0.92 | 0.79 |
-| H100             | 1.20 | 1.21 | 1.19 | 1.19 | 1.20 | 1.19 | 1.19 | 1.03 | 0.82 |
-| H200             | 1.20 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.20 | 0.83 | 0.74 |
-| B200             | 1.25 | 1.26 | 1.22 | 1.22 | 1.22 | 1.19 | 1.14 | 0.83 | 0.64 |
 | B300             | 1.63 | 1.56 | 1.62 | 1.62 | 1.65 | 1.64 | 1.53 | 1.09 | 0.88 |
+| B200             | 1.25 | 1.26 | 1.22 | 1.22 | 1.22 | 1.19 | 1.14 | 0.83 | 0.64 |
+| H200             | 1.20 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.20 | 0.83 | 0.74 |
+| H100             | 1.20 | 1.21 | 1.19 | 1.19 | 1.20 | 1.19 | 1.19 | 1.03 | 0.82 |
+| A100-80GB        | 1.21 | 1.10 | 1.10 | 1.10 | 1.12 | 1.18 | 1.18 | 0.92 | 0.79 |
 
 FMMS is up to **1.65x faster** (B300, N=16).
 Across typical decode batch sizes (1 to 64), FMMS is 10-65% faster.
@@ -290,17 +364,34 @@ B200 and B300 have identical bandwidth and compute specs, so the cause of this g
 `sampling_from_logits` is not used in vLLM, but it is the fastest FlashInfer sampling function benchmarked.
 It also uses a Gumbel-max trick internally, but operates on pre-materialized logits.
 
+::: {.panel-tabset group="gpu-flashinfer2"}
+## B300
+![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-b300.png){width="80%"}
+
+## B200
+![Relative performance vs FlashInfer baselines on B200.](imgs/relative-perf-vs-flashinfer-b200.png){width="80%"}
+
+## H200
+![Relative performance vs FlashInfer baselines on H200.](imgs/relative-perf-vs-flashinfer-h200.png){width="80%"}
+
+## H100
+![Relative performance vs FlashInfer baselines on H100.](imgs/relative-perf-vs-flashinfer-h100.png){width="80%"}
+
+## A100-80GB
+![Relative performance vs FlashInfer baselines on A100-80GB.](imgs/relative-perf-vs-flashinfer-a100-80gb.png){width="80%"}
+:::
+
 | GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
 | ---------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-| A100-80GB        | 1.12 | 1.04 | 1.03 | 1.04 | 1.05 | 1.11 | 1.10 | 0.81 | 0.71 |
-| H100             | 1.13 | 1.13 | 1.12 | 1.12 | 1.11 | 1.10 | 1.10 | 0.93 | 0.70 |
-| H200             | 1.10 | 1.10 | 1.08 | 1.08 | 1.08 | 1.09 | 1.07 | 0.72 | 0.62 |
-| B200             | 1.15 | 1.15 | 1.08 | 1.07 | 1.06 | 1.05 | 1.02 | 0.74 | 0.57 |
 | B300             | 1.14 | 1.14 | 1.08 | 1.08 | 1.07 | 1.07 | 1.03 | 0.75 | 0.55 |
+| B200             | 1.15 | 1.15 | 1.08 | 1.07 | 1.06 | 1.05 | 1.02 | 0.74 | 0.57 |
+| H200             | 1.10 | 1.10 | 1.08 | 1.08 | 1.08 | 1.09 | 1.07 | 0.72 | 0.62 |
+| H100             | 1.13 | 1.13 | 1.12 | 1.12 | 1.11 | 1.10 | 1.10 | 0.93 | 0.70 |
+| A100-80GB        | 1.12 | 1.04 | 1.03 | 1.04 | 1.05 | 1.11 | 1.10 | 0.81 | 0.71 |
 
 A clear pattern emerges: **FMMS is 3-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**.
 The crossover point varies by GPU, but is consistently in the N=64--128 range.
-:::
+::::
 
 ### Why the Crossover? Arithmetic Intensity
 
@@ -317,6 +408,48 @@ A GPU becomes compute-bound when the arithmetic intensity exceeds its **ops:byte
 $$
 \text{ops:byte} = \frac{989 \text{ TFLOP/s (BF16)}}{3.35 \text{ TB/s (HBM3)}} \approx 295
 $$
+
+The roofline plot in @fig-roofline confirms this: all methods track the memory-bound slope up to N=64, then curve toward the compute ceiling.
+Each point is labeled with its batch size.
+FMMS sits slightly above the baselines in the memory-bound region, reflecting its bandwidth savings from avoiding the logits round-trip.
+
+::: {.panel-tabset group="gpu"}
+# B300
+![Roofline model on B300 (V=128,256, d=8,192). The ridge point marks the transition from memory-bound to compute-bound.](imgs/roofline-large-b300.png){width="60%" #fig-roofline}
+
+# B200
+![Roofline model on B200.](imgs/roofline-large-b200.png){width="60%"}
+
+# H200
+![Roofline model on H200.](imgs/roofline-large-h200.png){width="60%"}
+
+# H100
+![Roofline model on H100.](imgs/roofline-large-h100.png){width="60%"}
+
+# A100-80GB
+![Roofline model on A100-80GB.](imgs/roofline-large-a100.png){width="60%"}
+:::
+
+@fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
+In the memory-bound region (N=1 to 64), FMMS consistently achieves higher throughput than all baselines, reaching ~90% of peak HBM bandwidth on H100.
+This is the direct mechanism behind the speedups: by fusing the matmul and sampling, FMMS uses the available memory bandwidth more efficiently.
+
+::: {.panel-tabset group="gpu"}
+# B300
+![Memory throughput on B300 (V=128,256, d=8,192). The dashed line shows peak HBM bandwidth.](imgs/memory-throughput-large-b300.png){width="60%" #fig-memory-throughput}
+
+# B200
+![Memory throughput on B200.](imgs/memory-throughput-large-b200.png){width="60%"}
+
+# H200
+![Memory throughput on H200.](imgs/memory-throughput-large-h200.png){width="60%"}
+
+# H100
+![Memory throughput on H100.](imgs/memory-throughput-large-h100.png){width="60%"}
+
+# A100-80GB
+![Memory throughput on A100-80GB.](imgs/memory-throughput-large-a100.png){width="60%"}
+:::
 
 | Batch size $N$ | Arithmetic intensity | Regime on H100 |
 | -------------- | -------------------- | --------------- |
@@ -335,6 +468,10 @@ The kernel microbenchmarks above measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
 Each configuration is run 5 times; the table shows the median TPOT (lower is better) and the TPOT reduction.
 All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
+
+![Median TPOT vs concurrency for both models. The gap between baseline and FMMS is clearly visible on Qwen3-1.7B (left) and smaller but consistent on gpt-oss-120b (right).](imgs/tpot_vs_concurrency.png){width="100%" #fig-tpot-vs-concurrency}
+
+![TPOT speedup (%) per run. Each light dot is one of 5 runs; the line connects the medians. Qwen3-1.7B shows 10-19% speedups across all concurrency levels.](imgs/speedup_vs_concurrency.png){width="100%" #fig-speedup-vs-concurrency}
 
 ::: {.panel-tabset group="model"}
 # Qwen3-1.7B (V=151,936, d=2,048)
