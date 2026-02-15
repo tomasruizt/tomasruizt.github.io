@@ -23,7 +23,6 @@ citation: true
 
 <!-- TODO
 - Update date before publishing
-- Introduce a "Learnings" section and move content there (e.g. swizzling bug, profiling insights, NCU tips)
 - Lead with strong benchmark results up front. Separate that from the longer story motivating the kernel (Background, Overview, Tiling the Computation, Incremental Sampling, Gumbel-Max Trick). Readers should see the payoff before the explanation.
 - Improve or remove the absolute performance plots (batch-scaling). They're hard to read and the point is unclear. The absolute runtime table also doesn't communicate much on its own. Needs better storytelling or should be cut in favor of the relative performance plots which tell a clearer story.
 - The method/explanation sections might be less informative than in the README. Compare and check.
@@ -33,7 +32,6 @@ citation: true
 - The roofline plot must be larger to be readable (currently width="60%").
 - The memory throughput plot says "Inference batch size" on the x-axis. Harmonize to "Batch Size" everywhere across all plots.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
-- The torch.multinomial bf16 subtlety might fit better in the Learnings section than in Correctness.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline would be nice (show the fused single-pass vs the unfused matmul-write-read-sample pipeline).
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
 -->
@@ -208,7 +206,9 @@ samples = tile_indices.gather(0, best_tiles)  # what index did it have?
 
 This stage operates on `num_V_tiles` elements per hidden state (e.g. 512 tiles for V=128K with a tile size of 256) and is negligibly cheap compared to stage 1.
 
-## Profiling
+## Learnings
+
+### Profiling with Nsight Compute
 
 NVIDIA Nsight Compute (NCU) was invaluable for identifying optimization opportunities. The profiler provides detailed metrics on warp stalls, memory utilization, and cache behavior. Here are the key insights it surfaced:
 
@@ -218,10 +218,10 @@ NVIDIA Nsight Compute (NCU) was invaluable for identifying optimization opportun
 
 **Shared memory bank conflicts.** The profiler also flagged bank conflicts when storing data to shared memory. In CUDA, this is relatively easy to fix by padding the shared memory array by +1 element per row, breaking the stride alignment. In Triton, we don't have direct control over shared memory layout, so I left this optimization on the table.
 
-## Swizzling Bug
+### Swizzling Bug
 
 The Triton documentation for matrix multiplication suggests to swizzle the program ids to improve the data reuse. @fig-loading-blocks-in-grouped-order shows the difference between loading data blocks in row-major order vs loading them in a "grouped" order.
-The expected benefit of this optimization is a "more than 10%" speedup in the matmul performance. 
+The expected benefit of this optimization is a "more than 10%" speedup in the matmul performance.
 The reason is that tiles of data are not loaded from VRAM but rather from the faster L2 cache.
 
 ![Loading Blocks in Grouped Order. Source: [Triton Docs](https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#l2-cache-optimizations)](imgs/grouped_vs_row_major_ordering.png){width="80%" text-align="left" fig-alt="Loading Blocks in Grouped Order" .lightbox #fig-loading-blocks-in-grouped-order}
@@ -237,6 +237,13 @@ The performance was _too good to be true_, so I dug deeper and found the bug.
 ::: {.callout-note}
 If you don't understand why your algorithm is running faster than expected, something might be wrong with the code.
 :::
+
+### `torch.multinomial` and bfloat16
+
+`torch.multinomial` (used in the naive baseline) produces incorrect sampling distributions when given bfloat16 probabilities.
+The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa.
+The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`.
+This is a real bug that affects production code, and PyTorch's documentation does not mention this precision requirement.
 
 ## Performance
 
@@ -524,8 +531,6 @@ FMMS reduces TPOT by 2-4% at low concurrency (1-8).
 ## Correctness
 
 FMMS uses the Gumbel-max trick, which produces **exact** samples from the categorical distribution -- it is not an approximation. To verify this, I use a chi-squared goodness-of-fit test that compares 10,000 empirical samples against the theoretical softmax probabilities. The test is parametrized over multiple vocabulary sizes and batch sizes to catch tile-boundary edge cases.
-
-One subtlety: `torch.multinomial` (used in the naive baseline) produces incorrect distributions when given bfloat16 probabilities. The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa. The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`. This is a real bug that affects production code, and PyTorch's documentation does not mention this precision requirement.
 
 As an end-to-end quality check, I integrated FMMS into vLLM and ran the GSM8K benchmark (1,319 questions, 0-shot CoT) via [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) on Qwen3-1.7B, with answers graded by an LLM judge.
 
