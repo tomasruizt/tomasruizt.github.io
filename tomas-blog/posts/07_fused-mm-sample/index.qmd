@@ -24,7 +24,6 @@ citation: true
 <!-- TODO
 - Update date before publishing
 - Lead with strong benchmark results up front. Separate that from the longer story motivating the kernel (Background, Overview, Tiling the Computation, Incremental Sampling, Gumbel-Max Trick). Readers should see the payoff before the explanation.
-- Improve or remove the absolute performance plots (batch-scaling). They're hard to read and the point is unclear. The absolute runtime table also doesn't communicate much on its own. Needs better storytelling or should be cut in favor of the relative performance plots which tell a clearer story.
 - The method/explanation sections might be less informative than in the README. Compare and check.
 - Table columns seem sometimes too wide. See if they can be made narrower with markdown/Quarto styling.
 - The text says compute-bound starts at N=128, but roofline plots show the ridge at 153 to 295 depending on GPU. Reconcile the discussion with the actual per-GPU ridge points.
@@ -257,10 +256,13 @@ Both FlashInfer kernels require the full logits, so I include in their runtime t
 (2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
 (3) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
 
-### H100 Results
+### Scaling Behavior
 
 @fig-batch-scaling shows execution time (left) and throughput in samples/ms (right) across batch sizes.
-FMMS (blue) is the fastest method up to batch size 64, after which `sampling_from_logits` (red) takes the lead.
+All methods have nearly flat latency from N=1 to 32 (memory-bound: runtime is dominated by loading the weight matrix).
+Beyond N=64, latency rises as the matmul becomes compute-bound.
+FMMS (red) is the fastest method in the flat region, where fusion eliminates the extra HBM round-trip for logits.
+At N=128+, the baselines catch up as the matmul dominates and cuBLAS efficiency matters more.
 
 ::: {.panel-tabset group="gpu"}
 # B300
