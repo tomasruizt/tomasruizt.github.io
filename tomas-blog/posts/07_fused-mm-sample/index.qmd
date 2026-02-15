@@ -453,7 +453,10 @@ All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
 ![TPOT speedup (%) per run. Each light dot is one of 5 runs; the line connects the medians.](imgs/speedup_vs_concurrency.png){width="100%" #fig-speedup-vs-concurrency}
 
 ::: {.panel-tabset group="model"}
-# Qwen3-1.7B (V=151,936, d=2,048)
+# Qwen3-1.7B
+
+Qwen3-1.7B has V=151,936 and d=2,048.
+The small hidden dimension makes the LM head matmul strongly memory-bound, so fusion has a large impact.
 
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | ----------- | ------------- | ---------------- | -------------- |
@@ -467,11 +470,13 @@ All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
 | 128         | 4.21          | 4.05             | -4.4%          |
 | 256         | 15.43         | 14.28            | -7.6%          |
 
-FMMS reduces TPOT by 10-19% across all concurrency levels on Qwen3-1.7B.
-The small hidden dimension (d=2,048) makes the LM head matmul strongly memory-bound, so fusion has a large impact.
+FMMS reduces TPOT by 10-19% across all concurrency levels.
 Peak improvement is -18.7% at concurrency 64.
 
-# Qwen3-8B (V=152,064, d=4,096)
+# Qwen3-8B
+
+Qwen3-8B has V=152,064 and d=4,096.
+The larger hidden dimension means the LM head matmul is a bigger fraction of the decode step compared to Qwen3-1.7B, but still strongly memory-bound.
 
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | ----------- | ------------- | ---------------- | -------------- |
@@ -485,11 +490,13 @@ Peak improvement is -18.7% at concurrency 64.
 | 128         | 6.27          | 5.47             | -12.8%         |
 | 256         | 27.73         | 19.61            | -29.3%         |
 
-FMMS reduces TPOT by 3-29% on Qwen3-8B.
-The larger hidden dimension (d=4,096 vs 2,048) means the LM head matmul is a bigger fraction of the decode step compared to Qwen3-1.7B, but still strongly memory-bound.
+FMMS reduces TPOT by 3-29%.
 Peak improvement is -29.3% at concurrency 256.
 
-# gpt-oss-120b (V=201,088, d=2,880)
+# gpt-oss-120b
+
+gpt-oss-120b has V=201,088 and d=2,880.
+The improvement is smaller because the LM head matmul is a smaller fraction of the total decode step in a 120B-parameter model.
 
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | ----------- | ------------- | ---------------- | -------------- |
@@ -503,8 +510,7 @@ Peak improvement is -29.3% at concurrency 256.
 | 128         | 23.39         | 23.25            | -0.6%          |
 | 256         | 27.43         | 27.06            | -1.4%          |
 
-On gpt-oss-120b, FMMS reduces TPOT by 2-4% at low concurrency (1-8).
-The improvement is smaller than Qwen3-1.7B because the LM head matmul is a smaller fraction of the total decode step in a 120B-parameter model.
+FMMS reduces TPOT by 2-4% at low concurrency (1-8).
 :::
 
 ## Correctness
