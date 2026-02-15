@@ -22,7 +22,6 @@ draft: true
 ---
 
 <!-- TODO
-- Consider removing A100 from tables and GPU tabsets (was it removed from README?)
 - Add Qwen3-8B vLLM results once available
 - Verify B300 outlier in top_k_top_p comparison (identical specs to B200 but 1.5-1.7x vs 1.1-1.3x)
 - Update date before publishing
@@ -270,9 +269,6 @@ FMMS (blue) is the fastest method up to batch size 64, after which `sampling_fro
 
 # H100
 ![Batch scaling on H100.](imgs/batch-scaling-large-h100.png){width="100%"}
-
-# A100-80GB
-![Batch scaling on A100-80GB.](imgs/batch-scaling-large-a100.png){width="100%"}
 :::
 
 The following table shows absolute execution times (in milliseconds) on an H100 GPU.
@@ -307,9 +303,6 @@ This is the sampling path used in vLLM when top-k and top-p are unset (torch com
 
 ## H100
 ![Relative performance vs PyTorch Compiled on H100.](imgs/relative-perf-vs-pytorch-h100.png){width="80%"}
-
-## A100-80GB
-![Relative performance vs PyTorch Compiled on A100-80GB.](imgs/relative-perf-vs-pytorch-a100-80gb.png){width="80%"}
 :::
 
 | GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
@@ -318,9 +311,8 @@ This is the sampling path used in vLLM when top-k and top-p are unset (torch com
 | B200             | 1.37 | 1.31 | 1.27 | 1.25 | 1.26 | 1.26 | 1.25 | 0.97 | 0.71 |
 | H200             | 1.23 | 1.21 | 1.19 | 1.20 | 1.20 | 1.24 | 1.27 | 0.94 | 0.78 |
 | H100             | 1.22 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.27 | 1.17 | 0.90 |
-| A100-80GB        | 1.20 | 1.11 | 1.09 | 1.10 | 1.12 | 1.20 | 1.27 | 0.98 | 0.84 |
 
-FMMS is faster across all GPUs and all batch sizes from 1 to 64, with speedups of 9-37%.
+FMMS is faster across all GPUs and all batch sizes from 1 to 64, with speedups of 19-37%.
 H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.17x, while other GPUs drop to ~1.0 or below.
 This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.
 
@@ -341,9 +333,6 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 
 ## H100
 ![Relative performance vs FlashInfer baselines on H100.](imgs/relative-perf-vs-flashinfer-h100.png){width="80%"}
-
-## A100-80GB
-![Relative performance vs FlashInfer baselines on A100-80GB.](imgs/relative-perf-vs-flashinfer-a100-80gb.png){width="80%"}
 :::
 
 | GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
@@ -352,11 +341,10 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 | B200             | 1.25 | 1.26 | 1.22 | 1.22 | 1.22 | 1.19 | 1.14 | 0.83 | 0.64 |
 | H200             | 1.20 | 1.21 | 1.20 | 1.20 | 1.20 | 1.21 | 1.20 | 0.83 | 0.74 |
 | H100             | 1.20 | 1.21 | 1.19 | 1.19 | 1.20 | 1.19 | 1.19 | 1.03 | 0.82 |
-| A100-80GB        | 1.21 | 1.10 | 1.10 | 1.10 | 1.12 | 1.18 | 1.18 | 0.92 | 0.79 |
 
 FMMS is up to **1.65x faster** (B300, N=16).
-Across typical decode batch sizes (1 to 64), FMMS is 10-65% faster.
-B300 is a striking outlier: 1.5-1.7x speedups while A100-B200 show 1.1-1.3x.
+Across typical decode batch sizes (1 to 64), FMMS is 14-65% faster.
+B300 is a striking outlier: 1.5-1.7x speedups while B200/H200/H100 show 1.1-1.3x.
 B200 and B300 have identical bandwidth and compute specs, so the cause of this gap is unclear.
 
 # FlashInfer `sampling_from_logits`
@@ -376,9 +364,6 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 
 ## H100
 ![Relative performance vs FlashInfer baselines on H100.](imgs/relative-perf-vs-flashinfer-h100.png){width="80%"}
-
-## A100-80GB
-![Relative performance vs FlashInfer baselines on A100-80GB.](imgs/relative-perf-vs-flashinfer-a100-80gb.png){width="80%"}
 :::
 
 | GPU / Batch Size | 1    | 2    | 4    | 8    | 16   | 32   | 64   | 128  | 256  |
@@ -387,9 +372,9 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 | B200             | 1.15 | 1.15 | 1.08 | 1.07 | 1.06 | 1.05 | 1.02 | 0.74 | 0.57 |
 | H200             | 1.10 | 1.10 | 1.08 | 1.08 | 1.08 | 1.09 | 1.07 | 0.72 | 0.62 |
 | H100             | 1.13 | 1.13 | 1.12 | 1.12 | 1.11 | 1.10 | 1.10 | 0.93 | 0.70 |
-| A100-80GB        | 1.12 | 1.04 | 1.03 | 1.04 | 1.05 | 1.11 | 1.10 | 0.81 | 0.71 |
 
-A clear pattern emerges: **FMMS is 3-15% faster at small batch sizes (N=1 to 64) but regresses at large batch sizes (N=128+)**.
+A clear pattern emerges: **FMMS is faster at all batch sizes from 1 to 64 on every GPU tested**, with speedups of 2-15%.
+It regresses at large batch sizes (N=128+).
 The crossover point varies by GPU, but is consistently in the N=64--128 range.
 ::::
 
@@ -425,9 +410,6 @@ FMMS sits slightly above the baselines in the memory-bound region, reflecting it
 
 # H100
 ![Roofline model on H100.](imgs/roofline-large-h100.png){width="60%"}
-
-# A100-80GB
-![Roofline model on A100-80GB.](imgs/roofline-large-a100.png){width="60%"}
 :::
 
 @fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
@@ -446,9 +428,6 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 
 # H100
 ![Memory throughput on H100.](imgs/memory-throughput-large-h100.png){width="60%"}
-
-# A100-80GB
-![Memory throughput on A100-80GB.](imgs/memory-throughput-large-a100.png){width="60%"}
 :::
 
 | Batch size $N$ | Arithmetic intensity | Regime on H100 |
@@ -528,7 +507,8 @@ The difference is +0.2 percentage points (p=0.776, paired bootstrap), not statis
 ## Conclusion
 
 FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical.
-In kernel microbenchmarks, FMMS is 3-15% faster than the fastest baseline (FlashInfer `sampling_from_logits`) and up to 37% faster than PyTorch compiled sampling at the batch sizes that matter most for LLM decode (N=1 to 64), where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
+In kernel microbenchmarks, FMMS outperforms every baseline on every GPU tested at batch sizes 1 to 64: 2-15% faster than the fastest baseline (FlashInfer `sampling_from_logits`) and 19-37% faster than PyTorch compiled sampling.
+These are the batch sizes that matter most for LLM decode, where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
 
 These gains translate to real-world speedups: integrated into vLLM, FMMS reduces median TPOT by 10-19% on Qwen3-1.7B and 2-4% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
 
