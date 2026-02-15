@@ -22,8 +22,6 @@ citation: true
 ---
 
 <!-- TODO
-- Document the models used in end-to-end benchmarking (why these three, what they represent, parameter counts)
-- Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
 - Update date before publishing
 - Introduce a "Learnings" section and move content there (e.g. swizzling bug, profiling insights, NCU tips)
 - Lead with strong benchmark results up front. Separate that from the longer story motivating the kernel (Background, Overview, Tiling the Computation, Incremental Sampling, Gumbel-Max Trick). Readers should see the payoff before the explanation.
@@ -37,6 +35,7 @@ citation: true
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - The torch.multinomial bf16 subtlety might fit better in the Learnings section than in Correctness.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline would be nice (show the fused single-pass vs the unfused matmul-write-read-sample pipeline).
+- Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
 -->
 
 ## Background
@@ -445,6 +444,15 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 
 The kernel microbenchmarks above measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
+I chose three models spanning different sizes and architectures.
+The LM head is a standard dense linear layer in all three, so FMMS applies identically regardless of MoE routing.
+
+| Model | Type | Hidden size (d) | Vocab size (V) |
+| ----- | ---- | --------------- | --------------- |
+| Qwen3-1.7B | Dense | 2,048 | 151,936 |
+| Qwen3-8B | Dense | 4,096 | 152,064 |
+| gpt-oss-120b | MoE (128 experts, 4 active) | 2,880 | 201,088 |
+
 Each configuration is run 5 times; the table shows the median TPOT (lower is better) and the TPOT reduction.
 All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
 
