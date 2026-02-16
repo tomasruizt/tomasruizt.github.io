@@ -23,7 +23,6 @@ citation: true
 ---
 
 <!-- TODO (sorted easiest to hardest)
-- Reconcile "compute-bound at N=128" with actual per-GPU ridge points (153-295 depending on GPU).
 - Mention ~90% peak memory bandwidth at low batch sizes (H200, H100). Explain what 100% would mean: load weights + hidden states from HBM, write back only the samples (a few ints) to GMEM.
 - Make all tables collapsible.
 - In the "Scaling Behavior" plot, document: left panel (time) lower is better, right panel (samples/ms) higher is better.
@@ -97,7 +96,7 @@ Both FlashInfer kernels require the full logits, so I include in their runtime t
 All methods have nearly flat latency from N=1 to 32 (memory-bound: runtime is dominated by loading the weight matrix).
 Beyond N=64, latency rises as the matmul becomes compute-bound.
 FMMS (red) is the fastest method in the flat region, where fusion eliminates the extra HBM round-trip for logits.
-At N=128+, the baselines catch up as the matmul dominates and cuBLAS efficiency matters more.
+At larger batch sizes, the baselines catch up as the matmul approaches the compute-bound regime and cuBLAS efficiency matters more.
 
 ::::: {.panel-tabset group="workload-size"}
 # Small
@@ -319,7 +318,7 @@ For the small config, FMMS stays above 1.0x up to N=128 on B300/H100.
 For the large config, it regresses at N=128+ on most GPUs.
 :::::
 
-## Why It Works (and When It Doesn't)
+## Roofline Analysis
 
 The benchmarks above show a clear crossover: FMMS wins at small batch sizes and regresses at large ones.
 The explanation lies in the **arithmetic intensity** of the matmul. The matmul $W_{[V, d]} \times H_{[N, d]}^T$ has:
@@ -328,7 +327,9 @@ $$
 \text{Arithmetic Intensity} = \frac{\text{FLOPs}}{\text{Bytes}} = \frac{2 \cdot V \cdot d \cdot N}{2 \cdot V \cdot d} = N
 $$
 
-The weight matrix $W$ dominates the memory traffic ($V \cdot d$ elements, each read once), and the hidden states are negligible when $N \ll V$. So the arithmetic intensity is simply $N$: each byte of weights loaded produces $N$ multiply-adds.
+The weight matrix $W$ dominates the memory traffic ($V \cdot d$ elements, each read once), and the hidden states are negligible when $N \ll V$[^hidden-states-negligible]. So the arithmetic intensity is simply $N$: each byte of weights loaded produces $N$ multiply-adds.
+
+[^hidden-states-negligible]: Even at the largest benchmarked batch size (N=256) with the small config (V=151,936, d=4,096), the hidden states are 256 $\times$ 4,096 $\times$ 2 bytes = 2 MB versus 1.17 GB for the weight matrix (0.17%). The exact arithmetic intensity is $N \cdot V / (V + N)$ = 255.57, versus the approximation of 256.
 
 A GPU becomes compute-bound when the arithmetic intensity exceeds its **ops:byte ratio** (peak compute / peak memory bandwidth). For the H100:
 
@@ -336,13 +337,29 @@ $$
 \text{ops:byte} = \frac{989 \text{ TFLOP/s (BF16)}}{3.35 \text{ TB/s (HBM3)}} \approx 295
 $$
 
-The roofline plot in @fig-roofline confirms this: all methods track the memory-bound slope up to N=64, then curve toward the compute ceiling.
+The roofline plot in @fig-roofline confirms this: all methods track the memory-bound slope up to N=64, then flatten as they approach the compute ceiling.
 Each point is labeled with its batch size.
 FMMS sits slightly above the baselines in the memory-bound region, reflecting its bandwidth savings from avoiding the logits round-trip.
 
+::::: {.panel-tabset group="workload-size"}
+### Small
 ::: {.panel-tabset group="gpu"}
 # B300
-![Roofline model on B300 (V=128,256, d=8,192). The ridge point marks the transition from memory-bound to compute-bound.](imgs/roofline-large-b300.png){width="85%" #fig-roofline}
+![Roofline model on B300 (V=151,936, d=4,096). The ridge point marks the transition from memory-bound to compute-bound.](imgs/roofline-small-b300.png){width="85%" #fig-roofline}
+
+# B200
+![Roofline model on B200.](imgs/roofline-small-b200.png){width="85%"}
+
+# H200
+![Roofline model on H200.](imgs/roofline-small-h200.png){width="85%"}
+
+# H100
+![Roofline model on H100.](imgs/roofline-small-h100.png){width="85%"}
+:::
+### Large
+::: {.panel-tabset group="gpu"}
+# B300
+![Roofline model on B300 (V=128,256, d=8,192).](imgs/roofline-large-b300.png){width="85%"}
 
 # B200
 ![Roofline model on B200.](imgs/roofline-large-b200.png){width="85%"}
@@ -353,14 +370,33 @@ FMMS sits slightly above the baselines in the memory-bound region, reflecting it
 # H100
 ![Roofline model on H100.](imgs/roofline-large-h100.png){width="85%"}
 :::
+::::
+
+### Memory Throughput
 
 @fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
 In the memory-bound region (N=1 to 64), FMMS consistently achieves higher throughput than all baselines, reaching ~90% of peak HBM bandwidth on H100.
 This is the direct mechanism behind the speedups: by fusing the matmul and sampling, FMMS uses the available memory bandwidth more efficiently.
 
+::::: {.panel-tabset group="workload-size"}
+### Small
 ::: {.panel-tabset group="gpu"}
 # B300
-![Memory throughput on B300 (V=128,256, d=8,192). The dashed line shows peak HBM bandwidth.](imgs/memory-throughput-large-b300.png){width="85%" #fig-memory-throughput}
+![Memory throughput on B300 (V=151,936, d=4,096). The dashed line shows peak HBM bandwidth.](imgs/memory-throughput-small-b300.png){width="85%" #fig-memory-throughput}
+
+# B200
+![Memory throughput on B200.](imgs/memory-throughput-small-b200.png){width="85%"}
+
+# H200
+![Memory throughput on H200.](imgs/memory-throughput-small-h200.png){width="85%"}
+
+# H100
+![Memory throughput on H100.](imgs/memory-throughput-small-h100.png){width="85%"}
+:::
+### Large
+::: {.panel-tabset group="gpu"}
+# B300
+![Memory throughput on B300 (V=128,256, d=8,192).](imgs/memory-throughput-large-b300.png){width="85%"}
 
 # B200
 ![Memory throughput on B200.](imgs/memory-throughput-large-b200.png){width="85%"}
@@ -371,17 +407,27 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 # H100
 ![Memory throughput on H100.](imgs/memory-throughput-large-h100.png){width="85%"}
 :::
+::::
 
-| Batch size $N$ | Arithmetic intensity | Regime on H100 |
-| - | - | ---- |
-| 1 | 1 | Deeply memory-bound (295x below threshold) |
-| 32 | 32 | Memory-bound (9x below) |
-| 64 | 64 | Memory-bound (5x below) |
-| 295 | 295 | Crossover to compute-bound |
+### Takeaway
 
-**When memory-bound (N < ~128)**, the kernel's throughput is determined by how fast it reads the weight matrix from HBM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to HBM, then read them back for sampling -- this extra round-trip wastes bandwidth on the bottleneck path.
+| $N$ | Regime on H100 (ridge = 295) |
+| - | - |
+| 1 | Memory-bound (295x below ridge) |
+| 32 | Memory-bound (9x below) |
+| 64 | Memory-bound (5x below) |
+| 295 | Crossover to compute-bound |
 
-**When compute-bound (N > ~128)**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS carries the overhead of Gumbel noise generation and the max-reduction fused into the same kernel.
+**When memory-bound**, the kernel's throughput is determined by how fast it reads the weight matrix from HBM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to HBM, then read them back for sampling. This extra round-trip wastes bandwidth on the bottleneck path.
+
+**When compute-bound**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. 
+The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS implements the matmul in Triton.
+It also suffers from higher register pressure, because it fuses Gumbel noise generation and the max-reduction into the same kernel.
+
+The theoretical crossover is the GPU's ops:byte ratio (the ridge point in @fig-roofline): 295 for H100, 281 for B300/B200, 206 for H200.
+In practice, the transition is gradual: @fig-memory-throughput shows that achieved throughput already drops at N=128, well before the ridge point.
+This is why FMMS loses its advantage at large batch sizes despite still being "memory-bound" in roofline terms.
+The sweet spot for FMMS is the typical LLM decode regime (N $\leq$ 64), where the operation is deeply memory-bound and fusion pays off the most.
 
 ## End-to-End: vLLM
 
