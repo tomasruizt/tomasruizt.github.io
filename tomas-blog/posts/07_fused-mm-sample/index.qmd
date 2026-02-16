@@ -23,17 +23,16 @@ citation: true
 ---
 
 <!-- TODO (sorted easiest to hardest)
-- In the "Scaling Behavior" plot, document: left panel (time) lower is better, right panel (samples/ms) higher is better.
 - In "Relative Performance Across GPUs", put together the tabsets for both FlashInfer baselines. They share the images, but the tables differ.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
-- The method/explanation sections might be less informative than in the README. Compare and check. E.g. it contains information about the GPUs.
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
 - Expand the Correctness section: explain stochastic output, chi-squared test parameters (10,000 samples, p<0.01, bins with expected count <5 excluded), paired bootstrap test (p=0.776) for GSM8K.
 - Makefiles are awesome. Document how I used them in this project.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline (fused single-pass vs unfused matmul-write-read-sample pipeline).
 - Make tabsets have less padding.
 - Boldface (or color-code) the most important cells in each table.
+- Make plots accessible for color-blind readers, but minimize changes.
 -->
 
 ## The Bottleneck
@@ -88,6 +87,24 @@ Both FlashInfer kernels require the full logits, so I include in their runtime t
 (1) **Naive PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
 (2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
 (3) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
+
+All baselines are torch compiled, so the matmul dispatches to cuBLAS.
+
+### GPUs
+
+Since FMMS saves memory bandwidth, its advantage depends on how memory-bound the workload is.
+I benchmark across four modern datacenter GPUs:
+
+| GPU | HBM Bandwidth (GB/s) | Peak BF16 (TFLOP/s) | Ops:Byte Ratio |
+| --- | --- | --- | --- |
+| B300 | 8,000 | 2,250 | 281 |
+| B200 | 8,000 | 2,250 | 281 |
+| H200 | 4,800 | 989 | 206 |
+| H100 | 3,350 | 989 | 295 |
+
+: {.sm}
+
+The ops:byte ratio (peak compute / peak bandwidth) determines the crossover point where the matmul transitions from memory-bound to compute-bound.
 
 ### Scaling Behavior
 
