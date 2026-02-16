@@ -19,10 +19,15 @@ triton_dir = $(BENCH)/triton-bench-$(if $(filter h100,$(1)),h100!,$(1))/custom-p
 #   source-name.png -> target-name-{gpu}.png
 TRITON_PLOTS := \
 	batch-scaling-large:batch-scaling-large \
-	relative-performance-vs-pytorch-large:relative-perf-vs-pytorch \
-	relative-performance-vs-flashinfer-large:relative-perf-vs-flashinfer \
+	batch-scaling-small:batch-scaling-small \
+	relative-performance-vs-pytorch-large:relative-perf-vs-pytorch-large \
+	relative-performance-vs-pytorch-small:relative-perf-vs-pytorch-small \
+	relative-performance-vs-flashinfer-large:relative-perf-vs-flashinfer-large \
+	relative-performance-vs-flashinfer-small:relative-perf-vs-flashinfer-small \
 	roofline-large:roofline-large \
-	memory-throughput-large:memory-throughput-large
+	roofline-small:roofline-small \
+	memory-throughput-large:memory-throughput-large \
+	memory-throughput-small:memory-throughput-small
 
 # vLLM plots (GPU-independent).
 VLLM_DIR := $(BENCH)/vllm-bench-b200/imgs
