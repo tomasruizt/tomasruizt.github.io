@@ -23,12 +23,10 @@ citation: true
 
 <!-- TODO
 - Update date before publishing
-- ~~Lead with strong benchmark results up front.~~ Done: restructured post to show results before algorithm.
 - The method/explanation sections might be less informative than in the README. Compare and check.
 - Table columns seem sometimes too wide. See if they can be made narrower with markdown/Quarto styling.
 - The text says compute-bound starts at N=128, but roofline plots show the ridge at 153 to 295 depending on GPU. Reconcile the discussion with the actual per-GPU ridge points.
 - At low batch sizes FMMS reaches ~90% of peak memory bandwidth (H200, H100). Deserves a mention and explanation of what 100% would mean: load weights + hidden states from HBM, write back only the samples (a few ints) to GMEM. Almost no wasted traffic.
-- The memory throughput plot says "Inference batch size" on the x-axis. Harmonize to "Batch Size" everywhere across all plots.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline would be nice (show the fused single-pass vs the unfused matmul-write-read-sample pipeline).
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
