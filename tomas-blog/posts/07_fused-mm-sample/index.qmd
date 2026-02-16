@@ -23,10 +23,8 @@ citation: true
 ---
 
 <!-- TODO (sorted easiest to hardest)
-- Mention ~90% peak memory bandwidth at low batch sizes (H200, H100). Explain what 100% would mean: load weights + hidden states from HBM, write back only the samples (a few ints) to GMEM.
-- Make all tables collapsible.
+- Make all tables collapsible. 
 - In the "Scaling Behavior" plot, document: left panel (time) lower is better, right panel (samples/ms) higher is better.
-- In the memory throughput plot, put Speed-of-Light % on the left y-axis and throughput (GB/s) on the right y-axis, so the grid aligns with the SoL ticks.
 - In "Relative Performance Across GPUs", put together the tabsets for both FlashInfer baselines. They share the images, but the tables differ.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
@@ -387,7 +385,9 @@ FMMS sits slightly above the baselines in the memory-bound region, reflecting it
 ### Memory Throughput
 
 @fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
-In the memory-bound region (N=1 to 64), FMMS consistently achieves higher throughput than all baselines, reaching ~90% of peak HBM bandwidth on H100.
+At low batch sizes (N $\leq$ 64), where the operation is deeply memory-bound, FMMS consistently achieves higher throughput than all baselines.
+Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-60% on B300/B200 (small config).
+100% would mean the kernel does nothing but stream the weight matrix from HBM at the hardware's maximum rate, with zero overhead for computation, synchronization, or memory access patterns.
 This is the direct mechanism behind the speedups: by fusing the matmul and sampling, FMMS uses the available memory bandwidth more efficiently.
 
 ::::: {.panel-tabset group="workload-size"}
