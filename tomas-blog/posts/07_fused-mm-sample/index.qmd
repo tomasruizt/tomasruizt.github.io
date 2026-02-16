@@ -27,7 +27,6 @@ citation: true
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
-- Makefiles are awesome. Document how I used them in this project.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline (fused single-pass vs unfused matmul-write-read-sample pipeline).
 - Make tabsets have less padding.
 - Boldface (or color-code) the most important cells in each table.
@@ -713,6 +712,21 @@ If you don't understand why your algorithm is running faster than expected, some
 The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa.
 The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`.
 This is a real bug that affects production code, and PyTorch's documentation does not mention this precision requirement.
+
+### Makefiles for GPU Benchmarking
+
+This project uses Makefiles to orchestrate benchmarking across cloud GPUs and local profiling.
+What started as a few convenience targets grew into the primary interface for running experiments.
+The root Makefile defines a three-stage pipeline for kernel benchmarks: (1) run on Modal, (2) download results, (3) generate plots.
+The commands can be parametrized, as exemplified below:
+
+```makefile
+make modal-triton-benchmark GPU=h100!   # full pipeline on H100
+make modal-triton-benchmark GPU=b200    # same pipeline on B200
+make modal-triton-benchmark-all-gpus    # loop over all GPUs
+```
+
+Makefiles can use `$(shell which python)` instead of hardcoded paths, so the same targets work across local dev machines and remote cloud GPUs.
 
 ## Related Work
 
