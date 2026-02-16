@@ -23,7 +23,7 @@ citation: true
 
 <!-- TODO
 - Update date before publishing
-- Lead with strong benchmark results up front. Separate that from the longer story motivating the kernel (Background, Overview, Tiling the Computation, Incremental Sampling, Gumbel-Max Trick). Readers should see the payoff before the explanation.
+- ~~Lead with strong benchmark results up front.~~ Done: restructured post to show results before algorithm.
 - The method/explanation sections might be less informative than in the README. Compare and check.
 - Table columns seem sometimes too wide. See if they can be made narrower with markdown/Quarto styling.
 - The text says compute-bound starts at N=128, but roofline plots show the ridge at 153 to 295 depending on GPU. Reconcile the discussion with the actual per-GPU ridge points.
@@ -33,70 +33,15 @@ citation: true
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline would be nice (show the fused single-pass vs the unfused matmul-write-read-sample pipeline).
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
+- Expand the Correctness section: explain that the kernel output is stochastic, so a simple equality unit test is insufficient; instead the sampling distribution must match the reference. For the chi-squared test, mention the concrete parameters (10,000 samples, p<0.01 threshold, bins with expected count <5 excluded). For GSM8K, note that the baseline also samples (temperature=0.6, as set by Qwen3's chat template), so even reruns of the baseline give slightly different accuracy. This is why a paired bootstrap test (p=0.776) is used to compare FMMS vs baseline, rather than a raw accuracy comparison.
 -->
 
-## Background
+## The Bottleneck
 
-The paper _Cut Your Losses in Large-Vocabulary Language Models_ by @wijmans2025cut presents a method to massively reduce the VRAM footprint of training LLMs.
-The key idea is to avoid materializing the full logits during the loss computation.
-Instead, they compute the loss incrementally on SRAM.
-They report reducing the memory footprint computing the cross-entropy loss for Gemma 2 (2B) from 24GB to 1MB on a batch of size 8,192.
-
-This made me wonder: 
-Can we use this technique to reduce the VRAM footprint of inference on LLMs?
-There is an important difference between training and inference.
-During training, we never sample from the distribution given by the logits.
-Instead, a method called teacher-forcing is used:
-The logits are compared to the ground truth and the loss is computed by the cross-entropy loss function.
-In constrast, during inference, the logits must be converted into a distribution, e.g. using the softmax function,
-and then sampled from.
-
-The kernels in [Liger Kernel](https://github.com/linkedin/Liger-Kernel) by @hsu2025ligerkernelefficienttriton are also aimed at training-time, and include no sampling primitives.
-The [FlashInfer](https://github.com/flashinfer-ai/flashinfer) library by @ye2025flashinfer is aimed at inference, but all the sampling kernels take `logits` or `probs` as input, which means that you still need to materialize full logits in VRAM before calling them. Below are two examples of the FlashInfer [sampling API](https://docs.flashinfer.ai/api/sampling.html) for reference.
-
-```python
-# Sampling method taking probs
-sampling_from_probs(probs: Tensor, ...) -> Tensor
-
-# Sampling method taking logits
-top_k_top_p_sampling_from_logits(logits: Tensor, ...) -> Tensor
-```
-
-While FlashInfer is the backbone of inference engines like vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23], or SGLang [@zheng2024sglang],
-it still assumed that logits must be materialized in VRAM.
-But I was looking for a method that incrementally computed the logits and sampled from them in a single pass.
-I knew that incrementally computing the softmax is possible, as described by @milakov2018onlinenormalizercalculationsoftmax (_online-softmax_).
-However, they still materialize the full probabilities in VRAM.
-The online-softmax method is also used in _FlashAttention_ [@dao2022flashattention], but they never sample from the probabilities,
-because they are used in attention, rather than in the language modeling (LM) head.
-All the building blocks exist (online-softmax, incremental logit computation), but have never been put together in a single method for efficient sampling. I set out to implement this myself.
-
-::: {.callout-note}
-# Note
-I later found the paper **FlashSample**, which presents a conceptually similar algorithm [@qin2025flashsampling].
-The paper was submitted to ICLR 25, but it was rejected due to a weak justification and experimental evidence.
-In this post I present comprehensive experimental results, compare the method against the best baselines for LLM sampling, and dive deep into the real bottlenecks of LLM sampling.
-:::
-
-## Overview
-Let's restate the goals:
-
-* We want to sample from the probability determined by the logits of the LM head
-* We want to avoid materializing the full logits in VRAM
-
-This means that the inputs of the kernel are the hidden states $H$ of the last hidden layer and last position, and the weights $W$ of the LM head.
-Multiplying them yield the logits $L$, from which the probabilities $P$ are computed using the softmax. The sizes are as follows:
-
-* $W$ has shape $(V, d)$, where $V$ is the vocabulary size and $d$ is the hidden dimension
-* $H$ has shape $(d, N)$, where $N$ is the number of hidden states. E.g. during batched inference, $N$ is the batch size.
-* $L$ has shape $(V, N)$
-* $P$ has shape $(V, N)$
-
-Generally speaking, the largest among these is the vocabulary size $V$, which can range up to 256k, followed by the hidden dimension $d$, which be around 8k, and finally the batch size $N$, which can be 256 in batched inference.
-
-Below is a simple PyTorch function that implements the sampling by computing the logits and probabilities.
-This is just to get an idea of the steps involved, but we want to avoid computing the logits in full.
-For simplicity, I'm sampling a single sample, and not applying any temperature scaling.
+Every LLM decode step runs the same pipeline: multiply hidden states by the LM head weights to produce logits, normalize via softmax, then sample a token.
+The logits tensor has shape $[N, V]$, where $V$ is the vocabulary size (up to 256K) and $N$ is the batch size.
+In the standard approach, this entire tensor is written to HBM and then read back for sampling.
+This round-trip is pure waste when the operation is memory-bound, which is the common case during decode ($N \leq 64$).
 
 ```python
 def sample(
@@ -109,142 +54,25 @@ def sample(
     return samples  # [N, 1]
 ```
 
-## Tiling the Computation
-To break down the computation into an incremental fashion, I used Triton, which supports tiling the computation.
-The logits are the result of a matrix multiplication, which can be tiled in across the $V$, $d$, and $H$ dimensions as shown in @fig-tiled-mm.
-The tiles of $W$ have shape $(T_V, T_d)$ while the tiles of $H$ have shape $(T_d, T_N)$.
-The resulting tiles of the logits have shape $(T_V, T_N)$.
+Existing libraries assume the logits are already materialized: FlashInfer's [@ye2025flashinfer] sampling kernels take `logits` or `probs` as input, and Liger Kernel [@hsu2025ligerkernelefficienttriton] targets training rather than inference.
+Can the matmul and sampling be fused into a single kernel that never writes logits to HBM?
 
-![Tiling the computation of the logits.](imgs/Fused%20MM%20sample.png){width="80%" text-align="left" fig-alt="Tiling the computation of the logits" .lightbox #fig-tiled-mm}
+## The Idea: Fuse Everything
 
-## Incremental Sampling
-
-The next part of the puzzle is how to incrementally sample based on a single tile of logits, rather than on the full vector of logits.
-The problem is not strictly the softmax normalization factor, which can be computed incrementally (online-softmax).
-Rather, the problem is that we don't know how likely each token is in comparison to the others until we have computed the last (bottom) tile of logits.
-
-To understand this, consider the logits case below, where the vocabulary size $V=8$, the tile size $T_V=2$ (so, 8/2 = 4 tiles).
-The horizontal lines separate the tiles.
-Notice how its impossible to know and sample from the highest probability logit (50.0) until the last tile is computed.
+FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, never writing logits to HBM.
+The trick is the Gumbel-max reparameterization, which replaces softmax + multinomial with a single argmax over noised logits:
 
 $$
-\begin{aligned}
-L &= \begin{bmatrix}
-1.0 \\
-1.2 \\
-\hline
-2.0 \\
-1.4 \\
-\hline
-1.0 \\
-2.1 \\
-\hline
-1.1 \\
-50.0
-\end{bmatrix}
-\end{aligned}
+\text{sample} = \text{argmax}_i \left( \ell_i + G_i \right) \sim \text{Categorical}(\pi)
 $$
 
-However, there is one statistical trick to circumvent this problem: The Gumbel-Max trick.
+where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. noise variables and $\ell_i$ are the logits.
+The crucial property is that argmax decomposes over tiles: each tile of the vocabulary computes its local maximum, and a cheap global reduction over tile-local maxima produces the final sample.
+The kernel computes logits tile by tile, finds each tile's winner, and discards the rest.
 
-## Gumbel-Max Trick
+The rest of this post shows the benchmark results first, then explains the algorithm in detail.
 
-The Gumbel-max trick lets us sample from a categorical distribution using only logits, completely bypassing the softmax function. The key identity is:
-
-$$
-\text{argmax}_i \left( \log \pi_i + G_i \right) \sim \text{Categorical}(\pi_1, \ldots, \pi_V)
-$$
-
-where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. Gumbel random variables, and $\pi_i$ are the (unnormalized) probabilities.
-Since logits are $\ell_i = \log \pi_i$ (up to a constant that cancels in the argmax), we can equivalently write:
-
-$$
-\text{sample} = \text{argmax}_i \left( \ell_i + G_i \right)
-$$
-
-A Gumbel(0,1) random variable can be generated from a uniform random variable $U \sim \text{Uniform}(0, 1)$ as $G = -\log(-\log(U))$.
-
-### Why this is useful for tiled computation
-
-The crucial property is that **argmax decomposes over tiles**. If we split the vocabulary into tiles $T_1, T_2, \ldots, T_K$, we can compute the local maximum in each tile independently:
-
-$$
-m_k = \max_{i \in T_k} \left( \ell_i + G_i \right), \quad a_k = \text{argmax}_{i \in T_k} \left( \ell_i + G_i \right)
-$$
-
-and then the global sample is simply:
-
-$$
-\text{sample} = a_{k^*} \quad \text{where} \quad k^* = \text{argmax}_k \, m_k
-$$
-
-Each tile only needs to output two values: its local max $m_k$ and the corresponding vocabulary index $a_k$. The full logit vector is never materialized -- each tile computes its logits, adds Gumbel noise, finds the local winner, and discards the rest. The final reduction over $K$ tiles is trivially cheap.
-
-Compare this with the standard approach: softmax requires a full pass to compute the normalizer $Z = \sum_i e^{\ell_i}$, then another pass to compute probabilities, then sampling via inverse CDF. None of these operations decompose over tiles without cross-tile communication.
-
-## Two-Stage Architecture
-
-Putting the tiled matmul and the Gumbel-max trick together, the kernel has a two-stage design:
-
-**Stage 1 (GPU kernel):** The Triton kernel launches a 2D grid of programs indexed by `(v, h)`, where `v` ranges over vocabulary tiles and `h` over batch tiles. Each program:
-
-1. Computes its tile of logits via the tiled matmul: `logits_blk = W_tile @ H_tile.T`
-2. Scales by temperature: `logits_blk /= temperature`
-3. Generates Gumbel noise and adds it to the logits
-4. Finds the local maximum and argmax over the vocabulary dimension
-5. Writes the local max value and the corresponding global vocabulary index to main memory
-
-Each program outputs just two values per hidden state: the local max and its index. The intermediate output is a tensor of shape `[num_V_tiles, N, num_samples]`.
-
-**Stage 2 (host-side reduction):** A simple PyTorch reduction finds which tile had the global maximum for each hidden state, then gathers the corresponding vocabulary index:
-
-```python
-best_tiles = tile_maxs.argmax(dim=0)   # which tile won?
-samples = tile_indices.gather(0, best_tiles)  # what index did it have?
-```
-
-This stage operates on `num_V_tiles` elements per hidden state (e.g. 512 tiles for V=128K with a tile size of 256) and is negligibly cheap compared to stage 1.
-
-## Learnings
-
-### Profiling with Nsight Compute
-
-NVIDIA Nsight Compute (NCU) was invaluable for identifying optimization opportunities. The profiler provides detailed metrics on warp stalls, memory utilization, and cache behavior. Here are the key insights it surfaced:
-
-**Warp stalls and memory access patterns.** The initial version showed significant warp stalls due to suboptimal memory access. NCU suggested looking for opportunities to improve memory access patterns, which led me to transpose the hidden states for coalesced reads. However, this change had only a marginal effect.
-
-**Increasing tile size for data reuse.** A much better improvement was to increase the tile size along the batch dimension ($T_N$) from 4 to 32. This means each tile of weights is reused 8x more often to compute logits, directly improving the arithmetic intensity. This is a classic compute-vs-memory optimization: at small batch sizes the kernel is memory-bound, so making each weight load do more useful work is the primary lever.
-
-**Shared memory bank conflicts.** The profiler also flagged bank conflicts when storing data to shared memory. In CUDA, this is relatively easy to fix by padding the shared memory array by +1 element per row, breaking the stride alignment. In Triton, we don't have direct control over shared memory layout, so I left this optimization on the table.
-
-### Swizzling Bug
-
-The Triton documentation for matrix multiplication suggests to swizzle the program ids to improve the data reuse. @fig-loading-blocks-in-grouped-order shows the difference between loading data blocks in row-major order vs loading them in a "grouped" order.
-The expected benefit of this optimization is a "more than 10%" speedup in the matmul performance.
-The reason is that tiles of data are not loaded from VRAM but rather from the faster L2 cache.
-
-![Loading Blocks in Grouped Order. Source: [Triton Docs](https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#l2-cache-optimizations)](imgs/grouped_vs_row_major_ordering.png){width="80%" text-align="left" fig-alt="Loading Blocks in Grouped Order" .lightbox #fig-loading-blocks-in-grouped-order}
-
-I implemented this optimization with the existing Triton function `triton.language.swizzle_2d` ([docs](https://triton-lang.org/main/python-api/generated/triton.language.swizzle2d.html)), and saw speed increase massively. The Nsight Compute profiler showed that the L2 cache utilization increased from 50% to 90%, a steep jump.
-
-However, I had made a mistake and passed wrong arguments to `swizzle_2d`.
-This resulted in the same tiles being reloaded again and again, destroying the correctness of the computation, and explaning the excessive L2 cache utilization.
-This bug was nevertheless difficult to catch, because the output of the kernel is a stochastic sample, rather than a deterministic result.
-What made me suspicious was that my kernel, which includes a matmul, was 2x faster than the cuBLAS matmul, which should be close to optimal.
-The performance was _too good to be true_, so I dug deeper and found the bug.
-
-::: {.callout-note}
-If you don't understand why your algorithm is running faster than expected, something might be wrong with the code.
-:::
-
-### `torch.multinomial` and bfloat16
-
-`torch.multinomial` (used in the naive baseline) produces incorrect sampling distributions when given bfloat16 probabilities.
-The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa.
-The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`.
-This is a real bug that affects production code, and PyTorch's documentation does not mention this precision requirement.
-
-## Performance
+## Kernel Benchmarks
 
 I compare the performance of FMMS against strong baselines in LLM sampling. All benchmarks use the "large" configuration (V=128,256, d=8,192), representative of Llama 3 70B.
 
@@ -377,8 +205,9 @@ It regresses at large batch sizes (N=128+).
 The crossover point varies by GPU, but is consistently in the N=64--128 range.
 ::::
 
-### Why the Crossover? Arithmetic Intensity
+## Why It Works (and When It Doesn't)
 
+The benchmarks above show a clear crossover: FMMS wins at small batch sizes and regresses at large ones.
 The explanation lies in the **arithmetic intensity** of the matmul. The matmul $W_{[V, d]} \times H_{[N, d]}^T$ has:
 
 $$
@@ -440,9 +269,9 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 
 **When compute-bound (N > ~128)**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS carries the overhead of Gumbel noise generation and the max-reduction fused into the same kernel.
 
-## End-to-End vLLM Benchmarks
+## End-to-End: vLLM
 
-The kernel microbenchmarks above measure the FMMS kernel in isolation.
+The kernel benchmarks measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
 I chose three models spanning different sizes and architectures.
 The LM head is a standard dense linear layer in all three, so FMMS applies identically regardless of MoE routing.
@@ -533,6 +362,162 @@ As an end-to-end quality check, I integrated FMMS into vLLM and ran the GSM8K be
 | FMMS Triton             | 89.4%    | [87.7%, 91.0%] |
 
 The difference is +0.2 percentage points (p=0.776, paired bootstrap), not statistically significant, confirming that FMMS does not degrade model accuracy.
+
+## The Algorithm
+
+The previous sections showed what FMMS achieves; this section explains how it works.
+The inputs are the LM head weights $W$ with shape $(V, d)$ and hidden states $H$ with shape $(N, d)$.
+Inside the kernel, $H$ is transposed to $(d, N)$ so the matmul $W \times H^T$ produces logits of shape $(V, N)$.
+
+### Tiled Matmul
+
+To break down the computation into an incremental fashion, I used Triton, which supports tiling the computation.
+The logits are the result of a matrix multiplication, which can be tiled across the $V$, $d$, and $N$ dimensions as shown in @fig-tiled-mm.
+The tiles of $W$ have shape $(T_V, T_d)$ while the tiles of $H$ have shape $(T_d, T_N)$.
+The resulting tiles of the logits have shape $(T_V, T_N)$.
+
+![Tiling the computation of the logits.](imgs/Fused%20MM%20sample.png){width="80%" text-align="left" fig-alt="Tiling the computation of the logits" .lightbox #fig-tiled-mm}
+
+### Why Tiled Sampling Is Hard
+
+The next part of the puzzle is how to incrementally sample based on a single tile of logits, rather than on the full vector of logits.
+The problem is not strictly the softmax normalization factor, which can be computed incrementally (online-softmax).
+Rather, the problem is that the relative likelihood of each token is unknown until the last (bottom) tile of logits is computed.
+
+To understand this, consider the logits case below, where the vocabulary size $V=8$, the tile size $T_V=2$ (so, 8/2 = 4 tiles).
+The horizontal lines separate the tiles.
+Notice how it is impossible to know and sample from the highest probability logit (50.0) until the last tile is computed.
+
+$$
+\begin{aligned}
+L &= \begin{bmatrix}
+1.0 \\
+1.2 \\
+\hline
+2.0 \\
+1.4 \\
+\hline
+1.0 \\
+2.1 \\
+\hline
+1.1 \\
+50.0
+\end{bmatrix}
+\end{aligned}
+$$
+
+However, there is one statistical trick to circumvent this problem: The Gumbel-Max trick.
+
+### The Gumbel-Max Trick
+
+The Gumbel-max trick enables sampling from a categorical distribution using only logits, completely bypassing the softmax function. The key identity is:
+
+$$
+\text{argmax}_i \left( \log \pi_i + G_i \right) \sim \text{Categorical}(\pi_1, \ldots, \pi_V)
+$$
+
+where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. Gumbel random variables, and $\pi_i$ are the (unnormalized) probabilities.
+Since logits are $\ell_i = \log \pi_i$ (up to a constant that cancels in the argmax), this is equivalently:
+
+$$
+\text{sample} = \text{argmax}_i \left( \ell_i + G_i \right)
+$$
+
+A Gumbel(0,1) random variable can be generated from a uniform random variable $U \sim \text{Uniform}(0, 1)$ as $G = -\log(-\log(U))$.
+
+#### Why this is useful for tiled computation
+
+The crucial property is that **argmax decomposes over tiles**. If the vocabulary is split into tiles $T_1, T_2, \ldots, T_K$, the local maximum in each tile can be computed independently:
+
+$$
+m_k = \max_{i \in T_k} \left( \ell_i + G_i \right), \quad a_k = \text{argmax}_{i \in T_k} \left( \ell_i + G_i \right)
+$$
+
+and then the global sample is simply:
+
+$$
+\text{sample} = a_{k^*} \quad \text{where} \quad k^* = \text{argmax}_k \, m_k
+$$
+
+Each tile only needs to output two values: its local max $m_k$ and the corresponding vocabulary index $a_k$. The full logit vector is never materialized -- each tile computes its logits, adds Gumbel noise, finds the local winner, and discards the rest. The final reduction over $K$ tiles is trivially cheap.
+
+Compare this with the standard approach: softmax requires a full pass to compute the normalizer $Z = \sum_i e^{\ell_i}$, then another pass to compute probabilities, then sampling via inverse CDF. None of these operations decompose over tiles without cross-tile communication.
+
+### Two-Stage Architecture
+
+Putting the tiled matmul and the Gumbel-max trick together, the kernel has a two-stage design:
+
+**Stage 1 (GPU kernel):** The Triton kernel launches a 2D grid of programs indexed by `(v, h)`, where `v` ranges over vocabulary tiles and `h` over batch tiles. Each program:
+
+1. Computes its tile of logits via the tiled matmul: `logits_blk = W_tile @ H_tile.T`
+2. Scales by temperature: `logits_blk /= temperature`
+3. Generates Gumbel noise and adds it to the logits
+4. Finds the local maximum and argmax over the vocabulary dimension
+5. Writes the local max value and the corresponding global vocabulary index to main memory
+
+Each program outputs just two values per hidden state: the local max and its index. The intermediate output is a tensor of shape `[num_V_tiles, N, num_samples]`.
+
+**Stage 2 (host-side reduction):** A simple PyTorch reduction finds which tile had the global maximum for each hidden state, then gathers the corresponding vocabulary index:
+
+```python
+best_tiles = tile_maxs.argmax(dim=0)   # which tile won?
+samples = tile_indices.gather(0, best_tiles)  # what index did it have?
+```
+
+This stage operates on `num_V_tiles` elements per hidden state (e.g. 512 tiles for V=128K with a tile size of 256) and is negligibly cheap compared to stage 1.
+
+## Lessons from the Trenches
+
+### Profiling with Nsight Compute
+
+NVIDIA Nsight Compute (NCU) was invaluable for identifying optimization opportunities. The profiler provides detailed metrics on warp stalls, memory utilization, and cache behavior. Here are the key insights it surfaced:
+
+**Warp stalls and memory access patterns.** The initial version showed significant warp stalls due to suboptimal memory access. NCU suggested looking for opportunities to improve memory access patterns, which led me to transpose the hidden states for coalesced reads. However, this change had only a marginal effect.
+
+**Increasing tile size for data reuse.** A much better improvement was to increase the tile size along the batch dimension ($T_N$) from 4 to 32. This means each tile of weights is reused 8x more often to compute logits, directly improving the arithmetic intensity. This is a classic compute-vs-memory optimization: at small batch sizes the kernel is memory-bound, so making each weight load do more useful work is the primary lever.
+
+**Shared memory bank conflicts.** The profiler also flagged bank conflicts when storing data to shared memory. In CUDA, this is relatively easy to fix by padding the shared memory array by +1 element per row, breaking the stride alignment. In Triton, there is no direct control over shared memory layout, so I left this optimization on the table.
+
+### Swizzling Bug
+
+The Triton documentation for matrix multiplication suggests to swizzle the program ids to improve the data reuse. @fig-loading-blocks-in-grouped-order shows the difference between loading data blocks in row-major order vs loading them in a "grouped" order.
+The expected benefit of this optimization is a "more than 10%" speedup in the matmul performance.
+The reason is that tiles of data are not loaded from VRAM but rather from the faster L2 cache.
+
+![Loading Blocks in Grouped Order. Source: [Triton Docs](https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#l2-cache-optimizations)](imgs/grouped_vs_row_major_ordering.png){width="80%" text-align="left" fig-alt="Loading Blocks in Grouped Order" .lightbox #fig-loading-blocks-in-grouped-order}
+
+I implemented this optimization with the existing Triton function `triton.language.swizzle_2d` ([docs](https://triton-lang.org/main/python-api/generated/triton.language.swizzle2d.html)), and saw speed increase massively. The Nsight Compute profiler showed that the L2 cache utilization increased from 50% to 90%, a steep jump.
+
+However, I had made a mistake and passed wrong arguments to `swizzle_2d`.
+This resulted in the same tiles being reloaded again and again, destroying the correctness of the computation, and explaning the excessive L2 cache utilization.
+This bug was nevertheless difficult to catch, because the output of the kernel is a stochastic sample, rather than a deterministic result.
+What made me suspicious was that my kernel, which includes a matmul, was 2x faster than the cuBLAS matmul, which should be close to optimal.
+The performance was _too good to be true_, so I dug deeper and found the bug.
+
+::: {.callout-note}
+If you don't understand why your algorithm is running faster than expected, something might be wrong with the code.
+:::
+
+### `torch.multinomial` and bfloat16
+
+`torch.multinomial` (used in the naive baseline) produces incorrect sampling distributions when given bfloat16 probabilities.
+The internal CDF accumulation loses precision with bfloat16's 7-bit mantissa.
+The fix is to upcast to float32 before softmax: `probs = (logits.float() / temperature).softmax(dim=-1)`.
+This is a real bug that affects production code, and PyTorch's documentation does not mention this precision requirement.
+
+## Related Work
+
+_Cut Your Losses in Large-Vocabulary Language Models_ [@wijmans2025cut] is the direct inspiration for this work.
+They avoid materializing logits during training by computing the cross-entropy loss incrementally on SRAM, reducing memory from 24GB to 1MB for Gemma 2 (2B).
+FMMS extends this idea to inference, where the challenge shifts from loss computation to sampling.
+
+_FlashSampling_ [@qin2025flashsampling] presents a conceptually similar algorithm for fused sampling.
+The paper was submitted to ICLR 25 but rejected due to weak justification and experimental evidence.
+This post presents comprehensive benchmarks against strong baselines across multiple GPUs.
+
+_FlashInfer_ [@ye2025flashinfer] provides high-performance sampling kernels used in vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23] and SGLang [@zheng2024sglang], but all its sampling functions take pre-materialized logits or probabilities as input.
+_Liger Kernel_ [@hsu2025ligerkernelefficienttriton] focuses on training-time kernel fusion and includes no sampling primitives.
+The _online-softmax_ method [@milakov2018onlinenormalizercalculationsoftmax] enables incremental normalization and is used in _FlashAttention_ [@dao2022flashattention], but neither applies it to sampling from the LM head.
 
 ## Conclusion
 
