@@ -23,7 +23,7 @@ citation: true
 ---
 
 <!-- TODO (sorted easiest to hardest)
-- In "Relative Performance Across GPUs", put together the tabsets for both FlashInfer baselines. They share the images, but the tables differ.
+- In the relative perf comparison plot against FlashInfer, use this order: FMMS, FlashInfer:sampling_from_logits, FlashInfer:top_k_top_p.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
@@ -228,10 +228,12 @@ For the large config, FMMS wins at batch sizes 1-64 (20-35% faster) but regresse
 H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.13x (large) and 1.52x (small).
 This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.
 
-# FlashInfer `top_k_top_p`
+# FlashInfer
 
-This is the FlashInfer sampling function used in vLLM when top-k or top-p is set.
-I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runtimes.
+Two FlashInfer baselines are compared:
+
+* `flashinfer:sampling_from_logits()` is FlashInfer's fastest sampling kernel, but not used in vLLM. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
+* `flashinfer:top_k_top_p_sampling_from_logits()` is the sampling function used in vLLM when top-k or top-p is set (I set top-k=-1 and top-p=1.0 to disable filtering).
 
 :::: {.panel-tabset group="workload-size"}
 ### Small
@@ -251,7 +253,7 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 :::
 
 <details>
-<summary>Show data table</summary>
+<summary>Show data table: vs <code>top_k_top_p</code></summary>
 
 | GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
 | --- | - | - | - | - | - | - | - | - | - |
@@ -264,68 +266,8 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 
 </details>
 
-### Large
-
-::: {.panel-tabset group="gpu"}
-#### B300
-![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-large-b300.png){width="80%"}
-
-#### B200
-![Relative performance vs FlashInfer baselines on B200.](imgs/relative-perf-vs-flashinfer-large-b200.png){width="80%"}
-
-#### H200
-![Relative performance vs FlashInfer baselines on H200.](imgs/relative-perf-vs-flashinfer-large-h200.png){width="80%"}
-
-#### H100
-![Relative performance vs FlashInfer baselines on H100.](imgs/relative-perf-vs-flashinfer-large-h100.png){width="80%"}
-:::
-
 <details>
-<summary>Show data table</summary>
-
-| GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
-| --- | - | - | - | - | - | - | - | - | - |
-| B300 | 1.57 | 1.65 | 1.66 | 1.67 | 1.67 | 1.64 | 1.55 | 1.09 | 0.89 |
-| B200 | 1.27 | 1.24 | 1.21 | 1.19 | 1.21 | 1.20 | 1.18 | 0.86 | 0.68 |
-| H200 | 1.25 | 1.21 | 1.22 | 1.22 | 1.22 | 1.20 | 1.20 | 0.81 | 0.75 |
-| H100 | 1.18 | 1.22 | 1.19 | 1.20 | 1.20 | 1.18 | 1.20 | 1.01 | 0.79 |
-
-: Speedup vs `top_k_top_p` (large config) {.sm .striped}
-
-</details>
-
-::::
-
-FMMS is up to **2.30x faster** (B300, small config, N=16).
-For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes.
-B300 is a striking outlier: 1.6-2.3x speedups while B200/H200/H100 show 1.2-1.5x.
-B200 and B300 have identical bandwidth and compute specs, and FMMS runs at the same speed on both (within 2%).
-The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 than on B200, likely due to incomplete optimization for the newer B300 architecture (sm_110).
-
-# FlashInfer `sampling_from_logits`
-
-`sampling_from_logits` is not used in vLLM, but it is the fastest FlashInfer sampling function benchmarked.
-It also uses a Gumbel-max trick internally, but operates on pre-materialized logits.
-
-:::: {.panel-tabset group="workload-size"}
-### Small
-
-::: {.panel-tabset group="gpu"}
-#### B300
-![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-small-b300.png){width="80%"}
-
-#### B200
-![Relative performance vs FlashInfer baselines on B200.](imgs/relative-perf-vs-flashinfer-small-b200.png){width="80%"}
-
-#### H200
-![Relative performance vs FlashInfer baselines on H200.](imgs/relative-perf-vs-flashinfer-small-h200.png){width="80%"}
-
-#### H100
-![Relative performance vs FlashInfer baselines on H100.](imgs/relative-perf-vs-flashinfer-small-h100.png){width="80%"}
-:::
-
-<details>
-<summary>Show data table</summary>
+<summary>Show data table: vs <code>sampling_from_logits</code></summary>
 
 | GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
 | --- | - | - | - | - | - | - | - | - | - |
@@ -355,7 +297,21 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 :::
 
 <details>
-<summary>Show data table</summary>
+<summary>Show data table: vs <code>top_k_top_p</code></summary>
+
+| GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
+| --- | - | - | - | - | - | - | - | - | - |
+| B300 | 1.57 | 1.65 | 1.66 | 1.67 | 1.67 | 1.64 | 1.55 | 1.09 | 0.89 |
+| B200 | 1.27 | 1.24 | 1.21 | 1.19 | 1.21 | 1.20 | 1.18 | 0.86 | 0.68 |
+| H200 | 1.25 | 1.21 | 1.22 | 1.22 | 1.22 | 1.20 | 1.20 | 0.81 | 0.75 |
+| H100 | 1.18 | 1.22 | 1.19 | 1.20 | 1.20 | 1.18 | 1.20 | 1.01 | 0.79 |
+
+: Speedup vs `top_k_top_p` (large config) {.sm .striped}
+
+</details>
+
+<details>
+<summary>Show data table: vs <code>sampling_from_logits</code></summary>
 
 | GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
 | --- | - | - | - | - | - | - | - | - | - |
@@ -370,7 +326,13 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 
 ::::
 
-A clear pattern emerges: **FMMS is faster at all batch sizes from 1 to 64 on every GPU tested**, with speedups of 3-25%.
+Vs `top_k_top_p`, FMMS is up to **2.30x faster** (B300, small config, N=16).
+For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes.
+B300 is a striking outlier: 1.6-2.3x speedups while B200/H200/H100 show 1.2-1.5x.
+B200 and B300 have identical bandwidth and compute specs, and FMMS runs at the same speed on both (within 2%).
+The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 than on B200, likely due to incomplete optimization for the newer B300 architecture (sm_110).
+
+Vs `sampling_from_logits`, **FMMS is faster at all batch sizes from 1 to 64 on every GPU tested**, with speedups of 3-25%.
 For the small config, FMMS stays above 1.0x up to N=128 on B300/H100.
 For the large config, it regresses at N=128+ on most GPUs.
 :::::
