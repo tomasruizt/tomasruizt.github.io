@@ -1,5 +1,5 @@
 ---
-title: "FMMS: A Fused Matmul-Sample Kernel"
+title: "FMMS: The Fused Matmul-Sample Kernel"
 subtitle: "An Efficient and Exact LLM Sampling Algorithm"
 author:
   - name: Tomas Ruiz
@@ -7,14 +7,14 @@ author:
     affiliations: Ludwig-Maximilians-Universität München
 # date: "2025-10-31" (began)
 date: "2026-02-16"
-categories: [GPUs, Triton, Mathematics]
+categories: [GPUs, Triton, vLLM, Transformers]
 format:
   html:
     toc: true
     code-line-numbers: true
 editor:
     render-on-save: true
-image: "imgs/Fused MM sample.png"
+image: "imgs/baseline-vs-fmms-diagram.png"
 engine: jupyter
 bibliography: refs.bib
 code-annotations: below
@@ -25,13 +25,11 @@ citation: true
 <!-- TODO (sorted easiest to hardest)
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
-- A side-by-side diagram comparing FMMS to the PyTorch baseline (fused single-pass vs unfused matmul-write-read-sample pipeline).
 - Make tabsets have less padding.
 -->
 
-::: {.callout-note appearance="simple"}
 ## TL;DR
-
+::: {.callout-note appearance="simple"}
 I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
 It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime.
 In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the *fastest FlashInfer* sampling kernel.
@@ -64,6 +62,10 @@ Can the matmul and sampling be fused into a single kernel that never writes logi
 ## The Idea: Fuse Everything
 
 FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, never writing logits to HBM.
+@fig-baseline-vs-fmms contrasts the two approaches.
+
+![W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.](imgs/baseline-vs-fmms-diagram.png){width="100%" #fig-baseline-vs-fmms}
+
 The trick is the Gumbel-max reparameterization, which replaces softmax + multinomial with a single argmax over noised logits:
 
 $$
@@ -76,7 +78,7 @@ The kernel computes logits tile by tile, finds each tile's winner, and discards 
 
 The rest of this post shows the benchmark results first, then explains the algorithm in detail.
 
-## Kernel Benchmarks
+## Kernel Microbenchmarks
 
 The LM head is a dense `[V, d]` matrix in every model, including MoE architectures (MoE only replaces the FFN layers, not the LM head).
 MoE models have surprisingly small hidden dimensions relative to their parameter count because the extra parameters live in expert FFN layers, not the LM head.
@@ -458,7 +460,7 @@ In practice, the transition is gradual: @fig-memory-throughput shows that achiev
 This is why FMMS loses its advantage at large batch sizes despite still being "memory-bound" in roofline terms.
 The sweet spot for FMMS is the typical LLM decode regime (N $\leq$ 64), where the operation is deeply memory-bound and fusion pays off the most.
 
-## End-to-End: vLLM
+## End-to-End Benchmarks (vLLM)
 
 The kernel benchmarks measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
