@@ -168,6 +168,8 @@ This is the sampling path used in vLLM when top-k and top-p are unset (torch com
 | H200 | 1.24 | 1.25 | 1.22 | 1.25 | 1.28 | 1.30 | 1.33 | 1.26 | 1.06 |
 | H100 | 1.22 | 1.23 | 1.21 | 1.22 | 1.25 | 1.29 | 1.40 | 1.52 | 1.23 |
 
+: Speedup vs PyTorch Compiled (small config) {.sm .striped}
+
 ### Large
 
 ::: {.panel-tabset group="gpu"}
@@ -190,6 +192,8 @@ This is the sampling path used in vLLM when top-k and top-p are unset (torch com
 | B200 | 1.35 | 1.31 | 1.27 | 1.24 | 1.26 | 1.25 | 1.27 | 0.97 | 0.74 |
 | H200 | 1.26 | 1.23 | 1.22 | 1.22 | 1.22 | 1.23 | 1.28 | 0.93 | 0.78 |
 | H100 | 1.22 | 1.22 | 1.20 | 1.21 | 1.21 | 1.21 | 1.28 | 1.13 | 0.87 |
+
+: Speedup vs PyTorch Compiled (large config) {.sm .striped}
 
 ::::
 
@@ -228,6 +232,8 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 | H200 | 1.29 | 1.37 | 1.35 | 1.37 | 1.36 | 1.32 | 1.23 | 1.04 | 0.89 |
 | H100 | 1.30 | 1.25 | 1.30 | 1.30 | 1.29 | 1.27 | 1.29 | 1.25 | 1.00 |
 
+: Speedup vs `top_k_top_p` (small config) {.sm .striped}
+
 ### Large
 
 ::: {.panel-tabset group="gpu"}
@@ -250,6 +256,8 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 | B200 | 1.27 | 1.24 | 1.21 | 1.19 | 1.21 | 1.20 | 1.18 | 0.86 | 0.68 |
 | H200 | 1.25 | 1.21 | 1.22 | 1.22 | 1.22 | 1.20 | 1.20 | 0.81 | 0.75 |
 | H100 | 1.18 | 1.22 | 1.19 | 1.20 | 1.20 | 1.18 | 1.20 | 1.01 | 0.79 |
+
+: Speedup vs `top_k_top_p` (large config) {.sm .striped}
 
 ::::
 
@@ -288,6 +296,8 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 | H200 | 1.16 | 1.17 | 1.14 | 1.14 | 1.13 | 1.08 | 1.01 | 0.84 | 0.70 |
 | H100 | 1.15 | 1.15 | 1.13 | 1.13 | 1.13 | 1.11 | 1.10 | 1.03 | 0.77 |
 
+: Speedup vs `sampling_from_logits` (small config) {.sm .striped}
+
 ### Large
 
 ::: {.panel-tabset group="gpu"}
@@ -310,6 +320,8 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 | B200 | 1.15 | 1.15 | 1.07 | 1.07 | 1.07 | 1.06 | 1.06 | 0.77 | 0.57 |
 | H200 | 1.13 | 1.12 | 1.11 | 1.10 | 1.10 | 1.09 | 1.08 | 0.72 | 0.63 |
 | H100 | 1.13 | 1.13 | 1.12 | 1.12 | 1.11 | 1.10 | 1.11 | 0.90 | 0.67 |
+
+: Speedup vs `sampling_from_logits` (large config) {.sm .striped}
 
 ::::
 
@@ -418,6 +430,8 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 | 64 | Memory-bound (5x below) |
 | 295 | Crossover to compute-bound |
 
+: {.sm}
+
 **When memory-bound**, the kernel's throughput is determined by how fast it reads the weight matrix from HBM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to HBM, then read them back for sampling. This extra round-trip wastes bandwidth on the bottleneck path.
 
 **When compute-bound**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. 
@@ -441,6 +455,8 @@ The LM head is a standard dense linear layer in all three, so FMMS applies ident
 | Qwen3-1.7B | Dense | 2,048 | 151,936 |
 | Qwen3-8B | Dense | 4,096 | 152,064 |
 | gpt-oss-120b | MoE (128 experts, 4 active) | 2,880 | 201,088 |
+
+: {.sm}
 
 Each configuration is run 5 times; the table shows the median TPOT (lower is better) and the TPOT reduction.
 All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
@@ -467,6 +483,8 @@ The small hidden dimension makes the LM head matmul strongly memory-bound, so fu
 | 128 | 4.21 | 4.05 | -4.4% |
 | 256 | 15.43 | 14.28 | -7.6% |
 
+: {.sm .striped}
+
 FMMS reduces TPOT by 10-19% across all concurrency levels.
 Peak improvement is -18.7% at concurrency 64.
 
@@ -486,6 +504,8 @@ The larger hidden dimension means the LM head matmul is a bigger fraction of the
 | 64 | 5.06 | 4.53 | -10.3% |
 | 128 | 6.27 | 5.47 | -12.8% |
 | 256 | 27.73 | 19.61 | -29.3% |
+
+: {.sm .striped}
 
 FMMS reduces TPOT by 3-29%.
 Peak improvement is -29.3% at concurrency 256.
@@ -507,6 +527,8 @@ The improvement is smaller because the LM head matmul is a smaller fraction of t
 | 128 | 23.39 | 23.25 | -0.6% |
 | 256 | 27.43 | 27.06 | -1.4% |
 
+: {.sm .striped}
+
 FMMS reduces TPOT by 2-4% at low concurrency (1-8).
 :::
 
@@ -520,6 +542,8 @@ As an end-to-end quality check, I integrated FMMS into vLLM and ran the GSM8K be
 | --- | - | - |
 | Baseline (vLLM default) | 89.6% | [87.9%, 91.2%] |
 | FMMS Triton | 89.4% | [87.7%, 91.0%] |
+
+: GSM8K accuracy on Qwen3-1.7B {.sm}
 
 The difference is +0.2 percentage points (p=0.776, paired bootstrap), not statistically significant, confirming that FMMS does not degrade model accuracy.
 
