@@ -28,11 +28,11 @@ citation: true
 - Table columns seem sometimes too wide. See if they can be made narrower with markdown/Quarto styling.
 - The text says compute-bound starts at N=128, but roofline plots show the ridge at 153 to 295 depending on GPU. Reconcile the discussion with the actual per-GPU ridge points.
 - At low batch sizes FMMS reaches ~90% of peak memory bandwidth (H200, H100). Deserves a mention and explanation of what 100% would mean: load weights + hidden states from HBM, write back only the samples (a few ints) to GMEM. Almost no wasted traffic.
-- The roofline plot must be larger to be readable (currently width="60%").
 - The memory throughput plot says "Inference batch size" on the x-axis. Harmonize to "Batch Size" everywhere across all plots.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline would be nice (show the fused single-pass vs the unfused matmul-write-read-sample pipeline).
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
+- Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
 - Expand the Correctness section: explain that the kernel output is stochastic, so a simple equality unit test is insufficient; instead the sampling distribution must match the reference. For the chi-squared test, mention the concrete parameters (10,000 samples, p<0.01 threshold, bins with expected count <5 excluded). For GSM8K, note that the baseline also samples (temperature=0.6, as set by Qwen3's chat template), so even reruns of the baseline give slightly different accuracy. This is why a paired bootstrap test (p=0.776) is used to compare FMMS vs baseline, rather than a raw accuracy comparison.
 -->
 
@@ -228,16 +228,16 @@ FMMS sits slightly above the baselines in the memory-bound region, reflecting it
 
 ::: {.panel-tabset group="gpu"}
 # B300
-![Roofline model on B300 (V=128,256, d=8,192). The ridge point marks the transition from memory-bound to compute-bound.](imgs/roofline-large-b300.png){width="60%" #fig-roofline}
+![Roofline model on B300 (V=128,256, d=8,192). The ridge point marks the transition from memory-bound to compute-bound.](imgs/roofline-large-b300.png){width="85%" #fig-roofline}
 
 # B200
-![Roofline model on B200.](imgs/roofline-large-b200.png){width="60%"}
+![Roofline model on B200.](imgs/roofline-large-b200.png){width="85%"}
 
 # H200
-![Roofline model on H200.](imgs/roofline-large-h200.png){width="60%"}
+![Roofline model on H200.](imgs/roofline-large-h200.png){width="85%"}
 
 # H100
-![Roofline model on H100.](imgs/roofline-large-h100.png){width="60%"}
+![Roofline model on H100.](imgs/roofline-large-h100.png){width="85%"}
 :::
 
 @fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
@@ -246,16 +246,16 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 
 ::: {.panel-tabset group="gpu"}
 # B300
-![Memory throughput on B300 (V=128,256, d=8,192). The dashed line shows peak HBM bandwidth.](imgs/memory-throughput-large-b300.png){width="60%" #fig-memory-throughput}
+![Memory throughput on B300 (V=128,256, d=8,192). The dashed line shows peak HBM bandwidth.](imgs/memory-throughput-large-b300.png){width="85%" #fig-memory-throughput}
 
 # B200
-![Memory throughput on B200.](imgs/memory-throughput-large-b200.png){width="60%"}
+![Memory throughput on B200.](imgs/memory-throughput-large-b200.png){width="85%"}
 
 # H200
-![Memory throughput on H200.](imgs/memory-throughput-large-h200.png){width="60%"}
+![Memory throughput on H200.](imgs/memory-throughput-large-h200.png){width="85%"}
 
 # H100
-![Memory throughput on H100.](imgs/memory-throughput-large-h100.png){width="60%"}
+![Memory throughput on H100.](imgs/memory-throughput-large-h100.png){width="85%"}
 :::
 
 | Batch size $N$ | Arithmetic intensity | Regime on H100 |
