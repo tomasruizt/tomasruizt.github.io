@@ -23,13 +23,12 @@ citation: true
 ---
 
 <!-- TODO (sorted easiest to hardest)
-- In "Scaling Behavior" the tabset labels say "Small (d=4,096)" and "Large (d=8,192)", suggesting only d differs. But V also changes (151,936 vs 128,256). Fix the labels to include both V and d.
 - Reconcile "compute-bound at N=128" with actual per-GPU ridge points (153-295 depending on GPU).
 - Mention ~90% peak memory bandwidth at low batch sizes (H200, H100). Explain what 100% would mean: load weights + hidden states from HBM, write back only the samples (a few ints) to GMEM.
 - Make all tables collapsible.
 - In the "Scaling Behavior" plot, document: left panel (time) lower is better, right panel (samples/ms) higher is better.
 - In the memory throughput plot, put Speed-of-Light % on the left y-axis and throughput (GB/s) on the right y-axis, so the grid aligns with the SoL ticks.
-- In "Relative Performance Across GPUs", put together the tabsets for both FlashInfer baselines.
+- In "Relative Performance Across GPUs", put together the tabsets for both FlashInfer baselines. They share the images, but the tables differ.
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
 - Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
 - The method/explanation sections might be less informative than in the README. Compare and check.
@@ -101,9 +100,9 @@ FMMS (red) is the fastest method in the flat region, where fusion eliminates the
 At N=128+, the baselines catch up as the matmul dominates and cuBLAS efficiency matters more.
 
 ::::: {.panel-tabset group="workload-size"}
-# Small (d=4,096)
+# Small
 
-::: {.panel-tabset group="gpu-scaling-small"}
+::: {.panel-tabset group="gpu"}
 ## B300
 ![Batch scaling on B300 (V=151,936, d=4,096).](imgs/batch-scaling-small-b300.png){width="100%" #fig-batch-scaling}
 
@@ -117,9 +116,9 @@ At N=128+, the baselines catch up as the matmul dominates and cuBLAS efficiency 
 ![Batch scaling on H100.](imgs/batch-scaling-small-h100.png){width="100%"}
 :::
 
-# Large (d=8,192)
+# Large
 
-::: {.panel-tabset group="gpu-scaling-large"}
+::: {.panel-tabset group="gpu"}
 ## B300
 ![Batch scaling on B300 (V=128,256, d=8,192).](imgs/batch-scaling-large-b300.png){width="100%"}
 
@@ -147,9 +146,9 @@ The relative speedup tables show `baseline_time / fmms_time`, so values > 1.0 me
 This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + `torch.multinomial`).
 
 :::: {.panel-tabset group="workload-size"}
-### Small (d=4,096)
+### Small
 
-::: {.panel-tabset group="gpu-pytorch-small"}
+::: {.panel-tabset group="gpu"}
 #### B300
 ![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-small-b300.png){width="80%" #fig-relative-perf-vs-pytorch}
 
@@ -170,9 +169,9 @@ This is the sampling path used in vLLM when top-k and top-p are unset (torch com
 | H200 | 1.24 | 1.25 | 1.22 | 1.25 | 1.28 | 1.30 | 1.33 | 1.26 | 1.06 |
 | H100 | 1.22 | 1.23 | 1.21 | 1.22 | 1.25 | 1.29 | 1.40 | 1.52 | 1.23 |
 
-### Large (d=8,192)
+### Large
 
-::: {.panel-tabset group="gpu-pytorch-large"}
+::: {.panel-tabset group="gpu"}
 #### B300
 ![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-large-b300.png){width="80%"}
 
@@ -207,9 +206,9 @@ This is the FlashInfer sampling function used in vLLM when top-k or top-p is set
 I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runtimes.
 
 :::: {.panel-tabset group="workload-size"}
-### Small (d=4,096)
+### Small
 
-::: {.panel-tabset group="gpu-flashinfer-small"}
+::: {.panel-tabset group="gpu"}
 #### B300
 ![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-small-b300.png){width="80%" #fig-relative-perf-vs-flashinfer}
 
@@ -230,9 +229,9 @@ I set top-k=-1 and top-p=1.0 to disable filtering and compare pure sampling runt
 | H200 | 1.29 | 1.37 | 1.35 | 1.37 | 1.36 | 1.32 | 1.23 | 1.04 | 0.89 |
 | H100 | 1.30 | 1.25 | 1.30 | 1.30 | 1.29 | 1.27 | 1.29 | 1.25 | 1.00 |
 
-### Large (d=8,192)
+### Large
 
-::: {.panel-tabset group="gpu-flashinfer-large"}
+::: {.panel-tabset group="gpu"}
 #### B300
 ![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-large-b300.png){width="80%"}
 
@@ -267,9 +266,9 @@ The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 th
 It also uses a Gumbel-max trick internally, but operates on pre-materialized logits.
 
 :::: {.panel-tabset group="workload-size"}
-### Small (d=4,096)
+### Small
 
-::: {.panel-tabset group="gpu-flashinfer2-small"}
+::: {.panel-tabset group="gpu"}
 #### B300
 ![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-small-b300.png){width="80%"}
 
@@ -290,9 +289,9 @@ It also uses a Gumbel-max trick internally, but operates on pre-materialized log
 | H200 | 1.16 | 1.17 | 1.14 | 1.14 | 1.13 | 1.08 | 1.01 | 0.84 | 0.70 |
 | H100 | 1.15 | 1.15 | 1.13 | 1.13 | 1.13 | 1.11 | 1.10 | 1.03 | 0.77 |
 
-### Large (d=8,192)
+### Large
 
-::: {.panel-tabset group="gpu-flashinfer2-large"}
+::: {.panel-tabset group="gpu"}
 #### B300
 ![Relative performance vs FlashInfer baselines on B300.](imgs/relative-perf-vs-flashinfer-large-b300.png){width="80%"}
 
