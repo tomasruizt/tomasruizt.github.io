@@ -24,11 +24,21 @@ citation: true
 
 <!-- TODO (sorted easiest to hardest)
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
-- Add a TL;DR section at the top with the main performance statements and a brief motivation for why this kernel is interesting.
 - Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
 - A side-by-side diagram comparing FMMS to the PyTorch baseline (fused single-pass vs unfused matmul-write-read-sample pipeline).
 - Make tabsets have less padding.
 -->
+
+::: {.callout-note appearance="simple"}
+## TL;DR
+
+I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
+It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime.
+In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the *fastest FlashInfer* sampling kernel.
+Integrated into vLLM on B200, it reduces *end-to-end TPOT* by up to 19% on Qwen3-1.7B, up to 29% on Qwen3-8B, and up to 4% on gpt-oss-120b, with no accuracy loss.
+
+The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample)
+:::
 
 ## The Bottleneck
 
