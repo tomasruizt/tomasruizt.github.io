@@ -22,35 +22,18 @@ citation: true
 # draft: true
 ---
 
-<!--
-TODO:
-- Flesh out the Algorithm section: add pseudocode or annotated kernel snippet, explain d-dimension reduction across tiles, Gumbel noise generation in SRAM, tile sizes
-- Add temperature to the Gumbel-max formula (ℓ_i / τ + G_i), so the reader knows temperature is supported before it appears in the algorithm section
-- Explain why FMMS must use a Triton matmul instead of cuBLAS (can't fuse custom logic into a cuBLAS call) where the idea is introduced
-- Add a limitations/future work section: top-k/top-p filtering, multi-GPU/tensor-parallel, path to upstream vLLM integration
-- Reconcile Qwen3-8B summary text ("3-7%") with trial 1 data showing -17.1% at concurrency 32 and -10.4% at concurrency 64
-- TL;DR "up to 29% on Qwen3-8B" is from the concurrency-256 anomaly called unexplained. Use the robust range or qualify it
-- TL;DR "up to 4% on gpt-oss-120b" understates trial 1 data (-4.6%). Say "up to 5%" or "2-5%"
-- Move "Quirks of E2E Benchmarking" out of the Qwen3-8B tab into a standalone subsection under E2E, since the variability lesson applies to all models
-- Add a brief paragraph after the Gumbel-max formula explaining the tile decomposition concretely (stage 1 + stage 2), so the reader has a mental model before 400 lines of benchmarks
-- Make the "Scaling Behavior" prose acknowledge how the pattern differs between small and large configs (large regresses at N=128+)
-- Fix typo: "pontentially" → "potentially"
-- Rephrase line 86: "so I include in their runtime the matmul" → "so their runtimes include the matmul that computes the logits"
-- Explicitly define the vLLM baseline in the E2E section (vLLM default sampling: softmax + multinomial)
-- Add a sentence explaining why argmax decomposes over tiles (the max of sub-maxima equals the global max)
--->
-
-## TL;DR
+# TL;DR
 ::: {.callout-note appearance="simple"}
 I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
 It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime.
 In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the *fastest FlashInfer* sampling kernel.
-Integrated into vLLM on B200, it reduces *end-to-end TPOT* across four models: up to 19% on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no accuracy loss.
+Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no accuracy loss.
 
-The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample)
+The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
+The algorithm is explained in @sec-solution and @sec-algorithm, kernel microbenchmarks are in @sec-microbenchmarks, and end-to-end benchmarks on vLLM are in @sec-e2e.
 :::
 
-## The Bottleneck
+# The Problem: GMEM Traffic
 
 Every LLM decode step runs the same pipeline: multiply hidden states by the LM head weights to produce logits, normalize via softmax, then sample a token.
 The logits tensor has shape $[N, V]$, where $V$ is the vocabulary size (up to 256K) and $N$ is the batch size.
@@ -71,26 +54,31 @@ def sample(
 Existing libraries assume the logits are already materialized: FlashInfer's [@ye2025flashinfer] sampling kernels take `logits` or `probs` as input, and Liger Kernel [@hsu2025ligerkernelefficienttriton] targets training rather than inference.
 Can the matmul and sampling be fused into a single kernel that never writes logits to GMEM?
 
-## The Idea: Fuse Everything
+# The Solution: Fusion {#sec-solution}
 
 FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, without writing the full logits tensor to GMEM.
 @fig-baseline-vs-fmms contrasts the two approaches.
 
-![W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.](imgs/baseline-vs-fmms-diagram.png){width="100%" #fig-baseline-vs-fmms}
+![W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.](imgs/baseline-vs-fmms-diagram.png){width="70%" #fig-baseline-vs-fmms}
 
 The trick is the Gumbel-max reparameterization, which replaces softmax + multinomial with a single argmax over noised logits:
 
 $$
-\text{sample} = \text{argmax}_i \left( \ell_i + G_i \right) \sim \text{Categorical}(\pi)
+\text{sample} = \text{argmax}_i \left( \frac{\ell_i}{\tau} + G_i \right) \sim \text{Categorical}(\text{softmax}(\ell / \tau))
 $$
 
-where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. noise variables and $\ell_i$ are the logits.
-The crucial property is that argmax decomposes over tiles: each tile of the vocabulary computes its local maximum, and a cheap global reduction over tile-local maxima produces the final sample.
+where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. noise variables, $\ell_i$ are the logits, and $\tau$ is the temperature parameter.
+The crucial property is that argmax decomposes over tiles.
+This works because the maximum of sub-maxima equals the global maximum, so each tile can independently find its local winner and a cheap reduction over tile-local winners produces the final sample.
 The kernel computes logits tile by tile, finds each tile's winner, and discards the rest.
+This requires implementing the matmul in Triton rather than calling cuBLAS, because cuBLAS is a closed-box library call and fusion needs custom logic (noise generation, argmax) injected into the matmul's inner loop.
 
-The rest of this post shows the benchmark results first, then explains the algorithm in detail.
+Concretely, the kernel has two stages.
+In stage 1, a 2D grid of Triton programs tiled over (vocabulary, batch) each computes its logit block via matmul, adds Gumbel noise, finds the tile-local argmax, and writes only two scalars to GMEM: the maximum noised logit value and the corresponding vocabulary index.
+In stage 2, a cheap host-side reduction over these tile-local maxima picks the global winner per batch row.
+The full algorithm details come later in this post; the next section shows the benchmark results first.
 
-## Kernel Microbenchmarks
+# Kernel Microbenchmarks {#sec-microbenchmarks}
 
 The LM head is a dense `[V, d]` matrix in every model, including MoE architectures (MoE only replaces the FFN layers, not the LM head).
 MoE models have surprisingly small hidden dimensions relative to their parameter count because the extra parameters live in expert FFN layers, not the LM head.
@@ -99,9 +87,9 @@ I benchmark two workload sizes based on [this analysis](https://github.com/tomas
 - **Small** (V=151,936, d=4,096): Qwen3-8B, and notably Qwen3-235B MoE (which has d=4,096 despite 235B total parameters).
 - **Large** (V=128,256, d=8,192): Llama 3 70B, DeepSeek V3 (d=7,168).
 
-### Baselines
+## Baselines
 
-Both FlashInfer kernels require the full logits, so I include in their runtime the matmul to compute the logits. This is a fair comparison because FMMS also computes a matmul -- the full logits tensor is just not written to GMEM.
+Both FlashInfer kernels require the full logits, so their runtimes include the matmul that computes the logits. This is a fair comparison because FMMS also computes a matmul -- the full logits tensor is just not written to GMEM.
 
 (1) **Naive PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
 (2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
@@ -109,7 +97,7 @@ Both FlashInfer kernels require the full logits, so I include in their runtime t
 
 All baselines are torch compiled, so the matmul dispatches to cuBLAS.
 
-### GPUs
+## GPUs
 
 Since FMMS saves memory bandwidth, its advantage depends on how memory-bound the workload is.
 I benchmark across four modern datacenter GPUs:
@@ -126,7 +114,7 @@ I benchmark across four modern datacenter GPUs:
 The ops:byte ratio (peak compute / peak bandwidth) determines the crossover point where the matmul transitions from memory-bound to compute-bound.
 All experiments are reproducible. The [GitHub README](https://github.com/tomasruizt/fused-mm-sample) has setup instructions and `make` targets for all benchmarks and tests.
 
-### Scaling Behavior
+## Scaling Behavior
 
 @fig-batch-scaling shows execution time (left) and throughput in samples/ms (right) across batch sizes.
 All methods have nearly flat latency from N=1 to 32 (memory-bound: runtime is dominated by loading the weight matrix).
@@ -171,7 +159,7 @@ At larger batch sizes, the baselines catch up as the matmul approaches the compu
 
 *All benchmarks: PyTorch 2.10.0, CUDA 13.0, run on Modal. Data as of 2026-02-11.*
 
-### Relative Performance Across GPUs
+## Relative Performance Across GPUs
 
 The relative speedup tables show `baseline_time / fmms_time`, so values > 1.0 mean FMMS is faster.
 
@@ -350,7 +338,7 @@ Two FlashInfer baselines are compared:
 Vs `top_k_top_p`, FMMS is up to **2.30x faster** (B300, small config, N=16).
 For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes^[B300 is a striking outlier: 1.6-2.3x speedups while B200/H200/H100 show 1.2-1.5x.
 B200 and B300 have identical bandwidth and compute specs, and FMMS runs at the same speed on both (within 2%).
-The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 than on B200, pontentially due to incomplete optimization for the newer B300 architecture (sm_110)].
+The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 than on B200, potentially due to incomplete optimization for the newer B300 architecture (sm_110)].
 
 Vs `sampling_from_logits`, **FMMS is faster at all batch sizes from 1 to 64 on every GPU tested**, with speedups of 3-25%.
 For the small config, FMMS stays above 1.0x up to N=128 on B300/H100.
@@ -413,7 +401,7 @@ FMMS also has higher register pressure from fusing Gumbel noise generation into 
 :::
 ::::
 
-### Memory Throughput
+## Memory Throughput
 
 @fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
 At low batch sizes (N $\leq$ 64), where the operation is deeply memory-bound, FMMS consistently achieves higher throughput than all baselines.
@@ -452,7 +440,7 @@ Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-6
 ::::
 
 
-## End-to-End Benchmarks (vLLM)
+# End-to-End Benchmarks (vLLM) {#sec-e2e}
 
 The kernel benchmarks measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
@@ -468,6 +456,7 @@ The LM head is a standard dense linear layer in all three, so FMMS applies ident
 
 : {.sm}
 
+The "Baseline" in the tables below is vLLM's default sampling path (torch compiled matmul followed by softmax and `torch.multinomial`), without FMMS.
 Each configuration is run 5 times per trial; some models have 2 independent trials to increase confidence.
 The plots pool data from all trials, and per-trial tables are available in the collapsible sections.
 All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
@@ -550,7 +539,7 @@ FMMS reduces TPOT by 11-19% across all concurrency levels.
 
 # Qwen3-8B
 
-FMMS reduces TPOT by 3-7% consistently across concurrency levels.
+FMMS reduces TPOT by 3-7% at most concurrency levels, with larger gains in some runs (up to 17% at concurrency 32 in trial 1).
 
 ::: {layout-ncol=2}
 ![](imgs/speedups/Qwen3-8B.png)
@@ -594,19 +583,6 @@ FMMS reduces TPOT by 3-7% consistently across concurrency levels.
 
 </details>
 
-### Quirks of E2E Benchmarking
-
-The two trials show substantial variability in absolute runtimes.
-At concurrency 32, trial 1 measures 6.06 ms (baseline) vs 5.14 ms (FMMS), while trial 2 measures 4.63 ms vs 4.43 ms.
-Despite this, the pattern is consistent: FMMS outperforms the baseline at every concurrency level in both trials.
-
-At concurrency 256 (not shown in the tables above), both variants degrade sharply, but the baseline degrades much more.
-In trial 1, the baseline jumps to 27.73 ms while FMMS reaches 19.61 ms (29% reduction).
-In trial 2, the baseline reaches 15.52 ms and FMMS 12.68 ms (19% reduction).
-The LM head is only a fraction of the total decode step, so the kernel-level speedup (1.3x in microbenchmarks at N=256) cannot explain a 19-29% end-to-end TPOT improvement.
-My main hypothesis is that vLLM's baseline sampling path launches kernels outside the main CUDA graph, incurring overhead that compounds at high batch sizes.
-FMMS replaces this with a single fused Triton kernel, avoiding that overhead entirely.
-
 # Qwen3-32B
 
 FMMS reduces TPOT by 1-2% across concurrency levels.
@@ -635,7 +611,7 @@ FMMS reduces TPOT by 1-2% across concurrency levels.
 </details>
 ::::
 
-## Correctness
+# Correctness {#sec-correctness}
 
 FMMS uses the Gumbel-max trick, which produces **exact** samples from the categorical distribution, not an approximation.
 But because the output is stochastic, correctness is harder to verify than for a deterministic kernel.
@@ -644,7 +620,7 @@ You cannot compare the output to a reference value; instead, you need statistica
 I verify this with a chi-squared goodness-of-fit test that runs as a regular unit test during development: draw 10,000 samples from the kernel using synthetic inputs with known logit vectors, and compare the empirical token frequencies against the theoretical softmax probabilities.
 The test is parametrized over multiple vocabulary sizes and batch sizes to catch tile-boundary edge cases.
 
-### End-to-End: GSM8K
+## End-to-End: GSM8K
 
 As an end-to-end quality check, I integrated FMMS into vLLM and ran the GSM8K benchmark (1,319 questions, 0-shot chain-of-thought) via [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) on Qwen3-1.7B.
 Answers were graded by an LLM judge.
@@ -661,7 +637,7 @@ The test is *paired* because both variants answer the same 1,319 questions: it c
 This cancels out shared question difficulty and focuses on questions where the variants actually disagree.
 The result is p=0.776, far from significant (threshold: p < 0.05), confirming that FMMS does not degrade model accuracy.
 
-## The Algorithm
+# The Algorithm {#sec-algorithm}
 
 The matmul $W_{[V,d]} \times H_{[N,d]}^T$ is tiled across the $V$, $d$, and $N$ dimensions as shown in @fig-tiled-mm.
 Each tile produces a $(T_V, T_N)$ block of logits in SRAM.
@@ -670,7 +646,7 @@ Each tile produces a $(T_V, T_N)$ block of logits in SRAM.
 
 Since argmax decomposes over tiles (as described above), the kernel has a two-stage design:
 
-* **Stage 1 (Triton kernel):** A 2D grid of programs indexed by `(v, h)` (vocabulary tile, batch tile). Each program computes its logit tile, scales by temperature, adds Gumbel noise, and writes only the local max value and vocabulary index to GMEM.
+* **Stage 1 (Triton kernel):** A 2D grid of programs indexed by `(v, h)` (vocabulary tile, batch tile). Each program computes its logit tile, scales by temperature, adds Gumbel noise, and finds the tile-local maximum. Only the max value and its global vocabulary index are written to GMEM.
 * **Stage 2 (host-side reduction):** A cheap PyTorch reduction over the `num_V_tiles` local maxima per hidden state:
 
 ```python
@@ -678,7 +654,34 @@ best_tiles = tile_maxs.argmax(dim=0)   # which tile won?
 samples = tile_indices.gather(0, best_tiles)  # what index did it have?
 ```
 
-## Related Work
+## Stage 1: Per-Tile Logic
+
+Here is what each program in the 2D grid does, in pseudocode:
+
+```python
+def program(v_tile, h_tile, W, H, temperature, seed):
+    logits = zeros(T_V, T_N, dtype=float32)        # <1>
+    for d_start in range(0, d, T_d):                # <2>
+        w = W[v_tile, d_start : d_start + T_d]      # load [T_V, T_d] from GMEM
+        h = H[h_tile, d_start : d_start + T_d]      # load [T_N, T_d] from GMEM
+        logits += w @ h.T                            # accumulate in SRAM
+
+    logits = logits / temperature
+    U = rand(T_V, T_N)                              # <3>
+    gumbel_noise = -log(-log(U))
+    noised = logits + gumbel_noise
+
+    max_val, max_idx = max(noised, dim=V)           # <4>
+    GMEM_maxs[v_tile, h_tile] = max_val             # [T_N]
+    GMEM_idxs[v_tile, h_tile] = max_idx + v_offset  # <5>
+```
+1. The accumulator is FP32 for precision, even though the weight and hidden state tiles are loaded in BF16.
+2. The inner loop tiles the $d$ dimension. Each iteration loads one strip of $W$ and $H$ and accumulates a partial dot product. The full logit tile never leaves SRAM.
+3. Gumbel noise is generated in-kernel using Triton's Philox PRNG (`tl.rand`), one draw per logit element. Each `(v, h)` tile uses a different seed offset so tiles produce independent noise.
+4. The argmax over the $V$ dimension reduces the $(T_V, T_N)$ tile to just $T_N$ values. This is where the fusion pays off: the full logit tile is consumed and discarded in SRAM.
+5. The local argmax index is shifted by `v_offset` to produce a global vocabulary index before writing to GMEM.
+
+# Related Work
 
 _Cut Your Losses in Large-Vocabulary Language Models_ [@wijmans2025cut] is the direct inspiration for this work.
 They avoid materializing logits during training by computing the cross-entropy loss incrementally on SRAM, reducing memory from 24GB to 1MB for Gemma 2 (2B).
@@ -692,7 +695,7 @@ _FlashInfer_ [@ye2025flashinfer] provides high-performance sampling kernels used
 _Liger Kernel_ [@hsu2025ligerkernelefficienttriton] focuses on training-time kernel fusion and includes no sampling primitives.
 The _online-softmax_ method [@milakov2018onlinenormalizercalculationsoftmax] enables incremental normalization and is used in _FlashAttention_ [@dao2022flashattention], but neither applies it to sampling from the LM head.
 
-## Conclusion
+# Conclusion
 
 FMMS fuses the LM head matmul with token sampling in a single Triton kernel, eliminating the GMEM round-trip for logits that every standard sampling path pays.
 The trade-off is straightforward: at large batch sizes where the matmul becomes compute-bound, cuBLAS-backed baselines are faster.
@@ -701,6 +704,15 @@ In this regime (batch sizes 1-64), FMMS outperforms every baseline on every GPU 
 
 Integrated into vLLM, these kernel-level gains translate to real end-to-end improvements on B200: up to 19% lower TPOT on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
 
-The code is open-source at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
+The code is open-source at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample). FMMS is currently integrated into vLLM on a [feature branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler), not merged upstream.
+
+## Future Work
+
+**Top-k/top-p filtering.**
+FMMS currently implements pure categorical sampling (temperature-scaled Gumbel-max).
+It does not support top-k or top-p filtering.
+Top-k is feasible to fuse: each tile can compute a local top-k during the matmul, and a small merge step combines the per-tile candidates.
+Top-p can be implemented if its applied after top-k, as is done in the FlashInfer top-k-top-p kernel, and also on the vLLM pytorch sampling path.
+In this case, top-p filtering is applied only to the surviving top-k tokens.
 
 # References
