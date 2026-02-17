@@ -24,7 +24,6 @@ citation: true
 
 <!-- TODO (sorted easiest to hardest)
 - Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
-- Explain why Qwen3-8B FMMS is faster at larger batch sizes despite being slower in kernel microbenchmarks at those sizes.
 - Make tabsets have less padding.
 -->
 
@@ -469,87 +468,160 @@ The LM head is a standard dense linear layer in all three, so FMMS applies ident
 
 | Model | Type | Hidden size (d) | Vocab size (V) |
 | - | --- | - | - |
+| gpt-oss-120b | MoE (128 experts, 4 active) | 2,880 | 201,088 |
 | Qwen3-1.7B | Dense | 2,048 | 151,936 |
 | Qwen3-8B | Dense | 4,096 | 152,064 |
-| gpt-oss-120b | MoE (128 experts, 4 active) | 2,880 | 201,088 |
+| Qwen3-32B | Dense | 5,120 | 152,064 |
 
 : {.sm}
 
-Each configuration is run 5 times; the table shows the median TPOT (lower is better) and the TPOT reduction.
+Each configuration is run 5 times per trial; some models have 2 independent trials to increase confidence.
+The plots pool data from all trials, and per-trial tables are available in the collapsible sections.
 All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
 
-![Median TPOT vs concurrency for all three models.](imgs/tpot_vs_concurrency.png){width="100%" #fig-tpot-vs-concurrency}
+:::: {.panel-tabset group="vllm-model"}
+# gpt-oss-120b
 
-![TPOT speedup (%) per run. Each light dot is one of 5 runs; the line connects the medians.](imgs/speedup_vs_concurrency.png){width="100%" #fig-speedup-vs-concurrency}
+The LM head is a smaller fraction of the total decode step in a 120B-parameter model.
+FMMS reduces TPOT by 2-5% at low concurrency (1-8).
+
+::: {layout-ncol=2}
+![](imgs/speedups/gpt-oss-120b.png)
+
+![](imgs/tpots/gpt-oss-120b.png)
+:::
 
 <details>
-<summary>Show per-model data tables</summary>
+<summary>Data table</summary>
 
-::: {.panel-tabset group="model"}
+| Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
+| - | - | - | - |
+| 1 | 3.45 | 3.29 | **-4.5%** |
+| 2 | 4.14 | 3.99 | -3.7% |
+| 4 | 5.28 | 5.11 | -3.0% |
+| 8 | 7.30 | 7.12 | -2.5% |
+| 16 | 9.94 | 9.77 | -1.9% |
+| 32 | 13.34 | 13.39 | +0.4% |
+| 64 | 17.80 | 17.50 | -1.3% |
+
+: Median TPOT on gpt-oss-120b. **Bold** marks the peak reduction. {.sm .striped}
+
+</details>
+
 # Qwen3-1.7B
 
-Qwen3-1.7B has V=151,936 and d=2,048.
 The small hidden dimension makes the LM head matmul strongly memory-bound, so fusion has a large impact.
-FMMS reduces TPOT by 10-19% across all concurrency levels.
-Peak improvement is -18.7% at concurrency 64.
+FMMS reduces TPOT by 11-19% across all concurrency levels.
+
+::: {layout-ncol=2}
+![](imgs/speedups/Qwen3-1.7B.png)
+
+![](imgs/tpots/Qwen3-1.7B.png)
+:::
+
+<details>
+<summary>Data table</summary>
 
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | - | - | - | - |
 | 1 | 2.25 | 2.00 | -10.8% |
-| 2 | 2.14 | 1.87 | -12.6% |
-| 4 | 2.15 | 1.84 | -14.5% |
+| 2 | 2.14 | 1.87 | -12.5% |
+| 4 | 2.15 | 1.84 | -14.6% |
 | 8 | 2.19 | 1.86 | -15.2% |
 | 16 | 2.24 | 1.85 | -17.7% |
-| 32 | 2.52 | 2.28 | -10.0% |
+| 32 | 2.52 | 2.28 | -11.7% |
 | 64 | 3.47 | 2.82 | **-18.7%** |
-| 128 | 4.21 | 4.05 | -4.4% |
-| 256 | 15.43 | 14.28 | -7.6% |
 
-: Runtimes on Qwen3-1.7B. **Bold** marks the peak TPOT reduction. {.sm .striped}
+: Median TPOT on Qwen3-1.7B. **Bold** marks the peak reduction. {.sm .striped}
+
+</details>
 
 # Qwen3-8B
 
-Qwen3-8B has V=152,064 and d=4,096.
-The larger hidden dimension means the LM head matmul is a bigger fraction of the decode step compared to Qwen3-1.7B, but still strongly memory-bound.
-FMMS reduces TPOT by 3-29%.
-Peak improvement is -29.3% at concurrency 256.
+FMMS reduces TPOT by 3-7% consistently across concurrency levels.
+
+::: {layout-ncol=2}
+![](imgs/speedups/Qwen3-8B.png)
+
+![](imgs/tpots/Qwen3-8B.png)
+:::
+
+<details>
+<summary>Data table</summary>
+
+::: {.panel-tabset}
+## Trial 1
 
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | - | - | - | - |
-| 1 | 4.50 | 4.34 | -3.7% |
-| 2 | 4.63 | 4.49 | -3.0% |
+| 1 | 4.50 | 4.34 | -3.8% |
+| 2 | 4.63 | 4.49 | -3.5% |
 | 4 | 5.07 | 4.93 | -2.7% |
-| 8 | 5.79 | 5.53 | -5.1% |
-| 16 | 5.93 | 5.52 | -7.4% |
-| 32 | 6.06 | 5.14 | -3.7% |
-| 64 | 5.06 | 4.53 | -10.3% |
-| 128 | 6.27 | 5.47 | -12.8% |
-| 256 | 27.73 | 19.61 | **-29.3%** |
+| 8 | 5.79 | 5.53 | -5.6% |
+| 16 | 5.93 | 5.52 | -7.5% |
+| 32 | 6.06 | 5.14 | **-17.1%** |
+| 64 | 5.06 | 4.53 | -10.4% |
 
-: Runtimes on Qwen3-8B. **Bold** marks the peak TPOT reduction. {.sm .striped}
+: Median TPOT on Qwen3-8B, trial 1. **Bold** marks the peak reduction. {.sm .striped}
 
-# gpt-oss-120b
-
-gpt-oss-120b has V=201,088 and d=2,880.
-The improvement is smaller because the LM head matmul is a smaller fraction of the total decode step in a 120B-parameter model.
-FMMS reduces TPOT by 2-4% at low concurrency (1-8).
+## Trial 2
 
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | - | - | - | - |
-| 1 | 3.45 | 3.29 | **-4.3%** |
-| 2 | 4.14 | 3.99 | -3.6% |
-| 4 | 5.28 | 5.11 | -3.1% |
-| 8 | 7.30 | 7.12 | -2.5% |
-| 16 | 9.94 | 9.77 | -1.8% |
-| 32 | 13.34 | 13.39 | +0.6% |
-| 64 | 17.80 | 17.50 | -1.7% |
-| 128 | 23.39 | 23.25 | -0.6% |
-| 256 | 27.43 | 27.06 | -1.4% |
+| 1 | 4.41 | 4.29 | -2.8% |
+| 2 | 4.35 | 4.05 | **-6.9%** |
+| 4 | 4.28 | 4.12 | -3.7% |
+| 8 | 4.38 | 4.22 | -3.6% |
+| 16 | 4.15 | 4.02 | -2.9% |
+| 32 | 4.63 | 4.43 | -4.5% |
+| 64 | 5.29 | 5.01 | -5.7% |
 
-: Runtimes on gpt-oss-120b. **Bold** marks the peak TPOT reduction. {.sm .striped}
+: Median TPOT on Qwen3-8B, trial 2. **Bold** marks the peak reduction. {.sm .striped}
+
 :::
 
 </details>
+
+### Quirks of E2E Benchmarking
+
+The two trials show substantial variability in absolute runtimes.
+At concurrency 32, trial 1 measures 6.06 ms (baseline) vs 5.14 ms (FMMS), while trial 2 measures 4.63 ms vs 4.43 ms.
+Despite this, the pattern is consistent: FMMS outperforms the baseline at every concurrency level in both trials.
+
+At concurrency 256 (not shown in the tables above), both variants degrade sharply, but the baseline degrades much more.
+In trial 1, the baseline jumps to 27.73 ms while FMMS reaches 19.61 ms (29% reduction).
+In trial 2, the baseline reaches 15.52 ms and FMMS 12.68 ms (19% reduction).
+The LM head is only a fraction of the total decode step, so the kernel-level speedup (1.3x in microbenchmarks at N=256) cannot explain a 19-29% end-to-end TPOT improvement.
+My main hypothesis is that vLLM's baseline sampling path launches kernels outside the main CUDA graph, incurring overhead that compounds at high batch sizes.
+FMMS replaces this with a single fused Triton kernel, avoiding that overhead entirely.
+
+# Qwen3-32B
+
+FMMS reduces TPOT by 1-2% across concurrency levels.
+
+::: {layout-ncol=2}
+![](imgs/speedups/Qwen3-32B.png)
+
+![](imgs/tpots/Qwen3-32B.png)
+:::
+
+<details>
+<summary>Data table</summary>
+
+| Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
+| - | - | - | - |
+| 1 | 12.83 | 12.59 | -1.9% |
+| 2 | 12.56 | 12.78 | +1.7% |
+| 4 | 12.54 | 12.34 | -1.6% |
+| 8 | 12.64 | 12.49 | -1.1% |
+| 16 | 13.05 | 12.90 | -1.1% |
+| 32 | 13.65 | 13.47 | -1.3% |
+| 64 | 14.85 | 14.68 | -1.3% |
+
+: Median TPOT on Qwen3-32B. {.sm .striped}
+
+</details>
+::::
 
 ## Correctness
 

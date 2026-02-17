@@ -29,9 +29,10 @@ TRITON_PLOTS := \
 	memory-throughput-large:memory-throughput-large \
 	memory-throughput-small:memory-throughput-small
 
-# vLLM plots (GPU-independent).
+# vLLM per-model plots (from subdirectories of vllm-bench-b200/imgs/).
 VLLM_DIR := $(BENCH)/vllm-bench-b200/imgs
-VLLM_PLOTS := tpot_vs_concurrency.png speedup_vs_concurrency.png
+VLLM_MODELS := Qwen3-1.7B Qwen3-8B Qwen3-32B gpt-oss-120b
+VLLM_SUBDIRS := tpots speedups strips
 
 .PHONY: copy-imgs
 copy-imgs:
@@ -43,7 +44,10 @@ copy-imgs:
 		) \
 	) true
 	@echo "Copying vLLM plots..."
-	@$(foreach plot,$(VLLM_PLOTS),\
-		cp "$(VLLM_DIR)/$(plot)" "$(IMGS)/$(plot)" && \
+	@$(foreach sub,$(VLLM_SUBDIRS),\
+		mkdir -p "$(IMGS)/$(sub)" && \
+		$(foreach model,$(VLLM_MODELS),\
+			cp "$(VLLM_DIR)/$(sub)/$(model).png" "$(IMGS)/$(sub)/$(model).png" && \
+		) \
 	) true
 	@echo "Done. Copied plots for GPUs: $(GPUS)"
