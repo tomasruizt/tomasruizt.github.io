@@ -22,11 +22,6 @@ citation: true
 # draft: true
 ---
 
-<!-- TODO (sorted easiest to hardest)
-- Add discussion on the vLLM speedup plot's large per-run variability (the scattered dots), especially at higher concurrency levels.
-- Make tabsets have less padding.
--->
-
 ## TL;DR
 ::: {.callout-note appearance="simple"}
 I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
@@ -483,7 +478,7 @@ All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.
 # gpt-oss-120b
 
 The LM head is a smaller fraction of the total decode step in a 120B-parameter model.
-FMMS reduces TPOT by 2-5% at low concurrency (1-8).
+FMMS reduces TPOT by up to 5% at low concurrency (1-8), with modest 1-2% improvements at higher concurrency levels.
 
 ::: {layout-ncol=2}
 ![](imgs/speedups/gpt-oss-120b.png)
@@ -494,17 +489,36 @@ FMMS reduces TPOT by 2-5% at low concurrency (1-8).
 <details>
 <summary>Data table</summary>
 
+::: {.panel-tabset}
+## Trial 1
+
 | Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
 | - | - | - | - |
-| 1 | 3.45 | 3.29 | **-4.5%** |
-| 2 | 4.14 | 3.99 | -3.7% |
-| 4 | 5.28 | 5.11 | -3.0% |
+| 1 | 3.45 | 3.29 | **-4.6%** |
+| 2 | 4.14 | 3.99 | -3.6% |
+| 4 | 5.28 | 5.11 | -3.2% |
 | 8 | 7.30 | 7.12 | -2.5% |
-| 16 | 9.94 | 9.77 | -1.9% |
+| 16 | 9.94 | 9.77 | -1.7% |
 | 32 | 13.34 | 13.39 | +0.4% |
-| 64 | 17.80 | 17.50 | -1.3% |
+| 64 | 17.80 | 17.50 | -1.7% |
 
-: Median TPOT on gpt-oss-120b. **Bold** marks the peak reduction. {.sm .striped}
+: Median TPOT on gpt-oss-120b, trial 1. **Bold** marks the peak reduction. {.sm .striped}
+
+## Trial 2
+
+| Concurrency | Baseline (ms) | FMMS Triton (ms) | TPOT Reduction |
+| - | - | - | - |
+| 1 | 3.54 | 3.53 | -0.3% |
+| 2 | 4.17 | 4.11 | -1.4% |
+| 4 | 5.28 | 5.15 | **-2.5%** |
+| 8 | 7.27 | 7.12 | -2.1% |
+| 16 | 9.97 | 9.79 | -1.8% |
+| 32 | 13.23 | 13.03 | -1.5% |
+| 64 | 17.52 | 17.24 | -1.6% |
+
+: Median TPOT on gpt-oss-120b, trial 2. **Bold** marks the peak reduction. {.sm .striped}
+
+:::
 
 </details>
 
@@ -805,6 +819,51 @@ make modal-triton-benchmark-all-gpus    # loop over all GPUs
 ```
 
 Makefiles can use `$(shell which python)` instead of hardcoded paths, so the same targets work across local dev machines and remote cloud GPUs.
+
+## Reproducing the Experiments
+
+The full source code is at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
+All benchmarks run on [Modal](https://modal.com) cloud GPUs and are orchestrated via `make` targets.
+
+### Setup
+
+```bash
+git clone https://github.com/tomasruizt/fused-mm-sample.git
+cd fused-mm-sample
+pip install -e '.[dev]'       # install with dev dependencies
+modal setup                   # configure Modal credentials
+```
+
+### Kernel Microbenchmarks
+
+The kernel benchmarks run a three-step pipeline: (1) execute on Modal, (2) download results, (3) generate plots.
+
+```bash
+make modal-triton-benchmark GPU=h100!         # single GPU
+make modal-triton-benchmark-all-gpus          # all GPUs (B300, B200, H200, H100)
+```
+
+Results are saved to `benchmarking/modal-results/triton-bench-{GPU}/` with CSVs and plots.
+
+### End-to-End vLLM Benchmarks
+
+The vLLM benchmarks use the FMMS-integrated [vLLM fork](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler) and sweep across concurrency levels with 5 runs per configuration.
+
+```bash
+make modal-vllm-benchmark-full-qwen3-1.7b GPU=b200
+make modal-vllm-benchmark-full-qwen3-8b GPU=b200
+make modal-vllm-benchmark-full-gpt-oss-120b GPU=b200
+```
+
+Results are saved to `benchmarking/modal-results/vllm-bench-{GPU}/` with per-model subdirectories.
+
+### Unit Tests
+
+The correctness tests verify the sampling distribution via a chi-squared goodness-of-fit test.
+
+```bash
+pytest tests/
+```
 
 ## Related Work
 
