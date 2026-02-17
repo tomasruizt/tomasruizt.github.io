@@ -36,7 +36,7 @@ The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https:/
 
 Every LLM decode step runs the same pipeline: multiply hidden states by the LM head weights to produce logits, normalize via softmax, then sample a token.
 The logits tensor has shape $[N, V]$, where $V$ is the vocabulary size (up to 256K) and $N$ is the batch size.
-In the standard approach, this entire tensor is written to HBM and then read back for sampling.
+In the standard approach, this entire tensor is written to GMEM and then read back for sampling.
 This round-trip is pure waste when the operation is memory-bound, which is the common case during decode ($N \leq 64$).
 
 ```python
@@ -51,11 +51,11 @@ def sample(
 ```
 
 Existing libraries assume the logits are already materialized: FlashInfer's [@ye2025flashinfer] sampling kernels take `logits` or `probs` as input, and Liger Kernel [@hsu2025ligerkernelefficienttriton] targets training rather than inference.
-Can the matmul and sampling be fused into a single kernel that never writes logits to HBM?
+Can the matmul and sampling be fused into a single kernel that never writes logits to GMEM?
 
 ## The Idea: Fuse Everything
 
-FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, never writing logits to HBM.
+FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, never writing logits to GMEM.
 @fig-baseline-vs-fmms contrasts the two approaches.
 
 ![W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.](imgs/baseline-vs-fmms-diagram.png){width="100%" #fig-baseline-vs-fmms}
@@ -106,13 +106,14 @@ I benchmark across four modern datacenter GPUs:
 : {.sm}
 
 The ops:byte ratio (peak compute / peak bandwidth) determines the crossover point where the matmul transitions from memory-bound to compute-bound.
+All experiments are reproducible. The [GitHub README](https://github.com/tomasruizt/fused-mm-sample) has setup instructions and `make` targets for all benchmarks and tests.
 
 ### Scaling Behavior
 
 @fig-batch-scaling shows execution time (left) and throughput in samples/ms (right) across batch sizes.
 All methods have nearly flat latency from N=1 to 32 (memory-bound: runtime is dominated by loading the weight matrix).
 Beyond N=64, latency rises as the matmul becomes compute-bound.
-FMMS (red) is the fastest method in the flat region, where fusion eliminates the extra HBM round-trip for logits.
+FMMS (red) is the fastest method in the flat region, where fusion eliminates the extra GMEM round-trip for logits.
 At larger batch sizes, the baselines catch up as the matmul approaches the compute-bound regime and cuBLAS efficiency matters more.
 
 ::::: {.panel-tabset group="workload-size"}
@@ -398,7 +399,7 @@ FMMS sits slightly above the baselines in the memory-bound region, reflecting it
 @fig-memory-throughput shows the achieved memory throughput (GB/s) as a function of batch size.
 At low batch sizes (N $\leq$ 64), where the operation is deeply memory-bound, FMMS consistently achieves higher throughput than all baselines.
 Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-60% on B300/B200 (small config).
-100% would mean the kernel does nothing but stream the weight matrix from HBM at the hardware's maximum rate, with zero overhead for computation, synchronization, or memory access patterns.
+100% would mean the kernel does nothing but stream the weight matrix from GMEM at the hardware's maximum rate, with zero overhead for computation, synchronization, or memory access patterns.
 This is the direct mechanism behind the speedups: by fusing the matmul and sampling, FMMS uses the available memory bandwidth more efficiently.
 
 ::::: {.panel-tabset group="workload-size"}
@@ -443,9 +444,9 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 
 : {.sm}
 
-**When memory-bound**, the kernel's throughput is determined by how fast it reads the weight matrix from HBM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to HBM, then read them back for sampling. This extra round-trip wastes bandwidth on the bottleneck path.
+**When memory-bound**, the kernel's throughput is determined by how fast it reads the weight matrix from GMEM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to GMEM, then read them back for sampling. This extra round-trip wastes bandwidth on the bottleneck path.
 
-**When compute-bound**, the matmul dominates runtime and the cost of the extra HBM traffic for logits becomes negligible relative to the computation. 
+**When compute-bound**, the matmul dominates runtime and the cost of the extra GMEM traffic for logits becomes negligible relative to the computation. 
 The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS implements the matmul in Triton.
 It also suffers from higher register pressure, because it fuses Gumbel noise generation and the max-reduction into the same kernel.
 
@@ -665,108 +666,20 @@ The result is p=0.776, far from significant (threshold: p < 0.05), confirming th
 
 ## The Algorithm
 
-The previous sections showed what FMMS achieves; this section explains how it works.
-The inputs are the LM head weights $W$ with shape $(V, d)$ and hidden states $H$ with shape $(N, d)$.
-Inside the kernel, $H$ is transposed to $(d, N)$ so the matmul $W \times H^T$ produces logits of shape $(V, N)$.
+The matmul $W_{[V,d]} \times H_{[N,d]}^T$ is tiled across the $V$, $d$, and $N$ dimensions as shown in @fig-tiled-mm.
+Each tile produces a $(T_V, T_N)$ block of logits in SRAM.
 
-### Tiled Matmul
+![Tiling the computation of the logits.](imgs/Fused%20MM%20sample.png){width="60%" text-align="left" fig-alt="Tiling the computation of the logits" .lightbox #fig-tiled-mm}
 
-To break down the computation into an incremental fashion, I used Triton, which supports tiling the computation.
-The logits are the result of a matrix multiplication, which can be tiled across the $V$, $d$, and $N$ dimensions as shown in @fig-tiled-mm.
-The tiles of $W$ have shape $(T_V, T_d)$ while the tiles of $H$ have shape $(T_d, T_N)$.
-The resulting tiles of the logits have shape $(T_V, T_N)$.
+Since argmax decomposes over tiles (as described above), the kernel has a two-stage design:
 
-![Tiling the computation of the logits.](imgs/Fused%20MM%20sample.png){width="80%" text-align="left" fig-alt="Tiling the computation of the logits" .lightbox #fig-tiled-mm}
-
-### Why Tiled Sampling Is Hard
-
-The next part of the puzzle is how to incrementally sample based on a single tile of logits, rather than on the full vector of logits.
-The problem is not strictly the softmax normalization factor, which can be computed incrementally (online-softmax).
-Rather, the problem is that the relative likelihood of each token is unknown until the last (bottom) tile of logits is computed.
-
-To understand this, consider the logits case below, where the vocabulary size $V=8$, the tile size $T_V=2$ (so, 8/2 = 4 tiles).
-The horizontal lines separate the tiles.
-Notice how it is impossible to know and sample from the highest probability logit (50.0) until the last tile is computed.
-
-$$
-\begin{aligned}
-L &= \begin{bmatrix}
-1.0 \\
-1.2 \\
-\hline
-2.0 \\
-1.4 \\
-\hline
-1.0 \\
-2.1 \\
-\hline
-1.1 \\
-50.0
-\end{bmatrix}
-\end{aligned}
-$$
-
-However, there is one statistical trick to circumvent this problem: The Gumbel-Max trick.
-
-### The Gumbel-Max Trick
-
-The Gumbel-max trick enables sampling from a categorical distribution using only logits, completely bypassing the softmax function. The key identity is:
-
-$$
-\text{argmax}_i \left( \log \pi_i + G_i \right) \sim \text{Categorical}(\pi_1, \ldots, \pi_V)
-$$
-
-where $G_i \sim \text{Gumbel}(0, 1)$ are i.i.d. Gumbel random variables, and $\pi_i$ are the (unnormalized) probabilities.
-Since logits are $\ell_i = \log \pi_i$ (up to a constant that cancels in the argmax), this is equivalently:
-
-$$
-\text{sample} = \text{argmax}_i \left( \ell_i + G_i \right)
-$$
-
-A Gumbel(0,1) random variable can be generated from a uniform random variable $U \sim \text{Uniform}(0, 1)$ as $G = -\log(-\log(U))$.
-
-#### Why this is useful for tiled computation
-
-The crucial property is that **argmax decomposes over tiles**. If the vocabulary is split into tiles $T_1, T_2, \ldots, T_K$, the local maximum in each tile can be computed independently:
-
-$$
-m_k = \max_{i \in T_k} \left( \ell_i + G_i \right), \quad a_k = \text{argmax}_{i \in T_k} \left( \ell_i + G_i \right)
-$$
-
-and then the global sample is simply:
-
-$$
-\text{sample} = a_{k^*} \quad \text{where} \quad k^* = \text{argmax}_k \, m_k
-$$
-
-Each tile only needs to output two values: its local max $m_k$ and the corresponding vocabulary index $a_k$. The full logit vector is never materialized -- each tile computes its logits, adds Gumbel noise, finds the local winner, and discards the rest. The final reduction over $K$ tiles is trivially cheap.
-
-Compare this with the standard approach: softmax requires a full pass to compute the normalizer $Z = \sum_i e^{\ell_i}$, then another pass to compute probabilities, then sampling via inverse CDF. None of these operations decompose over tiles without cross-tile communication.
-
-### Two-Stage Architecture
-
-Putting the tiled matmul and the Gumbel-max trick together, the kernel has a two-stage design:
-
-**Stage 1 (GPU kernel):** The Triton kernel launches a 2D grid of programs indexed by `(v, h)`, where `v` ranges over vocabulary tiles and `h` over batch tiles. Each program:
-
-1. Computes its tile of logits via the tiled matmul: `logits_blk = W_tile @ H_tile.T`
-2. Scales by temperature: `logits_blk /= temperature`
-3. Generates Gumbel noise and adds it to the logits
-4. Finds the local maximum and argmax over the vocabulary dimension
-5. Writes the local max value and the corresponding global vocabulary index to main memory
-
-Each program outputs just two values per hidden state: the local max and its index. The intermediate output is a tensor of shape `[num_V_tiles, N, num_samples]`.
-
-**Stage 2 (host-side reduction):** A simple PyTorch reduction finds which tile had the global maximum for each hidden state, then gathers the corresponding vocabulary index:
+* **Stage 1 (Triton kernel):** A 2D grid of programs indexed by `(v, h)` (vocabulary tile, batch tile). Each program computes its logit tile, scales by temperature, adds Gumbel noise, and writes only the local max value and vocabulary index to GMEM.
+* **Stage 2 (host-side reduction):** A cheap PyTorch reduction over the `num_V_tiles` local maxima per hidden state:
 
 ```python
 best_tiles = tile_maxs.argmax(dim=0)   # which tile won?
 samples = tile_indices.gather(0, best_tiles)  # what index did it have?
 ```
-
-This stage operates on `num_V_tiles` elements per hidden state (e.g. 512 tiles for V=128K with a tile size of 256) and is negligibly cheap compared to stage 1.
-
-All experiments are reproducible. The [GitHub README](https://github.com/tomasruizt/fused-mm-sample) has setup instructions and `make` targets for kernel microbenchmarks, end-to-end vLLM benchmarks, and unit tests.
 
 ## Related Work
 
@@ -786,7 +699,7 @@ The _online-softmax_ method [@milakov2018onlinenormalizercalculationsoftmax] ena
 
 FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical.
 In kernel microbenchmarks, FMMS outperforms every baseline on every GPU tested at batch sizes 1 to 64: 2-15% faster than the fastest baseline (FlashInfer `sampling_from_logits`) and 19-37% faster than PyTorch compiled sampling.
-These are the batch sizes that matter most for LLM decode, where the operation is memory-bound and eliminating the extra HBM round-trip for logits directly improves throughput.
+These are the batch sizes that matter most for LLM decode, where the operation is memory-bound and eliminating the extra GMEM round-trip for logits directly improves throughput.
 
 These gains translate to real-world speedups: integrated into vLLM, FMMS reduces median TPOT by 10-19% on Qwen3-1.7B, 3-29% on Qwen3-8B, and 2-4% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
 
