@@ -10,7 +10,1854 @@
 <atom:link href="https://tomasruizt.github.io/index.xml" rel="self" type="application/rss+xml"/>
 <description>Tomas Ruiz&#39;s blog</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Wed, 28 Jan 2026 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sun, 15 Feb 2026 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>FMMS: The Fused Matmul-Sample Kernel</title>
+  <dc:creator>Tomas Ruiz</dc:creator>
+  <link>https://tomasruizt.github.io/posts/07_fused-mm-sample/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="tldr" class="level1">
+<h1>TL;DR</h1>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p>I present <strong>FMMS</strong>, a Triton kernel to do fast and exact LLM sampling. It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime. In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the <em>fastest FlashInfer</em> sampling kernel. Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no accuracy loss.</p>
+<p>The code is available on GitHub: <a href="https://github.com/tomasruizt/fused-mm-sample">github.com/tomasruizt/fused-mm-sample</a>. The algorithm is explained in Section&nbsp;3 and Section&nbsp;7, kernel microbenchmarks are in Section&nbsp;4, and end-to-end benchmarks on vLLM are in Section&nbsp;5.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-problem-gmem-traffic" class="level1">
+<h1>The Problem: GMEM Traffic</h1>
+<p>Every LLM decode step runs the same pipeline: multiply hidden states by the LM head weights to produce logits, normalize via softmax, then sample a token. The logits tensor has shape <img src="https://latex.codecogs.com/png.latex?%5BN,%20V%5D">, where <img src="https://latex.codecogs.com/png.latex?V"> is the vocabulary size (up to 256K) and <img src="https://latex.codecogs.com/png.latex?N"> is the batch size. In the standard approach, this entire tensor is written to GMEM and then read back for sampling. This round-trip is pure waste when the operation is memory-bound, which is the common case during decode (<img src="https://latex.codecogs.com/png.latex?N%20%5Cleq%2064">).</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> sample(</span>
+<span id="cb1-2">    weights: torch.Tensor,       <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [V, d]</span></span>
+<span id="cb1-3">    hidden_states: torch.Tensor, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [N, d]</span></span>
+<span id="cb1-4">):</span>
+<span id="cb1-5">    logits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> hidden_states <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span> weights.T  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [N, V]</span></span>
+<span id="cb1-6">    probs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> logits.softmax(dim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [N, V]</span></span>
+<span id="cb1-7">    samples <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> torch.multinomial(probs, num_samples<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb1-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> samples  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [N, 1]</span></span></code></pre></div>
+<p>Existing libraries assume the logits are already materialized: FlashInfer’s <span class="citation" data-cites="ye2025flashinfer">(Ye et al. 2025)</span> sampling kernels take <code>logits</code> or <code>probs</code> as input, and Liger Kernel <span class="citation" data-cites="hsu2025ligerkernelefficienttriton">(Hsu et al. 2025)</span> targets training rather than inference. Can the matmul and sampling be fused into a single kernel that never writes logits to GMEM?</p>
+</section>
+<section id="sec-solution" class="level1">
+<h1>The Solution: Fusion</h1>
+<p>FMMS (Fused Matrix Multiplication &amp; Sampling) computes the matmul and samples in one kernel, without writing the full logits tensor to GMEM. Figure&nbsp;1 contrasts the two approaches.</p>
+<div id="fig-baseline-vs-fmms" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-baseline-vs-fmms-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/baseline-vs-fmms-diagram.png" class="img-fluid figure-img" style="width:70.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-baseline-vs-fmms-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.
+</figcaption>
+</figure>
+</div>
+<p>The trick is the Gumbel-max reparameterization <span class="citation" data-cites="2110.01515">(Huijben et al. 2021)</span>, which replaces softmax + multinomial with a single argmax over noised logits:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7Bsample%7D%20=%20%5Ctext%7Bargmax%7D_i%20%5Cleft(%20%5Cfrac%7B%5Cell_i%7D%7B%5Ctau%7D%20+%20G_i%20%5Cright)%20%5Csim%20%5Ctext%7BCategorical%7D(%5Ctext%7Bsoftmax%7D(%5Cell%20/%20%5Ctau))%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?G_i%20%5Csim%20%5Ctext%7BGumbel%7D(0,%201)"> are i.i.d. noise variables, <img src="https://latex.codecogs.com/png.latex?%5Cell_i"> are the logits, and <img src="https://latex.codecogs.com/png.latex?%5Ctau"> is the temperature parameter. The crucial property is that argmax decomposes over tiles. This works because the maximum of sub-maxima equals the global maximum, so each tile can independently find its local winner and a cheap reduction over tile-local winners produces the final sample. The kernel computes logits tile by tile, finds each tile’s winner, and discards the rest. This requires implementing the matmul in Triton rather than calling cuBLAS, because cuBLAS is a closed-box library call and fusion needs custom logic (noise generation, argmax) injected into the matmul’s inner loop.</p>
+<p>Concretely, the kernel has two stages. In stage 1, a 2D grid of Triton programs tiled over (vocabulary, batch) each computes its logit block via matmul, adds Gumbel noise, finds the tile-local argmax, and writes only two scalars to GMEM: the maximum noised logit value and the corresponding vocabulary index. In stage 2, a cheap host-side reduction over these tile-local maxima picks the global winner per batch row. The full algorithm details come later in this post; the next section shows the benchmark results first.</p>
+</section>
+<section id="sec-microbenchmarks" class="level1">
+<h1>Kernel Microbenchmarks</h1>
+<p>The LM head is a dense <code>[V, d]</code> matrix in every model, including MoE architectures (MoE only replaces the FFN layers, not the LM head). MoE models have surprisingly small hidden dimensions relative to their parameter count because the extra parameters live in expert FFN layers, not the LM head. I benchmark two workload sizes based on <a href="https://github.com/tomasruizt/fused-mm-sample/blob/main/findings/lm-head-configurations.md">this analysis</a> of LM head configurations across 25+ models:</p>
+<ul>
+<li><strong>Small</strong> (V=151,936, d=4,096): Qwen3-8B, and notably Qwen3-235B MoE (which has d=4,096 despite 235B total parameters).</li>
+<li><strong>Large</strong> (V=128,256, d=8,192): Llama 3 70B, DeepSeek V3 (d=7,168).</li>
+</ul>
+<section id="baselines" class="level2">
+<h2 class="anchored" data-anchor-id="baselines">Baselines</h2>
+<p>Both FlashInfer kernels require the full logits, so their runtimes include the matmul that computes the logits. This is a fair comparison because FMMS also computes a matmul, the full logits tensor is just not written to GMEM.</p>
+<ol type="1">
+<li><strong>PyTorch Compiled</strong>: torch compiled matmul + softmax + <code>torch.multinomial</code>.</li>
+<li><strong>FlashInfer <code>top_k_top_p_sampling_from_logits</code></strong>: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.</li>
+<li><strong>FlashInfer <code>sampling_from_logits</code></strong>: FlashInfer’s fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.</li>
+</ol>
+<p>All baselines are torch compiled, so the matmul dispatches to cuBLAS.</p>
+</section>
+<section id="gpus" class="level2">
+<h2 class="anchored" data-anchor-id="gpus">GPUs</h2>
+<p>Since FMMS saves memory bandwidth, its advantage depends on how memory-bound the workload is. I benchmark across four modern datacenter GPUs:</p>
+<table class="table-sm small caption-top table">
+<thead>
+<tr class="header">
+<th>GPU</th>
+<th>HBM Bandwidth (GB/s)</th>
+<th>Peak BF16 (TFLOP/s)</th>
+<th>Ops:Byte Ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td>8,000</td>
+<td>2,250</td>
+<td>281</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td>8,000</td>
+<td>2,250</td>
+<td>281</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>4,800</td>
+<td>989</td>
+<td>206</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td>3,350</td>
+<td>989</td>
+<td>295</td>
+</tr>
+</tbody>
+</table>
+<p>The ops:byte ratio (peak compute / peak bandwidth) determines the crossover point where the matmul transitions from memory-bound to compute-bound. All experiments are reproducible. The <a href="https://github.com/tomasruizt/fused-mm-sample">GitHub README</a> has setup instructions and <code>make</code> targets for all benchmarks and tests.</p>
+</section>
+<section id="scaling-behavior" class="level2">
+<h2 class="anchored" data-anchor-id="scaling-behavior">Scaling Behavior</h2>
+<p>Figure&nbsp;2 shows execution time (left) and throughput in samples/ms (right) across batch sizes. All methods have nearly flat latency from N=1 to 32 (memory-bound: runtime is dominated by loading the weight matrix). Beyond N=64, latency rises as the matmul becomes compute-bound. FMMS (red) is the fastest method in the flat region, where fusion eliminates the extra GMEM round-trip for logits. At larger batch sizes, the baselines catch up as the matmul approaches the compute-bound regime and cuBLAS efficiency matters more.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true">Small</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false">Large</a></li></ul>
+<div class="tab-content" data-group="workload-size">
+<div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" aria-controls="tabset-1-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div id="fig-batch-scaling" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-batch-scaling-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-small-b300.png" class="img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-batch-scaling-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Batch scaling on B300 (V=151,936, d=4,096).
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-small-b200.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" aria-labelledby="tabset-1-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-small-h200.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-1-4" class="tab-pane" aria-labelledby="tabset-1-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-small-h100.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-3-2" class="tab-pane" aria-labelledby="tabset-3-2-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" aria-controls="tabset-2-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-4" aria-controls="tabset-2-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-large-b300.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on B300 (V=128,256, d=8,192).</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-large-b200.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-2-3" class="tab-pane" aria-labelledby="tabset-2-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-large-h200.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-2-4" class="tab-pane" aria-labelledby="tabset-2-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/batch-scaling-large-h100.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Batch scaling on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p><em>All benchmarks: PyTorch 2.10.0, CUDA 13.0, run on Modal. Data as of 2026-02-11.</em></p>
+</section>
+<section id="relative-performance-across-gpus" class="level2">
+<h2 class="anchored" data-anchor-id="relative-performance-across-gpus">Relative Performance Across GPUs</h2>
+<p>The relative speedup tables show <code>baseline_time / fmms_time</code>, so values &gt; 1.0 mean FMMS is faster.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="baseline">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-10-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-1" aria-controls="tabset-10-1" aria-selected="true">PyTorch Compiled</a></li><li class="nav-item"><a class="nav-link" id="tabset-10-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-2" aria-controls="tabset-10-2" aria-selected="false">FlashInfer</a></li></ul>
+<div class="tab-content" data-group="baseline">
+<div id="tabset-10-1" class="tab-pane active" aria-labelledby="tabset-10-1-tab">
+<p>This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + <code>torch.multinomial</code>).</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" aria-controls="tabset-6-1" aria-selected="true">Small</a></li><li class="nav-item"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" aria-controls="tabset-6-2" aria-selected="false">Large</a></li></ul>
+<div class="tab-content" data-group="workload-size">
+<div id="tabset-6-1" class="tab-pane active" aria-labelledby="tabset-6-1-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" aria-controls="tabset-4-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" aria-controls="tabset-4-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-3" aria-controls="tabset-4-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-4" aria-controls="tabset-4-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-4-1" class="tab-pane active" aria-labelledby="tabset-4-1-tab">
+<div id="fig-relative-perf-vs-pytorch" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-relative-perf-vs-pytorch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-small-b300.png" class="img-fluid figure-img" style="width:80.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-relative-perf-vs-pytorch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Relative performance vs PyTorch Compiled on B300.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-4-2" class="tab-pane" aria-labelledby="tabset-4-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-small-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-4-3" class="tab-pane" aria-labelledby="tabset-4-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-small-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-4-4" class="tab-pane" aria-labelledby="tabset-4-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-small-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Show data table
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs PyTorch Compiled (small config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td>1.40</td>
+<td>1.38</td>
+<td>1.39</td>
+<td>1.35</td>
+<td>1.43</td>
+<td>1.38</td>
+<td>1.38</td>
+<td><strong>1.48</strong></td>
+<td>1.33</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td>1.36</td>
+<td>1.38</td>
+<td>1.37</td>
+<td>1.41</td>
+<td>1.41</td>
+<td>1.39</td>
+<td>1.36</td>
+<td><strong>1.48</strong></td>
+<td>1.31</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>1.24</td>
+<td>1.25</td>
+<td>1.22</td>
+<td>1.25</td>
+<td>1.28</td>
+<td>1.30</td>
+<td><strong>1.33</strong></td>
+<td>1.26</td>
+<td>1.06</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td>1.22</td>
+<td>1.23</td>
+<td>1.21</td>
+<td>1.22</td>
+<td>1.25</td>
+<td>1.29</td>
+<td>1.40</td>
+<td><strong>1.52</strong></td>
+<td>1.23</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+<div id="tabset-6-2" class="tab-pane" aria-labelledby="tabset-6-2-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" aria-controls="tabset-5-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" aria-controls="tabset-5-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" aria-controls="tabset-5-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-4" aria-controls="tabset-5-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-5-1" class="tab-pane active" aria-labelledby="tabset-5-1-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-large-b300.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on B300.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-5-2" class="tab-pane" aria-labelledby="tabset-5-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-large-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-5-3" class="tab-pane" aria-labelledby="tabset-5-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-large-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-5-4" class="tab-pane" aria-labelledby="tabset-5-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-pytorch-large-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Show data table
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs PyTorch Compiled (large config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td><strong>1.34</strong></td>
+<td>1.33</td>
+<td>1.23</td>
+<td>1.26</td>
+<td>1.28</td>
+<td>1.29</td>
+<td>1.23</td>
+<td>0.96</td>
+<td>0.71</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td><strong>1.35</strong></td>
+<td>1.31</td>
+<td>1.27</td>
+<td>1.24</td>
+<td>1.26</td>
+<td>1.25</td>
+<td>1.27</td>
+<td>0.97</td>
+<td>0.74</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>1.26</td>
+<td>1.23</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.23</td>
+<td><strong>1.28</strong></td>
+<td>0.93</td>
+<td>0.78</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.20</td>
+<td>1.21</td>
+<td>1.21</td>
+<td>1.21</td>
+<td><strong>1.28</strong></td>
+<td>1.13</td>
+<td>0.87</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+</div>
+</div>
+<p>For the small config, FMMS is faster at <strong>all batch sizes on all GPUs</strong> (minimum 1.06x on H200 at N=256), with speedups of 6-52%. The larger vocab (V=151,936) means more logits traffic, making fusion valuable even at high batch sizes. For the large config, FMMS wins at batch sizes 1-64 (20-35% faster) but regresses at N=128+ on B300/B200/H200. H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.13x (large) and 1.52x (small). This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.</p>
+</div>
+<div id="tabset-10-2" class="tab-pane" aria-labelledby="tabset-10-2-tab">
+<p>Two FlashInfer baselines are compared:</p>
+<ul>
+<li><code>flashinfer:sampling_from_logits()</code> is FlashInfer’s fastest sampling kernel, but not used in vLLM. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.</li>
+<li><code>flashinfer:top_k_top_p_sampling_from_logits()</code> is the sampling function used in vLLM when top-k or top-p is set (I set top-k=-1 and top-p=1.0 to disable filtering).</li>
+</ul>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" aria-controls="tabset-9-1" aria-selected="true">Small</a></li><li class="nav-item"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" aria-controls="tabset-9-2" aria-selected="false">Large</a></li></ul>
+<div class="tab-content" data-group="workload-size">
+<div id="tabset-9-1" class="tab-pane active" aria-labelledby="tabset-9-1-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" aria-controls="tabset-7-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" aria-controls="tabset-7-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-3" aria-controls="tabset-7-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-4" aria-controls="tabset-7-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-7-1" class="tab-pane active" aria-labelledby="tabset-7-1-tab">
+<div id="fig-relative-perf-vs-flashinfer" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-relative-perf-vs-flashinfer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-small-b300.png" class="img-fluid figure-img" style="width:80.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-relative-perf-vs-flashinfer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Relative performance vs FlashInfer baselines on B300.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-2" class="tab-pane" aria-labelledby="tabset-7-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-small-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-3" class="tab-pane" aria-labelledby="tabset-7-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-small-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-4" class="tab-pane" aria-labelledby="tabset-7-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-small-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Show data table: vs <code>top_k_top_p</code>
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs <code>top_k_top_p</code> (small config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td>2.05</td>
+<td>2.05</td>
+<td>1.94</td>
+<td>2.24</td>
+<td><strong>2.30</strong></td>
+<td>2.10</td>
+<td>1.89</td>
+<td>1.72</td>
+<td>1.63</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td>1.36</td>
+<td>1.46</td>
+<td><strong>1.48</strong></td>
+<td>1.47</td>
+<td>1.48</td>
+<td>1.36</td>
+<td>1.23</td>
+<td>1.17</td>
+<td>1.06</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>1.29</td>
+<td><strong>1.37</strong></td>
+<td>1.35</td>
+<td>1.37</td>
+<td>1.36</td>
+<td>1.32</td>
+<td>1.23</td>
+<td>1.04</td>
+<td>0.89</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td><strong>1.30</strong></td>
+<td>1.25</td>
+<td>1.30</td>
+<td>1.30</td>
+<td>1.29</td>
+<td>1.27</td>
+<td>1.29</td>
+<td>1.25</td>
+<td>1.00</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details>
+<summary>
+Show data table: vs <code>sampling_from_logits</code>
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs <code>sampling_from_logits</code> (small config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td><strong>1.25</strong></td>
+<td>1.23</td>
+<td>1.24</td>
+<td>1.23</td>
+<td>1.23</td>
+<td>1.14</td>
+<td>1.04</td>
+<td>1.00</td>
+<td>0.89</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td><strong>1.25</strong></td>
+<td>1.24</td>
+<td>1.24</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.14</td>
+<td>1.03</td>
+<td>0.96</td>
+<td>0.85</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>1.16</td>
+<td><strong>1.17</strong></td>
+<td>1.14</td>
+<td>1.14</td>
+<td>1.13</td>
+<td>1.08</td>
+<td>1.01</td>
+<td>0.84</td>
+<td>0.70</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td><strong>1.15</strong></td>
+<td>1.15</td>
+<td>1.13</td>
+<td>1.13</td>
+<td>1.13</td>
+<td>1.11</td>
+<td>1.10</td>
+<td>1.03</td>
+<td>0.77</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+<div id="tabset-9-2" class="tab-pane" aria-labelledby="tabset-9-2-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" aria-controls="tabset-8-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" aria-controls="tabset-8-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-8-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-3" aria-controls="tabset-8-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-8-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-4" aria-controls="tabset-8-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-8-1" class="tab-pane active" aria-labelledby="tabset-8-1-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-large-b300.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on B300.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-2" class="tab-pane" aria-labelledby="tabset-8-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-large-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-3" class="tab-pane" aria-labelledby="tabset-8-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-large-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-4" class="tab-pane" aria-labelledby="tabset-8-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/relative-perf-vs-flashinfer-large-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs FlashInfer baselines on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Show data table: vs <code>top_k_top_p</code>
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs <code>top_k_top_p</code> (large config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td>1.57</td>
+<td>1.65</td>
+<td>1.66</td>
+<td><strong>1.67</strong></td>
+<td>1.67</td>
+<td>1.64</td>
+<td>1.55</td>
+<td>1.09</td>
+<td>0.89</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td><strong>1.27</strong></td>
+<td>1.24</td>
+<td>1.21</td>
+<td>1.19</td>
+<td>1.21</td>
+<td>1.20</td>
+<td>1.18</td>
+<td>0.86</td>
+<td>0.68</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td><strong>1.25</strong></td>
+<td>1.21</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.20</td>
+<td>1.20</td>
+<td>0.81</td>
+<td>0.75</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td>1.18</td>
+<td><strong>1.22</strong></td>
+<td>1.19</td>
+<td>1.20</td>
+<td>1.20</td>
+<td>1.18</td>
+<td>1.20</td>
+<td>1.01</td>
+<td>0.79</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details>
+<summary>
+Show data table: vs <code>sampling_from_logits</code>
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs <code>sampling_from_logits</code> (large config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td><strong>1.14</strong></td>
+<td>1.14</td>
+<td>1.08</td>
+<td>1.08</td>
+<td>1.08</td>
+<td>1.07</td>
+<td>1.03</td>
+<td>0.76</td>
+<td>0.57</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td><strong>1.15</strong></td>
+<td>1.15</td>
+<td>1.07</td>
+<td>1.07</td>
+<td>1.07</td>
+<td>1.06</td>
+<td>1.06</td>
+<td>0.77</td>
+<td>0.57</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td><strong>1.13</strong></td>
+<td>1.12</td>
+<td>1.11</td>
+<td>1.10</td>
+<td>1.10</td>
+<td>1.09</td>
+<td>1.08</td>
+<td>0.72</td>
+<td>0.63</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td><strong>1.13</strong></td>
+<td>1.13</td>
+<td>1.12</td>
+<td>1.12</td>
+<td>1.11</td>
+<td>1.10</td>
+<td>1.11</td>
+<td>0.90</td>
+<td>0.67</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+</div>
+</div>
+<p>Vs <code>top_k_top_p</code>, FMMS is up to <strong>2.30x faster</strong> (B300, small config, N=16). For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes<sup>1</sup>.</p>
+<p>Vs <code>sampling_from_logits</code>, <strong>FMMS is faster at all batch sizes from 1 to 64 on every GPU tested</strong>, with speedups of 3-25%. For the small config, FMMS stays above 1.0x up to N=128 on B300/H100. For the large config, it regresses at N=128+ on most GPUs.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="roofline-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="roofline-analysis">Roofline Analysis</h2>
+<p>The benchmarks above show a clear crossover: FMMS wins at small batch sizes and regresses at large ones. The explanation lies in the <strong>arithmetic intensity</strong> of the matmul. The matmul <img src="https://latex.codecogs.com/png.latex?W_%7B%5BV,%20d%5D%7D%20%5Ctimes%20H_%7B%5BN,%20d%5D%7D%5ET"> has:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7BArithmetic%20Intensity%7D%20=%20%5Cfrac%7B%5Ctext%7BFLOPs%7D%7D%7B%5Ctext%7BBytes%7D%7D%20=%20%5Cfrac%7B2%20%5Ccdot%20V%20%5Ccdot%20d%20%5Ccdot%20N%7D%7B2%20%5Ccdot%20V%20%5Ccdot%20d%7D%20=%20N%0A"></p>
+<p>The weight matrix <img src="https://latex.codecogs.com/png.latex?W"> dominates the memory traffic (<img src="https://latex.codecogs.com/png.latex?V%20%5Ccdot%20d"> elements, each read once), and the hidden states are negligible when <img src="https://latex.codecogs.com/png.latex?N%20%5Cll%20V"><sup>2</sup>. So the arithmetic intensity is simply <img src="https://latex.codecogs.com/png.latex?N">: each byte of weights loaded produces <img src="https://latex.codecogs.com/png.latex?N"> multiply-adds.</p>
+<p>A GPU becomes compute-bound when the arithmetic intensity exceeds its <strong>ops:byte ratio</strong> (peak compute / peak memory bandwidth). For the H100:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7Bops:byte%7D%20=%20%5Cfrac%7B989%20%5Ctext%7B%20TFLOP/s%20(BF16)%7D%7D%7B3.35%20%5Ctext%7B%20TB/s%20(HBM3)%7D%7D%20%5Capprox%20295%0A"></p>
+<p>The roofline plot in Figure&nbsp;5 confirms this: all methods track the memory-bound slope up to N=64, then flatten as they approach the compute ceiling. Each point is labeled with its batch size. FMMS sits slightly above the baselines in the memory-bound region because it reads the weight matrix once and writes only two scalars per tile to GMEM, while the baselines write and read back the full logits tensor. At large batch sizes the matmul becomes compute-bound, and the baselines benefit from cuBLAS (via <code>torch.compile</code>), while FMMS implements the matmul in Triton. FMMS also has higher register pressure from fusing Gumbel noise generation into the same kernel.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-13-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-13-1" aria-controls="tabset-13-1" aria-selected="true">Small</a></li><li class="nav-item"><a class="nav-link" id="tabset-13-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-13-2" aria-controls="tabset-13-2" aria-selected="false">Large</a></li></ul>
+<div class="tab-content" data-group="workload-size">
+<div id="tabset-13-1" class="tab-pane active" aria-labelledby="tabset-13-1-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-11-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-1" aria-controls="tabset-11-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-11-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-2" aria-controls="tabset-11-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-11-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-3" aria-controls="tabset-11-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-11-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-4" aria-controls="tabset-11-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-11-1" class="tab-pane active" aria-labelledby="tabset-11-1-tab">
+<div id="fig-roofline" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-roofline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-small-b300.png" class="img-fluid figure-img" style="width:85.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-roofline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Roofline model on B300 (V=151,936, d=4,096). The ridge point marks the transition from memory-bound to compute-bound.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-11-2" class="tab-pane" aria-labelledby="tabset-11-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-small-b200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-11-3" class="tab-pane" aria-labelledby="tabset-11-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-small-h200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-11-4" class="tab-pane" aria-labelledby="tabset-11-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-small-h100.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-13-2" class="tab-pane" aria-labelledby="tabset-13-2-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-12-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-1" aria-controls="tabset-12-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-12-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-2" aria-controls="tabset-12-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-12-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-3" aria-controls="tabset-12-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-12-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-4" aria-controls="tabset-12-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-12-1" class="tab-pane active" aria-labelledby="tabset-12-1-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-large-b300.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on B300 (V=128,256, d=8,192).</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-12-2" class="tab-pane" aria-labelledby="tabset-12-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-large-b200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-12-3" class="tab-pane" aria-labelledby="tabset-12-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-large-h200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-12-4" class="tab-pane" aria-labelledby="tabset-12-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/roofline-large-h100.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Roofline model on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="memory-throughput" class="level2">
+<h2 class="anchored" data-anchor-id="memory-throughput">Memory Throughput</h2>
+<p>Figure&nbsp;6 shows the achieved memory throughput (GB/s) as a function of batch size. At low batch sizes (N <img src="https://latex.codecogs.com/png.latex?%5Cleq"> 64), where the operation is deeply memory-bound, FMMS consistently achieves higher throughput than all baselines. Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-60% on B300/B200 (small config). 100% would mean the kernel does nothing but stream the weight matrix from GMEM at the hardware’s maximum rate, with zero overhead for computation, synchronization, or memory access patterns.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-16-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-16-1" aria-controls="tabset-16-1" aria-selected="true">Small</a></li><li class="nav-item"><a class="nav-link" id="tabset-16-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-16-2" aria-controls="tabset-16-2" aria-selected="false">Large</a></li></ul>
+<div class="tab-content" data-group="workload-size">
+<div id="tabset-16-1" class="tab-pane active" aria-labelledby="tabset-16-1-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-14-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-1" aria-controls="tabset-14-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-14-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-2" aria-controls="tabset-14-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-14-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-3" aria-controls="tabset-14-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-14-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-4" aria-controls="tabset-14-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-14-1" class="tab-pane active" aria-labelledby="tabset-14-1-tab">
+<div id="fig-memory-throughput" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-memory-throughput-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-small-b300.png" class="img-fluid figure-img" style="width:85.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-memory-throughput-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Memory throughput on B300 (V=151,936, d=4,096). The dashed line shows peak HBM bandwidth.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-14-2" class="tab-pane" aria-labelledby="tabset-14-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-small-b200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-14-3" class="tab-pane" aria-labelledby="tabset-14-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-small-h200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-14-4" class="tab-pane" aria-labelledby="tabset-14-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-small-h100.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-16-2" class="tab-pane" aria-labelledby="tabset-16-2-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-15-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-1" aria-controls="tabset-15-1" aria-selected="true">B300</a></li><li class="nav-item"><a class="nav-link" id="tabset-15-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-2" aria-controls="tabset-15-2" aria-selected="false">B200</a></li><li class="nav-item"><a class="nav-link" id="tabset-15-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-3" aria-controls="tabset-15-3" aria-selected="false">H200</a></li><li class="nav-item"><a class="nav-link" id="tabset-15-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-4" aria-controls="tabset-15-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-15-1" class="tab-pane active" aria-labelledby="tabset-15-1-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-large-b300.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on B300 (V=128,256, d=8,192).</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-15-2" class="tab-pane" aria-labelledby="tabset-15-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-large-b200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-15-3" class="tab-pane" aria-labelledby="tabset-15-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-large-h200.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-15-4" class="tab-pane" aria-labelledby="tabset-15-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/memory-throughput-large-h100.png" class="img-fluid figure-img" style="width:85.0%"></p>
+<figcaption>Memory throughput on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-e2e" class="level1">
+<h1>End-to-End Benchmarks (vLLM)</h1>
+<p>The kernel benchmarks measure the FMMS kernel in isolation. To measure end-to-end impact, I integrated FMMS into vLLM (<a href="https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler">branch</a>) and benchmarked median time per output token (TPOT) across concurrency levels using <code>vllm bench sweep</code>. I chose four models spanning different sizes and architectures. The LM head is a standard dense linear layer in all four, so FMMS applies identically regardless of MoE routing.</p>
+<table class="table-sm small caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Type</th>
+<th>Hidden size (d)</th>
+<th>Vocab size (V)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>gpt-oss-120b</td>
+<td>MoE (128 experts, 4 active)</td>
+<td>2,880</td>
+<td>201,088</td>
+</tr>
+<tr class="even">
+<td>Qwen3-1.7B</td>
+<td>Dense</td>
+<td>2,048</td>
+<td>151,936</td>
+</tr>
+<tr class="odd">
+<td>Qwen3-8B</td>
+<td>Dense</td>
+<td>4,096</td>
+<td>152,064</td>
+</tr>
+<tr class="even">
+<td>Qwen3-32B</td>
+<td>Dense</td>
+<td>5,120</td>
+<td>152,064</td>
+</tr>
+</tbody>
+</table>
+<p>The “Baseline” in the tables below is vLLM’s default sampling path (torch compiled matmul followed by softmax and <code>torch.multinomial</code>), without FMMS. Each configuration is run 5 times per trial; some models have 2 independent trials to increase confidence. The plots pool data from all trials, and per-trial tables are available in the collapsible sections. All results are on a B200 GPU with PyTorch 2.10.0 and CUDA 13.0, run on Modal.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="vllm-model">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-19-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-1" aria-controls="tabset-19-1" aria-selected="true">gpt-oss-120b</a></li><li class="nav-item"><a class="nav-link" id="tabset-19-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-2" aria-controls="tabset-19-2" aria-selected="false">Qwen3-1.7B</a></li><li class="nav-item"><a class="nav-link" id="tabset-19-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-3" aria-controls="tabset-19-3" aria-selected="false">Qwen3-8B</a></li><li class="nav-item"><a class="nav-link" id="tabset-19-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-4" aria-controls="tabset-19-4" aria-selected="false">Qwen3-32B</a></li></ul>
+<div class="tab-content" data-group="vllm-model">
+<div id="tabset-19-1" class="tab-pane active" aria-labelledby="tabset-19-1-tab">
+<p>The LM head is a smaller fraction of the total decode step in a 120B-parameter model. FMMS reduces TPOT by up to 5% at low concurrency (1-8), with modest 1-2% improvements at higher concurrency levels.</p>
+<div>
+
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/speedups/gpt-oss-120b.png" class="img-fluid"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/tpots/gpt-oss-120b.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Data table
+</summary>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-17-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-17-1" aria-controls="tabset-17-1" aria-selected="true">Trial 1</a></li><li class="nav-item"><a class="nav-link" id="tabset-17-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-17-2" aria-controls="tabset-17-2" aria-selected="false">Trial 2</a></li></ul>
+<div class="tab-content">
+<div id="tabset-17-1" class="tab-pane active" aria-labelledby="tabset-17-1-tab">
+<table class="table-sm table-striped small caption-top table">
+<caption>Median TPOT on gpt-oss-120b, trial 1. <strong>Bold</strong> marks the peak reduction.</caption>
+<thead>
+<tr class="header">
+<th>Concurrency</th>
+<th>Baseline (ms)</th>
+<th>FMMS Triton (ms)</th>
+<th>TPOT Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>3.45</td>
+<td>3.29</td>
+<td><strong>-4.6%</strong></td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>4.14</td>
+<td>3.99</td>
+<td>-3.6%</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>5.28</td>
+<td>5.11</td>
+<td>-3.2%</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>7.30</td>
+<td>7.12</td>
+<td>-2.5%</td>
+</tr>
+<tr class="odd">
+<td>16</td>
+<td>9.94</td>
+<td>9.77</td>
+<td>-1.7%</td>
+</tr>
+<tr class="even">
+<td>32</td>
+<td>13.34</td>
+<td>13.39</td>
+<td>+0.4%</td>
+</tr>
+<tr class="odd">
+<td>64</td>
+<td>17.80</td>
+<td>17.50</td>
+<td>-1.7%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="tabset-17-2" class="tab-pane" aria-labelledby="tabset-17-2-tab">
+<table class="table-sm table-striped small caption-top table">
+<caption>Median TPOT on gpt-oss-120b, trial 2. <strong>Bold</strong> marks the peak reduction.</caption>
+<thead>
+<tr class="header">
+<th>Concurrency</th>
+<th>Baseline (ms)</th>
+<th>FMMS Triton (ms)</th>
+<th>TPOT Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>3.54</td>
+<td>3.53</td>
+<td>-0.3%</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>4.17</td>
+<td>4.11</td>
+<td>-1.4%</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>5.28</td>
+<td>5.15</td>
+<td><strong>-2.5%</strong></td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>7.27</td>
+<td>7.12</td>
+<td>-2.1%</td>
+</tr>
+<tr class="odd">
+<td>16</td>
+<td>9.97</td>
+<td>9.79</td>
+<td>-1.8%</td>
+</tr>
+<tr class="even">
+<td>32</td>
+<td>13.23</td>
+<td>13.03</td>
+<td>-1.5%</td>
+</tr>
+<tr class="odd">
+<td>64</td>
+<td>17.52</td>
+<td>17.24</td>
+<td>-1.6%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</details>
+</div>
+<div id="tabset-19-2" class="tab-pane" aria-labelledby="tabset-19-2-tab">
+<p>The small hidden dimension makes the LM head matmul strongly memory-bound, so fusion has a large impact. FMMS reduces TPOT by 11-19% across all concurrency levels.</p>
+<div>
+
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/speedups/Qwen3-1.7B.png" class="img-fluid"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/tpots/Qwen3-1.7B.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Data table
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Median TPOT on Qwen3-1.7B. <strong>Bold</strong> marks the peak reduction.</caption>
+<thead>
+<tr class="header">
+<th>Concurrency</th>
+<th>Baseline (ms)</th>
+<th>FMMS Triton (ms)</th>
+<th>TPOT Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>2.25</td>
+<td>2.00</td>
+<td>-10.8%</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>2.14</td>
+<td>1.87</td>
+<td>-12.5%</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>2.15</td>
+<td>1.84</td>
+<td>-14.6%</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>2.19</td>
+<td>1.86</td>
+<td>-15.2%</td>
+</tr>
+<tr class="odd">
+<td>16</td>
+<td>2.24</td>
+<td>1.85</td>
+<td>-17.7%</td>
+</tr>
+<tr class="even">
+<td>32</td>
+<td>2.52</td>
+<td>2.28</td>
+<td>-11.7%</td>
+</tr>
+<tr class="odd">
+<td>64</td>
+<td>3.47</td>
+<td>2.82</td>
+<td><strong>-18.7%</strong></td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+<div id="tabset-19-3" class="tab-pane" aria-labelledby="tabset-19-3-tab">
+<p>FMMS reduces TPOT by 3-7% at most concurrency levels, with larger gains in some runs (up to 17% at concurrency 32 in trial 1).</p>
+<div>
+
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/speedups/Qwen3-8B.png" class="img-fluid"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/tpots/Qwen3-8B.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Data table
+</summary>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-18-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-18-1" aria-controls="tabset-18-1" aria-selected="true">Trial 1</a></li><li class="nav-item"><a class="nav-link" id="tabset-18-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-18-2" aria-controls="tabset-18-2" aria-selected="false">Trial 2</a></li></ul>
+<div class="tab-content">
+<div id="tabset-18-1" class="tab-pane active" aria-labelledby="tabset-18-1-tab">
+<table class="table-sm table-striped small caption-top table">
+<caption>Median TPOT on Qwen3-8B, trial 1. <strong>Bold</strong> marks the peak reduction.</caption>
+<thead>
+<tr class="header">
+<th>Concurrency</th>
+<th>Baseline (ms)</th>
+<th>FMMS Triton (ms)</th>
+<th>TPOT Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>4.50</td>
+<td>4.34</td>
+<td>-3.8%</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>4.63</td>
+<td>4.49</td>
+<td>-3.5%</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>5.07</td>
+<td>4.93</td>
+<td>-2.7%</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>5.79</td>
+<td>5.53</td>
+<td>-5.6%</td>
+</tr>
+<tr class="odd">
+<td>16</td>
+<td>5.93</td>
+<td>5.52</td>
+<td>-7.5%</td>
+</tr>
+<tr class="even">
+<td>32</td>
+<td>6.06</td>
+<td>5.14</td>
+<td><strong>-17.1%</strong></td>
+</tr>
+<tr class="odd">
+<td>64</td>
+<td>5.06</td>
+<td>4.53</td>
+<td>-10.4%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="tabset-18-2" class="tab-pane" aria-labelledby="tabset-18-2-tab">
+<table class="table-sm table-striped small caption-top table">
+<caption>Median TPOT on Qwen3-8B, trial 2. <strong>Bold</strong> marks the peak reduction.</caption>
+<thead>
+<tr class="header">
+<th>Concurrency</th>
+<th>Baseline (ms)</th>
+<th>FMMS Triton (ms)</th>
+<th>TPOT Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>4.41</td>
+<td>4.29</td>
+<td>-2.8%</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>4.35</td>
+<td>4.05</td>
+<td><strong>-6.9%</strong></td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>4.28</td>
+<td>4.12</td>
+<td>-3.7%</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>4.38</td>
+<td>4.22</td>
+<td>-3.6%</td>
+</tr>
+<tr class="odd">
+<td>16</td>
+<td>4.15</td>
+<td>4.02</td>
+<td>-2.9%</td>
+</tr>
+<tr class="even">
+<td>32</td>
+<td>4.63</td>
+<td>4.43</td>
+<td>-4.5%</td>
+</tr>
+<tr class="odd">
+<td>64</td>
+<td>5.29</td>
+<td>5.01</td>
+<td>-5.7%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</details>
+</div>
+<div id="tabset-19-4" class="tab-pane" aria-labelledby="tabset-19-4-tab">
+<p>FMMS reduces TPOT by 1-2% across concurrency levels.</p>
+<div>
+
+</div>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/speedups/Qwen3-32B.png" class="img-fluid"></p>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: center;">
+<p><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/tpots/Qwen3-32B.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Data table
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Median TPOT on Qwen3-32B.</caption>
+<thead>
+<tr class="header">
+<th>Concurrency</th>
+<th>Baseline (ms)</th>
+<th>FMMS Triton (ms)</th>
+<th>TPOT Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>12.83</td>
+<td>12.59</td>
+<td>-1.9%</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>12.56</td>
+<td>12.78</td>
+<td>+1.7%</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>12.54</td>
+<td>12.34</td>
+<td>-1.6%</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>12.64</td>
+<td>12.49</td>
+<td>-1.1%</td>
+</tr>
+<tr class="odd">
+<td>16</td>
+<td>13.05</td>
+<td>12.90</td>
+<td>-1.1%</td>
+</tr>
+<tr class="even">
+<td>32</td>
+<td>13.65</td>
+<td>13.47</td>
+<td>-1.3%</td>
+</tr>
+<tr class="odd">
+<td>64</td>
+<td>14.85</td>
+<td>14.68</td>
+<td>-1.3%</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+</div>
+</div>
+<section id="a-note-on-variability" class="level2">
+<h2 class="anchored" data-anchor-id="a-note-on-variability">A Note on Variability</h2>
+<p>The Qwen3-8B trials show substantial run-to-run variability: at concurrency 32, trial 1 measures a 17% reduction, while trial 2 measures a 4.5% reduction. The absolute runtimes differ by 30%, potentially due to GPU thermal state or other system-level factors. This variability is inherent to end-to-end serving benchmarks, where many system-level factors beyond the kernel itself affect TPOT. Despite this, the direction is consistent: FMMS outperforms the baseline at every concurrency level in both trials.</p>
+</section>
+</section>
+<section id="sec-correctness" class="level1">
+<h1>Correctness</h1>
+<p>FMMS uses the Gumbel-max trick, which produces <strong>exact</strong> samples from the categorical distribution, not an approximation. But because the output is stochastic, correctness is harder to verify than for a deterministic kernel. You cannot compare the output to a reference value; instead, you need statistical tests that verify the output <em>distribution</em> is correct.</p>
+<p>I verify this with a chi-squared goodness-of-fit test that runs as a regular unit test during development: draw 10,000 samples from the kernel using synthetic inputs with known logit vectors, and compare the empirical token frequencies against the theoretical softmax probabilities. The test is parametrized over multiple vocabulary sizes and batch sizes to catch tile-boundary edge cases.</p>
+<section id="end-to-end-gsm8k" class="level2">
+<h2 class="anchored" data-anchor-id="end-to-end-gsm8k">End-to-End: GSM8K</h2>
+<p>As an end-to-end quality check, I integrated FMMS into vLLM and ran the GSM8K benchmark (1,319 questions, 0-shot chain-of-thought) via <a href="https://github.com/EleutherAI/lm-evaluation-harness">lm-evaluation-harness</a> on Qwen3-1.7B. Answers were graded by an LLM judge.</p>
+<table class="table-sm small caption-top table">
+<caption>GSM8K accuracy on Qwen3-1.7B</caption>
+<thead>
+<tr class="header">
+<th>Variant</th>
+<th>Accuracy</th>
+<th>95% CI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Baseline (vLLM default)</td>
+<td>89.6%</td>
+<td>[87.9%, 91.2%]</td>
+</tr>
+<tr class="even">
+<td>FMMS Triton</td>
+<td>89.4%</td>
+<td>[87.7%, 91.0%]</td>
+</tr>
+</tbody>
+</table>
+<p>To test whether this 0.2 percentage point difference is meaningful, I use a paired bootstrap test (10,000 resamples). The test is <em>paired</em> because both variants answer the same 1,319 questions: it computes per-question differences (correct vs.&nbsp;incorrect), then bootstraps the mean difference. This cancels out shared question difficulty and focuses on questions where the variants actually disagree. The result is p=0.776, far from significant (threshold: p &lt; 0.05), confirming that FMMS does not degrade model accuracy.</p>
+</section>
+</section>
+<section id="sec-algorithm" class="level1">
+<h1>The Algorithm</h1>
+<p>The matmul <img src="https://latex.codecogs.com/png.latex?W_%7B%5BV,d%5D%7D%20%5Ctimes%20H_%7B%5BN,d%5D%7D%5ET"> is tiled across the <img src="https://latex.codecogs.com/png.latex?V">, <img src="https://latex.codecogs.com/png.latex?d">, and <img src="https://latex.codecogs.com/png.latex?N"> dimensions as shown in Figure&nbsp;7. Each tile produces a <img src="https://latex.codecogs.com/png.latex?(T_V,%20T_N)"> block of logits in SRAM.</p>
+<div id="fig-tiled-mm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Tiling the computation of the logits" data-text-align="left">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tiled-mm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/Fused MM sample.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;7: Tiling the computation of the logits."><img src="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/Fused MM sample.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Tiling the computation of the logits"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tiled-mm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Tiling the computation of the logits.
+</figcaption>
+</figure>
+</div>
+<p>Since argmax decomposes over tiles (as described above), the kernel has a two-stage design:</p>
+<ul>
+<li><strong>Stage 1 (Triton kernel):</strong> A 2D grid of programs indexed by <code>(v, h)</code> (vocabulary tile, batch tile). Each program computes its logit tile, scales by temperature, adds Gumbel noise, and finds the tile-local maximum. Only the max value and its global vocabulary index are written to GMEM.</li>
+<li><strong>Stage 2 (host-side reduction):</strong> A cheap PyTorch reduction over the <code>num_V_tiles</code> local maxima per hidden state:</li>
+</ul>
+<div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb2-1">best_tiles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tile_maxs.argmax(dim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># which tile won?</span></span>
+<span id="cb2-2">samples <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tile_indices.gather(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, best_tiles)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># what index did it have?</span></span></code></pre></div>
+<section id="stage-1-per-tile-logic" class="level2">
+<h2 class="anchored" data-anchor-id="stage-1-per-tile-logic">Stage 1: Per-Tile Logic</h2>
+<p>Here is what each program in the 2D grid does, in pseudocode:</p>
+<div class="sourceCode" id="annotated-cell-3" style="background: #f1f3f5;"><pre class="sourceCode numberSource python code-annotation-code number-lines code-with-copy code-annotated"><code class="sourceCode python"><span id="annotated-cell-3-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> program(v_tile, h_tile, W, H, temperature, seed):</span>
+<span id="annotated-cell-3-2">    logits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> zeros(T_V, T_N, dtype<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>float32)</span>
+<a class="code-annotation-anchor" data-target-cell="annotated-cell-3" data-target-annotation="1" onclick="event.preventDefault();">1</a><span id="annotated-cell-3-3" class="code-annotation-target">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> d_start <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, d, T_d):</span>
+<span id="annotated-cell-3-4">        w <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> W[v_tile, d_start : d_start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> T_d]      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load [T_V, T_d] from GMEM</span></span>
+<span id="annotated-cell-3-5">        h <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> H[h_tile, d_start : d_start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> T_d]      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load [T_N, T_d] from GMEM</span></span>
+<span id="annotated-cell-3-6">        logits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> w <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span> h.T                           <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># accumulate in SRAM</span></span>
+<span id="annotated-cell-3-7"></span>
+<span id="annotated-cell-3-8">    logits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> logits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> temperature</span>
+<a class="code-annotation-anchor" data-target-cell="annotated-cell-3" data-target-annotation="2" onclick="event.preventDefault();">2</a><span id="annotated-cell-3-9" class="code-annotation-target">    U <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rand(T_V, T_N)</span>
+<span id="annotated-cell-3-10">    gumbel_noise <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>log(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>log(U))</span>
+<span id="annotated-cell-3-11">    noised <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> logits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> gumbel_noise</span>
+<span id="annotated-cell-3-12"></span>
+<a class="code-annotation-anchor" data-target-cell="annotated-cell-3" data-target-annotation="3" onclick="event.preventDefault();">3</a><span id="annotated-cell-3-13" class="code-annotation-target">    max_val, max_idx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">max</span>(noised, dim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>V)</span>
+<span id="annotated-cell-3-14">    GMEM_maxs[v_tile, h_tile] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> max_val             <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [T_N]</span></span>
+<span id="annotated-cell-3-15">    GMEM_idxs[v_tile, h_tile] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> max_idx</span><div class="code-annotation-gutter-bg"></div><div class="code-annotation-gutter"></div></code></pre></div>
+<dl class="code-annotation-container-grid">
+<dt data-target-cell="annotated-cell-3" data-target-annotation="1">1</dt>
+<dd>
+<span data-code-cell="annotated-cell-3" data-code-lines="3" data-code-annotation="1">The inner loop tiles the <img src="https://latex.codecogs.com/png.latex?d"> dimension. Each iteration loads one strip of <img src="https://latex.codecogs.com/png.latex?W"> and <img src="https://latex.codecogs.com/png.latex?H"> and accumulates a partial dot product. The full logit tile never leaves SRAM.</span>
+</dd>
+<dt data-target-cell="annotated-cell-3" data-target-annotation="2">2</dt>
+<dd>
+<span data-code-cell="annotated-cell-3" data-code-lines="9" data-code-annotation="2">Gumbel noise is generated in-kernel using Triton’s Philox PRNG (<code>tl.rand</code>), one draw per logit element. Each <code>(v, h)</code> tile uses a different seed offset so tiles produce independent noise.</span>
+</dd>
+<dt data-target-cell="annotated-cell-3" data-target-annotation="3">3</dt>
+<dd>
+<span data-code-cell="annotated-cell-3" data-code-lines="13" data-code-annotation="3">The argmax over the <img src="https://latex.codecogs.com/png.latex?V"> dimension reduces the <img src="https://latex.codecogs.com/png.latex?(T_V,%20T_N)"> tile to just <img src="https://latex.codecogs.com/png.latex?T_N"> values. The full logit tile is consumed and discarded in SRAM.</span>
+</dd>
+</dl>
+</section>
+</section>
+<section id="related-work" class="level1">
+<h1>Related Work</h1>
+<p><em>Cut Your Losses in Large-Vocabulary Language Models</em> <span class="citation" data-cites="wijmans2025cut">(Wijmans et al. 2025)</span> is the direct inspiration for this work. They avoid materializing logits during training by computing the cross-entropy loss incrementally on SRAM, reducing memory from 24GB to 1MB for Gemma 2 (2B). FMMS extends this idea to inference, where the challenge shifts from loss computation to sampling.</p>
+<p><em>FlashSampling</em> <span class="citation" data-cites="qin2025flashsampling">(Qin et al. 2025)</span> presents a conceptually similar algorithm for fused sampling. The paper was submitted to ICLR 25 but was not accepted. This post presents comprehensive benchmarks against strong baselines across multiple GPUs.</p>
+<p><em>FlashInfer</em> <span class="citation" data-cites="ye2025flashinfer">(Ye et al. 2025)</span> provides high-performance sampling kernels used in vLLM <span class="citation" data-cites="DBLP:conf/sosp/KwonLZ0ZY0ZS23">(Kwon et al. 2023)</span> and SGLang <span class="citation" data-cites="zheng2024sglang">(Zheng et al. 2024)</span>, but all its sampling functions take pre-materialized logits or probabilities as input. <em>Liger Kernel</em> <span class="citation" data-cites="hsu2025ligerkernelefficienttriton">(Hsu et al. 2025)</span> focuses on training-time kernel fusion and includes no sampling primitives. The <em>online-softmax</em> method <span class="citation" data-cites="milakov2018onlinenormalizercalculationsoftmax">(Milakov and Gimelshein 2018)</span> enables incremental normalization and is used in <em>FlashAttention</em> <span class="citation" data-cites="dao2022flashattention">(Dao et al. 2022)</span>, but neither applies it to sampling from the LM head.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>FMMS is most effective when the LM head matmul is memory-bound: batch sizes 1-64, which covers the typical LLM decode regime. In this range, it outperforms every baseline on every GPU tested, with kernel-level speedups of up to 25% vs FlashInfer’s fastest sampling kernel and 20-52% vs PyTorch compiled sampling. At larger batch sizes (128+), the matmul becomes compute-bound and cuBLAS-backed baselines are faster.</p>
+<p>The end-to-end impact depends on how much of the decode step the LM head represents. For small models (Qwen3-1.7B), FMMS reduces TPOT by up to 19%. For large models (gpt-oss-120b, Qwen3-32B), the LM head is a smaller fraction of the total step, so improvements are modest (1-5%). The sweet spot is small-to-medium models served at low-to-moderate concurrency, where the LM head is a significant bottleneck and the matmul stays memory-bound.</p>
+<p>The code is open-source at <a href="https://github.com/tomasruizt/fused-mm-sample">github.com/tomasruizt/fused-mm-sample</a>. FMMS is currently integrated into vLLM on a <a href="https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler">feature branch</a>, not merged upstream.</p>
+<section id="future-work" class="level2">
+<h2 class="anchored" data-anchor-id="future-work">Future Work</h2>
+<p><strong>Top-k/top-p filtering.</strong> FMMS does not yet support top-k or top-p filtering, but it is possible to implement them. For Top-k: each tile can compute a local top-k during the matmul, and a small merge step combines the per-tile candidates. Top-p can be implemented if it is applied after top-k, as is done in the FlashInfer top-k-top-p kernel, and also on the vLLM PyTorch sampling path. In this case, top-p filtering is applied only to the surviving top-k tokens.</p>
+</section>
+</section>
+<section id="references" class="level1">
+
+
+
+
+</section>
+
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-dao2022flashattention" class="csl-entry">
+Dao, Tri, Daniel Y Fu, Stefano Ermon, Atri Rudra, and Christopher Re. 2022. <span>“FlashAttention: Fast and Memory-Efficient Exact Attention with <span>IO</span>-Awareness.”</span> In <em>Advances in Neural Information Processing Systems</em>, edited by Alice H. Oh, Alekh Agarwal, Danielle Belgrave, and Kyunghyun Cho. <a href="https://openreview.net/forum?id=H4DqfPSibmx">https://openreview.net/forum?id=H4DqfPSibmx</a>.
+</div>
+<div id="ref-hsu2025ligerkernelefficienttriton" class="csl-entry">
+Hsu, Pin-Lun, Yun Dai, Vignesh Kothapalli, Qingquan Song, Shao Tang, Siyu Zhu, Steven Shimizu, Shivam Sahni, Haowen Ning, and Yanning Chen. 2025. <span>“Liger Kernel: Efficient Triton Kernels for LLM Training.”</span> <a href="https://arxiv.org/abs/2410.10989">https://arxiv.org/abs/2410.10989</a>.
+</div>
+<div id="ref-2110.01515" class="csl-entry">
+Huijben, I. A. M., W. Kool, M. B. Paulus, and R. J. G. v. Sloun. 2021. <span>“A Review of the Gumbel-Max Trick and Its Extensions for Discrete Stochasticity in Machine Learning.”</span> <em>IEEE Transactions on Pattern Analysis and Machine Intelligence</em> 45: 1353–71. <a href="https://doi.org/10.1109/tpami.2022.3157042">https://doi.org/10.1109/tpami.2022.3157042</a>.
+</div>
+<div id="ref-DBLP:conf/sosp/KwonLZ0ZY0ZS23" class="csl-entry">
+Kwon, Woosuk, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph Gonzalez, Hao Zhang, and Ion Stoica. 2023. <span>“Efficient Memory Management for Large Language Model Serving with PagedAttention.”</span> In <em>SOSP</em>, 611–26. <a href="https://doi.org/10.1145/3600006.3613165">https://doi.org/10.1145/3600006.3613165</a>.
+</div>
+<div id="ref-milakov2018onlinenormalizercalculationsoftmax" class="csl-entry">
+Milakov, Maxim, and Natalia Gimelshein. 2018. <span>“Online Normalizer Calculation for Softmax.”</span> <a href="https://arxiv.org/abs/1805.02867">https://arxiv.org/abs/1805.02867</a>.
+</div>
+<div id="ref-qin2025flashsampling" class="csl-entry">
+Qin, Zhen, Xuyang Shen, Yifan Zhang, and Yiran Zhong. 2025. <span>“FlashSampling: Fast and Memory-Efficient Exact Sampling with Group-Gumbel-Max.”</span> <a href="https://openreview.net/forum?id=V4Xs283LHH">https://openreview.net/forum?id=V4Xs283LHH</a>.
+</div>
+<div id="ref-wijmans2025cut" class="csl-entry">
+Wijmans, Erik, Brody Huval, Alexander Hertzberg, Vladlen Koltun, and Philipp Kraehenbuehl. 2025. <span>“Cut Your Losses in Large-Vocabulary Language Models.”</span> In <em>The Thirteenth International Conference on Learning Representations</em>. <a href="https://openreview.net/forum?id=E4Fk3YuG56">https://openreview.net/forum?id=E4Fk3YuG56</a>.
+</div>
+<div id="ref-ye2025flashinfer" class="csl-entry">
+Ye, Zihao, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, et al. 2025. <span>“FlashInfer: Efficient and Customizable Attention Engine for <span>LLM</span> Inference Serving.”</span> In <em>Eighth Conference on Machine Learning and Systems</em>. <a href="https://openreview.net/forum?id=RXPofAsL8F">https://openreview.net/forum?id=RXPofAsL8F</a>.
+</div>
+<div id="ref-zheng2024sglang" class="csl-entry">
+Zheng, Lianmin, Liangsheng Yin, Zhiqiang Xie, Chuyue Sun, Jeff Huang, Cody Hao Yu, Shiyi Cao, et al. 2024. <span>“<span>SGL</span>ang: Efficient Execution of Structured Language Model Programs.”</span> In <em>The Thirty-Eighth Annual Conference on Neural Information Processing Systems</em>. <a href="https://openreview.net/forum?id=VqkAKQibpq">https://openreview.net/forum?id=VqkAKQibpq</a>.
+</div>
+</div></section><section id="footnotes" class="footnotes footnotes-end-of-document"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>B300 is a striking outlier: 1.6-2.3x speedups while B200/H200/H100 show 1.2-1.5x. B200 and B300 have identical bandwidth and compute specs, and FMMS runs at the same speed on both (within 2%). The gap is entirely because FlashInfer’s <code>top_k_top_p</code> is ~35% slower on B300 than on B200, potentially due to incomplete optimization for the newer B300 architecture (sm_110)↩︎</p></li>
+<li id="fn2"><p>Even at the largest benchmarked batch size (N=256) with the small config (V=151,936, d=4,096), the hidden states are 256 <img src="https://latex.codecogs.com/png.latex?%5Ctimes"> 4,096 <img src="https://latex.codecogs.com/png.latex?%5Ctimes"> 2 bytes = 2 MB versus 1.17 GB for the weight matrix (0.17%). The exact arithmetic intensity is <img src="https://latex.codecogs.com/png.latex?N%20%5Ccdot%20V%20/%20(V%20+%20N)"> = 255.57, versus the approximation of 256.↩︎</p></li>
+</ol>
+</section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
+  author = {Ruiz, Tomas},
+  title = {FMMS: {The} {Fused} {Matmul-Sample} {Kernel}},
+  date = {2026-02-16},
+  url = {https://tomasruizt.github.io/posts/07_fused-mm-sample/},
+  langid = {en}
+}
+</code></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2026" class="csl-entry quarto-appendix-citeas">
+Ruiz, Tomas. 2026. <span>“FMMS: The Fused Matmul-Sample Kernel.”</span>
+February 16, 2026. <a href="https://tomasruizt.github.io/posts/07_fused-mm-sample/">https://tomasruizt.github.io/posts/07_fused-mm-sample/</a>.
+</div></div></section></div> ]]></description>
+  <category>GPUs</category>
+  <category>Triton</category>
+  <category>vLLM</category>
+  <category>Transformers</category>
+  <guid>https://tomasruizt.github.io/posts/07_fused-mm-sample/</guid>
+  <pubDate>Sun, 15 Feb 2026 23:00:00 GMT</pubDate>
+  <media:content url="https://tomasruizt.github.io/posts/07_fused-mm-sample/imgs/baseline-vs-fmms-diagram.png" medium="image" type="image/png" height="118" width="144"/>
+</item>
 <item>
   <title>Forecasting the Performance of Full CUDA Graphs for Speculative Decoding</title>
   <dc:creator>Tomas Ruiz</dc:creator>
@@ -37,7 +1884,7 @@
 <li><em>The Slope</em>: the incremental draft-model cost per additional speculative token</li>
 </ul></li>
 </ol>
-<div id="fig-itl-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Regression of ITL over number of speculative tokens.">
+<div id="fig-itl-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Regression of ITL over number of speculative tokens." data-text-align="left">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-itl-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/09_full-cuda-graphs-spec-decode/imgs/itl_k_comparison.png" class="img-fluid figure-img" style="width:50.0%" data-text-align="left" alt="Regression of ITL over number of speculative tokens.">
@@ -92,7 +1939,7 @@ Table&nbsp;1: Table: Speed comparison of Full CG and Piecewise CG.
 <h2 class="anchored" data-anchor-id="forecasted-end-to-end-impact">Forecasted End-to-end Impact</h2>
 <p>Assuming we could realize those per-token reductions inside speculative decoding, what does that translate to in terms of TPOT? I use the formula below to forecast the speedups for full CUDA graphs. <img src="https://latex.codecogs.com/png.latex?%0A%5Ctext%7BTPOT%7D%20=%20%5Cfrac%7B%5Ctext%7BITL%7D%7D%7B%5Ctext%7BAL%7D%7D%20=%20%5Cfrac%7BT_%7Bd%7D%20%5Ccdot%20K%20+%20T_%7Bt%7D%7D%7B%5Ctext%7BAL%7D%7D%0A"></p>
 <p>where <img src="https://latex.codecogs.com/png.latex?T_%7Bd%7D"> is the runtime of the draft model, <img src="https://latex.codecogs.com/png.latex?T_%7Bt%7D"> is the runtime of the target model, <img src="https://latex.codecogs.com/png.latex?K"> is the number of speculative tokens, and <img src="https://latex.codecogs.com/png.latex?%5Ctext%7BAL%7D"> is the acceptance length. Figure&nbsp;2 shows the TPOT values under Piecewise CG (Current), and Full CG (Expected). The minimum (best) TPOT values for each curve are marked with a cross. At <img src="https://latex.codecogs.com/png.latex?K=5"><sup>1</sup>, the TPOT improves from 10.43ms to 9.91ms <strong>(4.9% improvement)</strong>. The speedup ratios over vanilla decoding grow from 2.26× to 2.37× for Qwen3-32B (1.7B drafter) on MT-Bench.</p>
-<div id="fig-tpot-comparison-full-vs-piecewise" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="TPOT calculation">
+<div id="fig-tpot-comparison-full-vs-piecewise" class="quarto-float quarto-figure quarto-figure-center anchored" alt="TPOT calculation" data-text-align="left">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-tpot-comparison-full-vs-piecewise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/09_full-cuda-graphs-spec-decode/imgs/tpot_k_comparison.png" class="img-fluid figure-img" style="width:50.0%" data-text-align="left" alt="TPOT calculation">
@@ -288,7 +2135,7 @@ Example Benchmarking Output
 <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
 <div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
-<div id="fig-total-token-throughput-short" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Token throughput metrics" data-text-align="left">
+<div id="fig-total-token-throughput-short" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Token throughput metrics">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-total-token-throughput-short-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics">
@@ -372,7 +2219,7 @@ Figure&nbsp;2: Throughput as a function of <img src="https://latex.codecogs.com/
 <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" aria-controls="tabset-3-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
 <div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
-<div id="fig-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Speedup ratios of EAGLE-3" data-text-align="left">
+<div id="fig-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Speedup ratios of EAGLE-3">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3">
@@ -406,7 +2253,7 @@ Figure&nbsp;3: Speedup ratios of EAGLE-3
 <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" aria-controls="tabset-4-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" aria-controls="tabset-4-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-3" aria-controls="tabset-4-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
 <div id="tabset-4-1" class="tab-pane active" aria-labelledby="tabset-4-1-tab">
-<div id="fig-draft-model-vs-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Comparison of Speedups of Draft Model and EAGLE-3" data-text-align="left">
+<div id="fig-draft-model-vs-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-draft-model-vs-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3">
@@ -440,7 +2287,7 @@ Figure&nbsp;4: Comparison of Speedups of Draft Model and EAGLE-3
 <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" aria-controls="tabset-5-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" aria-controls="tabset-5-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" aria-controls="tabset-5-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
 <div id="tabset-5-1" class="tab-pane active" aria-labelledby="tabset-5-1-tab">
-<div id="fig-acceptance-lengths-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Acceptance Lengths for draft_model and EAGLE-3" data-text-align="left">
+<div id="fig-acceptance-lengths-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-acceptance-lengths-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3">
@@ -476,7 +2323,7 @@ Figure&nbsp;5: Acceptance Lengths for draft_model and EAGLE-3.
 <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" aria-controls="tabset-6-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" aria-controls="tabset-6-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-6-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-3" aria-controls="tabset-6-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
 <div id="tabset-6-1" class="tab-pane active" aria-labelledby="tabset-6-1-tab">
-<div id="fig-total-token-throughput-full" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Token Throughputs of all Methods" data-text-align="left">
+<div id="fig-total-token-throughput-full" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Token Throughputs of all Methods">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-total-token-throughput-full-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods">
@@ -520,7 +2367,7 @@ Figure&nbsp;6: Token Throughputs of all Methods
 <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" aria-controls="tabset-7-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" aria-controls="tabset-7-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-3" aria-controls="tabset-7-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
 <div id="tabset-7-1" class="tab-pane active" aria-labelledby="tabset-7-1-tab">
-<div id="fig-ttft-itl-tpot" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Inference Metrics" data-text-align="left">
+<div id="fig-ttft-itl-tpot" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Inference Metrics">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-ttft-itl-tpot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="https://tomasruizt.github.io/posts/06_vllm-spec-decode/imgs/llama70b/InstructCoder/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics">
@@ -684,7 +2531,7 @@ font-style: inherit;">def</span> test_draft_model_correctness(enforce_eager):</s
 </section>
 <section id="summary" class="level2">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
-<p>In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>) and compared it against vanilla decoding and EAGLE-3. On MT-Bench and InstructCoder, it delivers substantial speedups (up to 2.24×) without specialized training. Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes. The performance numbers are meant as a reference as of today (2026-01-25, commit <code>e1a34c3</code>), and can vary with model, workload, and deployment. Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.</p>
+<p>In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>) and compared it against vanilla decoding and EAGLE-3. It delivers substantial speedups over vanilla decoding (up to 3.55×) without specialized training. Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes. The performance numbers are meant as a reference as of today (2026-01-28, commit <code>e1a34c3</code>), and can vary with model, workload, and deployment. Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.</p>
 </section>
 <section id="acknowledgments" class="level2">
 <h2 class="anchored" data-anchor-id="acknowledgments">Acknowledgments</h2>
@@ -2207,7 +4054,7 @@ Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruiz
 
 </div>
 <script type="pyodide-1-contents">
-eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSJ9
+eyJjb2RlIjoieCA9IDNcbnkgPSA0XG5wcmludChmXCJ7eCp5fSDiiaQgezAuNSAqICh4KnggKyB5KnkpfVwiKSIsImF0dHIiOnsiZWRpdCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZSwiZXZhbCI6dHJ1ZX19
 </script>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -2234,7 +4081,7 @@ Note
 
 </div>
 <script type="pyodide-2-contents">
-eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSJ9
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5hcnJheShbMSwgMiwgM10pXG55ID0gbnAuYXJyYXkoWzQsIDUsIDZdKVxuXG5wcmludChmXCJ7eCBAIHl9IOKJpCB7MC41ICogKHggQCB4ICsgeSBAIHkpfVwiKSIsImF0dHIiOnsiZWRpdCI6dHJ1ZSwicnVuYnV0dG9uIjpmYWxzZSwiZXZhbCI6dHJ1ZX19
 </script>
 </div>
 </section>
@@ -2245,14 +4092,14 @@ eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoi
 <p><img src="https://latex.codecogs.com/png.latex?%E2%9F%A8%20f,%20g%20%E2%9F%A9%20=%20%5Cint%20f(x)%20g(x)%20dx"> Using this definition, the inequality holds for functions as well: <img src="https://latex.codecogs.com/png.latex?%0A%5Cbegin%7Balign%7D%0A%E2%9F%A8%20f,%20g%20%E2%9F%A9%20&amp;%E2%89%A4%20%5Cfrac%7B1%7D%7B2%7D%20(%E2%9F%A8%20f,%20f%20%E2%9F%A9%20+%20%E2%9F%A8%20g,%20g%20%E2%9F%A9)%20%5C%5C%0A&amp;=%20%5Cfrac%7B1%7D%7B2%7D%20%5Cleft(%20%5Cint%20f(x)%5E2%20dx%20+%20%5Cint%20g(x)%5E2%20dx%20%5Cright)%0A%5Cend%7Balign%7D%0A"></p>
 <p>Let’s take two concrete functions <img src="https://latex.codecogs.com/png.latex?f(x)%20=%20%5Ccos(x)"> and <img src="https://latex.codecogs.com/png.latex?g(x)%20=%20%5Csin(4x)">. I choose these arbitrarily because plotting them looks nice. Feel free to use different functions <code>f</code> and <code>g</code> in the code.</p>
 <script type="exercise-setup-ex_funcs-contents">
-eyJhdHRyIjp7InNldHVwIjp0cnVlLCJleGVyY2lzZSI6ImV4X2Z1bmNzIiwiZXZhbCI6dHJ1ZSwiZWRpdCI6dHJ1ZX0sImNvZGUiOiJpbXBvcnQgbWF0cGxvdGxpYi5weXBsb3QgYXMgcGx0XG5cbmRlZiBwbG90KHgsIGYsIGcpOlxuICAgIHBsdC5wbG90KHgsIGYqZywgbGFiZWw9XCIkZiBcXFxcY2RvdCBnJFwiLCBjb2xvcj1cImdyZWVuXCIpXG4gICAgcGx0LnBsb3QoeCwgZipmLCBsYWJlbD1cIiRmXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgZypnLCBsYWJlbD1cIiRnXjIkXCIsIGNvbG9yPVwibGlnaHRibHVlXCIpXG4gICAgcGx0LnBsb3QoeCwgMC41ICogKGYqZiArIGcqZyksIGxhYmVsPVwiJDAuNSAoZl4yICsgZ14yKSRcIiwgY29sb3I9XCJyZWRcIilcbiAgICBwbHQudGl0bGUoXCJVcHBlciBib3VuZCBmb3IgJFxcXFxsYW5nbGUgZiwgZyBcXFxccmFuZ2xlJFwiKVxuICAgIHBsdC5sZWdlbmQoKVxuICAgIHBsdC5ncmlkKClcbiAgICBwbHQuc2hvdygpIn0=
+eyJjb2RlIjoiaW1wb3J0IG1hdHBsb3RsaWIucHlwbG90IGFzIHBsdFxuXG5kZWYgcGxvdCh4LCBmLCBnKTpcbiAgICBwbHQucGxvdCh4LCBmKmcsIGxhYmVsPVwiJGYgXFxcXGNkb3QgZyRcIiwgY29sb3I9XCJncmVlblwiKVxuICAgIHBsdC5wbG90KHgsIGYqZiwgbGFiZWw9XCIkZl4yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIGcqZywgbGFiZWw9XCIkZ14yJFwiLCBjb2xvcj1cImxpZ2h0Ymx1ZVwiKVxuICAgIHBsdC5wbG90KHgsIDAuNSAqIChmKmYgKyBnKmcpLCBsYWJlbD1cIiQwLjUgKGZeMiArIGdeMikkXCIsIGNvbG9yPVwicmVkXCIpXG4gICAgcGx0LnRpdGxlKFwiVXBwZXIgYm91bmQgZm9yICRcXFxcbGFuZ2xlIGYsIGcgXFxcXHJhbmdsZSRcIilcbiAgICBwbHQubGVnZW5kKClcbiAgICBwbHQuZ3JpZCgpXG4gICAgcGx0LnNob3coKSIsImF0dHIiOnsiZXhlcmNpc2UiOiJleF9mdW5jcyIsInNldHVwIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlfX0=
 </script>
 <div>
 <div id="pyodide-4" class="exercise-cell">
 
 </div>
 <script type="pyodide-4-contents">
-eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJldmFsIjp0cnVlLCJlZGl0Ijp0cnVlLCJhdXRvcnVuIjp0cnVlfSwiY29kZSI6ImltcG9ydCBudW1weSBhcyBucFxuXG54ID0gbnAubGluc3BhY2UoMCwgMiwgMTAwKVxuZiA9IG5wLmNvcyh4KVxuZyA9IG5wLnNpbig0KngpXG5wbG90KHgsIGYsIGcpIn0=
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcbnBsb3QoeCwgZiwgZykiLCJhdHRyIjp7ImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJydW5idXR0b24iOmZhbHNlLCJhdXRvcnVuIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlfX0=
 </script>
 </div>
 <p>In the plot above, the individual functions <img src="https://latex.codecogs.com/png.latex?f%5E2"> and <img src="https://latex.codecogs.com/png.latex?g%5E2"> are plotted with light-blue lines. Their average is the red line, and the product <img src="https://latex.codecogs.com/png.latex?f%20%E2%8B%85%20g"> is the green line. The red line is an upper bound for the green one. We see that the green line crosses over the two blue lines at different points but never crosses over the red line.</p>
@@ -2262,7 +4109,7 @@ eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImV4ZXJjaXNlIjoiZXhfZnVuY3MiLCJldmFsIjp0cnVl
 
 </div>
 <script type="pyodide-5-contents">
-eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikifQ==
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbnggPSBucC5saW5zcGFjZSgwLCAyLCAxMDApXG5mID0gbnAuY29zKHgpXG5nID0gbnAuc2luKDQqeClcblxucHJpbnQoZlwie25wLnRyYXB6KGYqZywgeCl9IOKJpCB7MC41ICogKG5wLnRyYXB6KGYqZiwgeCkgKyBucC50cmFweihnKmcsIHgpKX1cIikiLCJhdHRyIjp7ImVkaXQiOnRydWUsInJ1bmJ1dHRvbiI6ZmFsc2UsImV2YWwiOnRydWV9fQ==
 </script>
 </div>
 </section>
@@ -2292,7 +4139,7 @@ Warning
 
 </div>
 <script type="pyodide-6-contents">
-eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIn0=
+eyJjb2RlIjoiaW1wb3J0IG51bXB5IGFzIG5wXG5cbmRpbSA9IDJcbkEgPSBucC5yYW5kb20ucmFuZG4oZGltLCBkaW0pXG5CID0gbnAucmFuZG9tLnJhbmRuKGRpbSwgZGltKVxuXG5kZWYgaXAoWCwgWSk6ICAjIGlubmVyIHByb2R1Y3RcbiAgcmV0dXJuIG5wLnRyYWNlKFguVCBAIFkpXG5cbnByaW50KGZcIntpcChBLCBCKX0g4omkIHswLjUgKiAoaXAoQSwgQSkgKyBpcChCLCBCKSl9XCIpIiwiYXR0ciI6eyJlZGl0Ijp0cnVlLCJydW5idXR0b24iOmZhbHNlLCJldmFsIjp0cnVlfX0=
 </script>
 </div>
 <p>The inequality holds, but I have no geometric intuition about the trace of a matrix, or how this inequality could be visualized for matrices. If you have an idea, please let me know! 🙏</p>
@@ -2303,10 +4150,10 @@ eyJhdHRyIjp7InJ1bmJ1dHRvbiI6ZmFsc2UsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoi
 
 
 <script type="pyodide-data">
-eyJwYWNrYWdlcyI6eyJwa2dzIjpbInB5b2RpZGVfaHR0cCIsIm1pY3JvcGlwIiwiaXB5dGhvbiJdfSwib3B0aW9ucyI6eyJlbnYiOnsiUExPVExZX1JFTkRFUkVSIjoicGxvdGx5X21pbWV0eXBlIn0sImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjguMS9mdWxsLyJ9fQ==
+eyJvcHRpb25zIjp7ImluZGV4VVJMIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L3B5b2RpZGUvdjAuMjguMS9mdWxsLyIsImVudiI6eyJQTE9UTFlfUkVOREVSRVIiOiJwbG90bHlfbWltZXR5cGUifX0sInBhY2thZ2VzIjp7InBrZ3MiOlsicHlvZGlkZV9odHRwIiwibWljcm9waXAiLCJpcHl0aG9uIl19fQ==
 </script>
 <script type="ojs-module-contents">
-eyJjb250ZW50cyI6W3siaW5saW5lIjpmYWxzZSwiY2VsbE5hbWUiOiJweW9kaWRlLTYiLCJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzYgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTYtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS02LWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfNiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNiwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiaW5saW5lIjpmYWxzZSwiY2VsbE5hbWUiOiJweW9kaWRlLTUiLCJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzUgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTUtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS01LWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfNSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNSwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCJ9LHsiaW5saW5lIjpmYWxzZSwiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzQgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTQtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICAvLyBEZWZhdWx0IGV4ZXJjaXNlIGNvbmZpZ3VyYXRpb25cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oXG4gICAge1xuICAgICAgaWQ6IFwicHlvZGlkZS00LWNvbnRlbnRzXCIsXG4gICAgICBlbnZpcjogYGV4ZXJjaXNlLWVudi0ke2Jsb2NrLmF0dHIuZXhlcmNpc2V9YCxcbiAgICAgIGVycm9yOiBmYWxzZSxcbiAgICAgIGNhcHRpb246ICdFeGVyY2lzZScsXG4gICAgfSxcbiAgICBibG9jay5hdHRyXG4gICk7XG5cbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLCBibG9jay5jb2RlLCBvcHRpb25zKTtcbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG52aWV3b2YgX3B5b2RpZGVfdmFsdWVfNCA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfNCwge30pO1xuX3B5b2RpZGVfZmVlZGJhY2tfNCA9IHtcbiAgY29uc3QgeyBQeW9kaWRlR3JhZGVyIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuICBjb25zdCBlbXB0eUZlZWRiYWNrID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7XG5cbiAgY29uc3QgZ3JhZGVyID0gbmV3IFB5b2RpZGVHcmFkZXIoX3B5b2RpZGVfdmFsdWVfNC5ldmFsdWF0b3IpO1xuICBjb25zdCBmZWVkYmFjayA9IGF3YWl0IGdyYWRlci5ncmFkZUV4ZXJjaXNlKCk7XG4gIGlmICghZmVlZGJhY2spIHJldHVybiBlbXB0eUZlZWRiYWNrO1xuICByZXR1cm4gZmVlZGJhY2s7XG59XG4iLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0In0seyJpbmxpbmUiOmZhbHNlLCJjZWxsTmFtZSI6InB5b2RpZGUtMiIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMiA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMi1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTItY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8yID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8yLCB7fSk7XG4iLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0In0seyJpbmxpbmUiOmZhbHNlLCJjZWxsTmFtZSI6InB5b2RpZGUtMSIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMSA9IHtcbiAgY29uc3QgeyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IsIGI2NERlY29kZSB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzY3JpcHRDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtMS1jb250ZW50c1xcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGJsb2NrID0gSlNPTi5wYXJzZShiNjREZWNvZGUoc2NyaXB0Q29udGVudCkpO1xuXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHsgaWQ6IGBweW9kaWRlLTEtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xID0gcHlvZGlkZU9qcy5wcm9jZXNzKF9weW9kaWRlX2VkaXRvcl8xLCB7fSk7XG4iLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0In0seyJpbmxpbmUiOmZhbHNlLCJjZWxsTmFtZSI6InB5b2RpZGUtcHJlbHVkZSIsInNvdXJjZSI6InB5b2RpZGVPanMgPSB7XG4gIGNvbnN0IHtcbiAgICBQeW9kaWRlRXZhbHVhdG9yLFxuICAgIFB5b2RpZGVFbnZpcm9ubWVudE1hbmFnZXIsXG4gICAgc2V0dXBQeXRob24sXG4gICAgc3RhcnRQeW9kaWRlV29ya2VyLFxuICAgIGI2NERlY29kZSxcbiAgICBjb2xsYXBzZVBhdGgsXG4gIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHN0YXR1c0NvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1zdGF0dXNcIik7XG4gIGNvbnN0IGluZGljYXRvckNvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGluZGljYXRvckNvbnRhaW5lci5jbGFzc0xpc3QucmVtb3ZlKFwiZC1ub25lXCIpO1xuXG4gIGxldCBzdGF0dXNUZXh0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKVxuICBzdGF0dXNUZXh0LmNsYXNzTGlzdCA9IFwiZXhlcmNpc2UtbG9hZGluZy1kZXRhaWxzXCI7XG4gIHN0YXR1c1RleHQgPSBzdGF0dXNDb250YWluZXIuYXBwZW5kQ2hpbGQoc3RhdHVzVGV4dCk7XG4gIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgSW5pdGlhbGlzZWA7XG5cbiAgLy8gSG9pc3QgaW5kaWNhdG9yIG91dCBmcm9tIGZpbmFsIHNsaWRlIHdoZW4gcnVubmluZyB1bmRlciByZXZlYWxcbiAgY29uc3QgcmV2ZWFsU3RhdHVzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgLmV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpZiAocmV2ZWFsU3RhdHVzKSB7XG4gICAgcmV2ZWFsU3RhdHVzLnJlbW92ZSgpO1xuICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsID4gLnNsaWRlc1wiKS5hcHBlbmRDaGlsZChyZXZlYWxTdGF0dXMpO1xuICB9XG5cbiAgLy8gTWFrZSBhbnkgcmV2ZWFsIHNsaWRlcyB3aXRoIGxpdmUgY2VsbHMgc2Nyb2xsYWJsZVxuICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKFwiLnJldmVhbCAuZXhlcmNpc2UtY2VsbFwiKS5mb3JFYWNoKChlbCkgPT4ge1xuICAgIGVsLmNsb3Nlc3QoJ3NlY3Rpb24uc2xpZGUnKS5jbGFzc0xpc3QuYWRkKFwic2Nyb2xsYWJsZVwiKTtcbiAgfSlcblxuICAvLyBQeW9kaWRlIHN1cHBsZW1lbnRhbCBkYXRhIGFuZCBvcHRpb25zXG4gIGNvbnN0IGRhdGFDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtZGF0YVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGRhdGEgPSBKU09OLnBhcnNlKGI2NERlY29kZShkYXRhQ29udGVudCkpO1xuXG4gIC8vIEdyYWIgbGlzdCBvZiByZXNvdXJjZXMgdG8gYmUgZG93bmxvYWRlZFxuICBjb25zdCBmaWxlc0NvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwidmZzLWZpbGVcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBmaWxlcyA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGZpbGVzQ29udGVudCkpO1xuXG4gIGxldCBweW9kaWRlUHJvbWlzZSA9IChhc3luYyAoKSA9PiB7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBQeW9kaWRlYDtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgc3RhcnRQeW9kaWRlV29ya2VyKGRhdGEub3B0aW9ucyk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6IG1pY3JvcGlwYDtcbiAgICBhd2FpdCBweW9kaWRlLmxvYWRQYWNrYWdlKFwibWljcm9waXBcIik7XG4gICAgY29uc3QgbWljcm9waXAgPSBhd2FpdCBweW9kaWRlLnB5aW1wb3J0KFwibWljcm9waXBcIik7XG4gICAgYXdhaXQgZGF0YS5wYWNrYWdlcy5wa2dzLm1hcCgocGtnKSA9PiAoKSA9PiB7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6ICR7cGtnfWA7XG4gICAgICByZXR1cm4gbWljcm9waXAuaW5zdGFsbChwa2cpO1xuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuICAgIGF3YWl0IG1pY3JvcGlwLmRlc3Ryb3koKTtcblxuICAgIC8vIERvd25sb2FkIGFuZCBpbnN0YWxsIHJlc291cmNlc1xuICAgIGF3YWl0IGZpbGVzLm1hcCgoZmlsZSkgPT4gYXN5bmMgKCkgPT4ge1xuICAgICAgY29uc3QgbmFtZSA9IGZpbGUuc3Vic3RyaW5nKGZpbGUubGFzdEluZGV4T2YoJy8nKSArIDEpO1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyByZXNvdXJjZTogJHtuYW1lfWA7XG4gICAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGZldGNoKGZpbGUpO1xuICAgICAgaWYgKCFyZXNwb25zZS5vaykge1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYENhbid0IGRvd25sb2FkIFxcYCR7ZmlsZX1cXGAuIEVycm9yICR7cmVzcG9uc2Uuc3RhdHVzfTogXCIke3Jlc3BvbnNlLnN0YXR1c1RleHR9XCIuYCk7XG4gICAgICB9XG4gICAgICBjb25zdCBkYXRhID0gYXdhaXQgcmVzcG9uc2UuYXJyYXlCdWZmZXIoKTtcblxuICAgICAgLy8gU3RvcmUgVVJMcyBpbiB0aGUgY3dkIHdpdGhvdXQgYW55IHN1YmRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGlmIChmaWxlLmluY2x1ZGVzKFwiOi8vXCIpKSB7XG4gICAgICAgIGZpbGUgPSBuYW1lO1xuICAgICAgfVxuXG4gICAgICAvLyBDb2xsYXBzZSBoaWdoZXIgZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgZmlsZSA9IGNvbGxhcHNlUGF0aChmaWxlKTtcblxuICAgICAgLy8gQ3JlYXRlIGRpcmVjdG9yeSB0cmVlLCBpZ25vcmluZyBcImRpcmVjdG9yeSBleGlzdHNcIiBWRlMgZXJyb3JzXG4gICAgICBjb25zdCBwYXJ0cyA9IGZpbGUuc3BsaXQoJy8nKS5zbGljZSgwLCAtMSk7XG4gICAgICBsZXQgcGF0aCA9ICcnO1xuICAgICAgd2hpbGUgKHBhcnRzLmxlbmd0aCA+IDApIHtcbiAgICAgICAgcGF0aCArPSBwYXJ0cy5zaGlmdCgpICsgJy8nO1xuICAgICAgICB0cnkge1xuICAgICAgICAgIGF3YWl0IHB5b2RpZGUuRlMubWtkaXIocGF0aCk7XG4gICAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgICBpZiAoZS5lcnJubyAhPT0gMjApIHtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBXcml0ZSB0aGlzIGZpbGUgdG8gdGhlIFZGU1xuICAgICAgdHJ5IHtcbiAgICAgICAgcmV0dXJuIGF3YWl0IHB5b2RpZGUuRlMud3JpdGVGaWxlKGZpbGUsIG5ldyBVaW50OEFycmF5KGRhdGEpKTtcbiAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgUHlvZGlkZSBlbnZpcm9ubWVudCBzZXR1cGA7XG4gICAgYXdhaXQgc2V0dXBQeXRob24ocHlvZGlkZSk7XG5cbiAgICBzdGF0dXNUZXh0LnJlbW92ZSgpO1xuICAgIGlmIChzdGF0dXNDb250YWluZXIuY2hpbGRyZW4ubGVuZ3RoID09IDApIHtcbiAgICAgIHN0YXR1c0NvbnRhaW5lci5wYXJlbnROb2RlLnJlbW92ZSgpO1xuICAgIH1cbiAgICByZXR1cm4gcHlvZGlkZTtcbiAgfSkoKS5jYXRjaCgoZXJyKSA9PiB7XG4gICAgc3RhdHVzVGV4dC5zdHlsZS5jb2xvciA9IFwidmFyKC0tZXhlcmNpc2UtZWRpdG9yLWhsLWVyLCAjQUQwMDAwKVwiO1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBlcnIubWVzc2FnZTtcbiAgICAvL2luZGljYXRvckNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKFwiLnNwaW5uZXItZ3Jvd1wiKS5jbGFzc0xpc3QuYWRkKFwiZC1ub25lXCIpO1xuICAgIHRocm93IGVycjtcbiAgfSk7XG5cbiAgLy8gS2VlcCB0cmFjayBvZiBpbml0aWFsIE9KUyBibG9jayByZW5kZXJcbiAgY29uc3QgcmVuZGVyZWRPanMgPSB7fTtcblxuICBjb25zdCBwcm9jZXNzID0gYXN5bmMgKGNvbnRleHQsIGlucHV0cykgPT4ge1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBweW9kaWRlUHJvbWlzZTtcbiAgICBjb25zdCBldmFsdWF0b3IgPSBuZXcgUHlvZGlkZUV2YWx1YXRvcihweW9kaWRlLCBjb250ZXh0KTtcbiAgICBhd2FpdCBldmFsdWF0b3IucHJvY2VzcyhpbnB1dHMpO1xuICAgIHJldHVybiBldmFsdWF0b3IuY29udGFpbmVyO1xuICB9XG5cbiAgcmV0dXJuIHtcbiAgICBweW9kaWRlUHJvbWlzZSxcbiAgICByZW5kZXJlZE9qcyxcbiAgICBwcm9jZXNzLFxuICB9O1xufVxuIiwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0In1dfQ==
+eyJjb250ZW50cyI6W3sic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJjZWxsTmFtZSI6InB5b2RpZGUtNiIsImlubGluZSI6ZmFsc2V9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJjZWxsTmFtZSI6InB5b2RpZGUtNSIsImlubGluZSI6ZmFsc2V9LHsic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBleGVyY2lzZSBjb25maWd1cmF0aW9uXG4gIGNvbnN0IG9wdGlvbnMgPSBPYmplY3QuYXNzaWduKFxuICAgIHtcbiAgICAgIGlkOiBcInB5b2RpZGUtNC1jb250ZW50c1wiLFxuICAgICAgZW52aXI6IGBleGVyY2lzZS1lbnYtJHtibG9jay5hdHRyLmV4ZXJjaXNlfWAsXG4gICAgICBlcnJvcjogZmFsc2UsXG4gICAgICBjYXB0aW9uOiAnRXhlcmNpc2UnLFxuICAgIH0sXG4gICAgYmxvY2suYXR0clxuICApO1xuXG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IocHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSwgYmxvY2suY29kZSwgb3B0aW9ucyk7XG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxudmlld29mIF9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbl9weW9kaWRlX2ZlZWRiYWNrXzQgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUdyYWRlciB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcbiAgY29uc3QgZW1wdHlGZWVkYmFjayA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO1xuXG4gIGNvbnN0IGdyYWRlciA9IG5ldyBQeW9kaWRlR3JhZGVyKF9weW9kaWRlX3ZhbHVlXzQuZXZhbHVhdG9yKTtcbiAgY29uc3QgZmVlZGJhY2sgPSBhd2FpdCBncmFkZXIuZ3JhZGVFeGVyY2lzZSgpO1xuICBpZiAoIWZlZWRiYWNrKSByZXR1cm4gZW1wdHlGZWVkYmFjaztcbiAgcmV0dXJuIGZlZWRiYWNrO1xufVxuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoicHlvZGlkZS00IiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzIgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTItY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0yLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMiwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoicHlvZGlkZS0yIiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJ2aWV3b2YgX3B5b2RpZGVfZWRpdG9yXzEgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7IGlkOiBgcHlvZGlkZS0xLWNvbnRlbnRzYCB9LCBibG9jay5hdHRyKTtcbiAgY29uc3QgZWRpdG9yID0gbmV3IFB5b2RpZGVFeGVyY2lzZUVkaXRvcihcbiAgICBweW9kaWRlT2pzLnB5b2RpZGVQcm9taXNlLFxuICAgIGJsb2NrLmNvZGUsXG4gICAgb3B0aW9uc1xuICApO1xuXG4gIHJldHVybiBlZGl0b3IuY29udGFpbmVyO1xufVxuX3B5b2RpZGVfdmFsdWVfMSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMSwge30pO1xuIiwibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoicHlvZGlkZS0xIiwiaW5saW5lIjpmYWxzZX0seyJzb3VyY2UiOiJweW9kaWRlT2pzID0ge1xuICBjb25zdCB7XG4gICAgUHlvZGlkZUV2YWx1YXRvcixcbiAgICBQeW9kaWRlRW52aXJvbm1lbnRNYW5hZ2VyLFxuICAgIHNldHVwUHl0aG9uLFxuICAgIHN0YXJ0UHlvZGlkZVdvcmtlcixcbiAgICBiNjREZWNvZGUsXG4gICAgY29sbGFwc2VQYXRoLFxuICB9ID0gd2luZG93Ll9leGVyY2lzZV9vanNfcnVudGltZTtcblxuICBjb25zdCBzdGF0dXNDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctc3RhdHVzXCIpO1xuICBjb25zdCBpbmRpY2F0b3JDb250YWluZXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChcImV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpbmRpY2F0b3JDb250YWluZXIuY2xhc3NMaXN0LnJlbW92ZShcImQtbm9uZVwiKTtcblxuICBsZXQgc3RhdHVzVGV4dCA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIilcbiAgc3RhdHVzVGV4dC5jbGFzc0xpc3QgPSBcImV4ZXJjaXNlLWxvYWRpbmctZGV0YWlsc1wiO1xuICBzdGF0dXNUZXh0ID0gc3RhdHVzQ29udGFpbmVyLmFwcGVuZENoaWxkKHN0YXR1c1RleHQpO1xuICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYEluaXRpYWxpc2VgO1xuXG4gIC8vIEhvaXN0IGluZGljYXRvciBvdXQgZnJvbSBmaW5hbCBzbGlkZSB3aGVuIHJ1bm5pbmcgdW5kZXIgcmV2ZWFsXG4gIGNvbnN0IHJldmVhbFN0YXR1cyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsIC5leGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaWYgKHJldmVhbFN0YXR1cykge1xuICAgIHJldmVhbFN0YXR1cy5yZW1vdmUoKTtcbiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCA+IC5zbGlkZXNcIikuYXBwZW5kQ2hpbGQocmV2ZWFsU3RhdHVzKTtcbiAgfVxuXG4gIC8vIE1ha2UgYW55IHJldmVhbCBzbGlkZXMgd2l0aCBsaXZlIGNlbGxzIHNjcm9sbGFibGVcbiAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbChcIi5yZXZlYWwgLmV4ZXJjaXNlLWNlbGxcIikuZm9yRWFjaCgoZWwpID0+IHtcbiAgICBlbC5jbG9zZXN0KCdzZWN0aW9uLnNsaWRlJykuY2xhc3NMaXN0LmFkZChcInNjcm9sbGFibGVcIik7XG4gIH0pXG5cbiAgLy8gUHlvZGlkZSBzdXBwbGVtZW50YWwgZGF0YSBhbmQgb3B0aW9uc1xuICBjb25zdCBkYXRhQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLWRhdGFcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBkYXRhID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZGF0YUNvbnRlbnQpKTtcblxuICAvLyBHcmFiIGxpc3Qgb2YgcmVzb3VyY2VzIHRvIGJlIGRvd25sb2FkZWRcbiAgY29uc3QgZmlsZXNDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInZmcy1maWxlXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZmlsZXMgPSBKU09OLnBhcnNlKGI2NERlY29kZShmaWxlc0NvbnRlbnQpKTtcblxuICBsZXQgcHlvZGlkZVByb21pc2UgPSAoYXN5bmMgKCkgPT4ge1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgUHlvZGlkZWA7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHN0YXJ0UHlvZGlkZVdvcmtlcihkYXRhLm9wdGlvbnMpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiBtaWNyb3BpcGA7XG4gICAgYXdhaXQgcHlvZGlkZS5sb2FkUGFja2FnZShcIm1pY3JvcGlwXCIpO1xuICAgIGNvbnN0IG1pY3JvcGlwID0gYXdhaXQgcHlvZGlkZS5weWltcG9ydChcIm1pY3JvcGlwXCIpO1xuICAgIGF3YWl0IGRhdGEucGFja2FnZXMucGtncy5tYXAoKHBrZykgPT4gKCkgPT4ge1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBwYWNrYWdlOiAke3BrZ31gO1xuICAgICAgcmV0dXJuIG1pY3JvcGlwLmluc3RhbGwocGtnKTtcbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcbiAgICBhd2FpdCBtaWNyb3BpcC5kZXN0cm95KCk7XG5cbiAgICAvLyBEb3dubG9hZCBhbmQgaW5zdGFsbCByZXNvdXJjZXNcbiAgICBhd2FpdCBmaWxlcy5tYXAoKGZpbGUpID0+IGFzeW5jICgpID0+IHtcbiAgICAgIGNvbnN0IG5hbWUgPSBmaWxlLnN1YnN0cmluZyhmaWxlLmxhc3RJbmRleE9mKCcvJykgKyAxKTtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcmVzb3VyY2U6ICR7bmFtZX1gO1xuICAgICAgY29uc3QgcmVzcG9uc2UgPSBhd2FpdCBmZXRjaChmaWxlKTtcbiAgICAgIGlmICghcmVzcG9uc2Uub2spIHtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBDYW4ndCBkb3dubG9hZCBcXGAke2ZpbGV9XFxgLiBFcnJvciAke3Jlc3BvbnNlLnN0YXR1c306IFwiJHtyZXNwb25zZS5zdGF0dXNUZXh0fVwiLmApO1xuICAgICAgfVxuICAgICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmFycmF5QnVmZmVyKCk7XG5cbiAgICAgIC8vIFN0b3JlIFVSTHMgaW4gdGhlIGN3ZCB3aXRob3V0IGFueSBzdWJkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBpZiAoZmlsZS5pbmNsdWRlcyhcIjovL1wiKSkge1xuICAgICAgICBmaWxlID0gbmFtZTtcbiAgICAgIH1cblxuICAgICAgLy8gQ29sbGFwc2UgaGlnaGVyIGRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGZpbGUgPSBjb2xsYXBzZVBhdGgoZmlsZSk7XG5cbiAgICAgIC8vIENyZWF0ZSBkaXJlY3RvcnkgdHJlZSwgaWdub3JpbmcgXCJkaXJlY3RvcnkgZXhpc3RzXCIgVkZTIGVycm9yc1xuICAgICAgY29uc3QgcGFydHMgPSBmaWxlLnNwbGl0KCcvJykuc2xpY2UoMCwgLTEpO1xuICAgICAgbGV0IHBhdGggPSAnJztcbiAgICAgIHdoaWxlIChwYXJ0cy5sZW5ndGggPiAwKSB7XG4gICAgICAgIHBhdGggKz0gcGFydHMuc2hpZnQoKSArICcvJztcbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICBhd2FpdCBweW9kaWRlLkZTLm1rZGlyKHBhdGgpO1xuICAgICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgICAgaWYgKGUuZXJybm8gIT09IDIwKSB7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgLy8gV3JpdGUgdGhpcyBmaWxlIHRvIHRoZSBWRlNcbiAgICAgIHRyeSB7XG4gICAgICAgIHJldHVybiBhd2FpdCBweW9kaWRlLkZTLndyaXRlRmlsZShmaWxlLCBuZXcgVWludDhBcnJheShkYXRhKSk7XG4gICAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICBjb25zdCBlcnJvclRleHRQdHIgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuX3N0cmVycm9yKGUuZXJybm8pO1xuICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICB9XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYFB5b2RpZGUgZW52aXJvbm1lbnQgc2V0dXBgO1xuICAgIGF3YWl0IHNldHVwUHl0aG9uKHB5b2RpZGUpO1xuXG4gICAgc3RhdHVzVGV4dC5yZW1vdmUoKTtcbiAgICBpZiAoc3RhdHVzQ29udGFpbmVyLmNoaWxkcmVuLmxlbmd0aCA9PSAwKSB7XG4gICAgICBzdGF0dXNDb250YWluZXIucGFyZW50Tm9kZS5yZW1vdmUoKTtcbiAgICB9XG4gICAgcmV0dXJuIHB5b2RpZGU7XG4gIH0pKCkuY2F0Y2goKGVycikgPT4ge1xuICAgIHN0YXR1c1RleHQuc3R5bGUuY29sb3IgPSBcInZhcigtLWV4ZXJjaXNlLWVkaXRvci1obC1lciwgI0FEMDAwMClcIjtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gZXJyLm1lc3NhZ2U7XG4gICAgLy9pbmRpY2F0b3JDb250YWluZXIucXVlcnlTZWxlY3RvcihcIi5zcGlubmVyLWdyb3dcIikuY2xhc3NMaXN0LmFkZChcImQtbm9uZVwiKTtcbiAgICB0aHJvdyBlcnI7XG4gIH0pO1xuXG4gIC8vIEtlZXAgdHJhY2sgb2YgaW5pdGlhbCBPSlMgYmxvY2sgcmVuZGVyXG4gIGNvbnN0IHJlbmRlcmVkT2pzID0ge307XG5cbiAgY29uc3QgcHJvY2VzcyA9IGFzeW5jIChjb250ZXh0LCBpbnB1dHMpID0+IHtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgcHlvZGlkZVByb21pc2U7XG4gICAgY29uc3QgZXZhbHVhdG9yID0gbmV3IFB5b2RpZGVFdmFsdWF0b3IocHlvZGlkZSwgY29udGV4dCk7XG4gICAgYXdhaXQgZXZhbHVhdG9yLnByb2Nlc3MoaW5wdXRzKTtcbiAgICByZXR1cm4gZXZhbHVhdG9yLmNvbnRhaW5lcjtcbiAgfVxuXG4gIHJldHVybiB7XG4gICAgcHlvZGlkZVByb21pc2UsXG4gICAgcmVuZGVyZWRPanMsXG4gICAgcHJvY2VzcyxcbiAgfTtcbn1cbiIsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwiaW5saW5lIjpmYWxzZX1dfQ==
 </script>
 <div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
 <div id="exercise-loading-status" class="d-flex gap-2">
@@ -2347,7 +4194,7 @@ W10=
 <section id="summary" class="level1">
 <h1>Summary</h1>
 <p>In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation <img src="https://latex.codecogs.com/png.latex?W"> is shown in figure 1 (green).</p>
-<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Learned Linear Transformation" data-text-align="center">
+<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="center" alt="Learned Linear Transformation">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="linear-adaptation/linear-adaptation.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."><img src="https://tomasruizt.github.io/posts/01_linear-adaptation/linear-adaptation/linear-adaptation.png" class="img-fluid figure-img" style="width:75.0%" data-text-align="center" alt="Learned Linear Transformation"></a>
