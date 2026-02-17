@@ -694,9 +694,8 @@ _Cut Your Losses in Large-Vocabulary Language Models_ [@wijmans2025cut] is the d
 They avoid materializing logits during training by computing the cross-entropy loss incrementally on SRAM, reducing memory from 24GB to 1MB for Gemma 2 (2B).
 FMMS extends this idea to inference, where the challenge shifts from loss computation to sampling.
 
-_FlashSampling_ [@qin2025flashsampling] presents a conceptually similar algorithm for fused sampling.
-The paper was submitted to ICLR 25 but was not accepted.
-This post presents comprehensive benchmarks against strong baselines across multiple GPUs.
+_FlashSampling_ [@qin2025flashsampling] presents a conceptually very similar algorithm for fused sampling.
+The paper was submitted to ICLR 25 but was not accepted, and no open-source implementation is available.
 
 _FlashInfer_ [@ye2025flashinfer] provides high-performance sampling kernels used in vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23] and SGLang [@zheng2024sglang], but all its sampling functions take pre-materialized logits or probabilities as input.
 _Liger Kernel_ [@hsu2025ligerkernelefficienttriton] focuses on training-time kernel fusion and includes no sampling primitives.
