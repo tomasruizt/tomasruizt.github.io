@@ -401,7 +401,6 @@ FMMS also has higher register pressure from fusing Gumbel noise generation into 
 At low batch sizes (N $\leq$ 64), where the operation is deeply memory-bound, FMMS consistently achieves higher throughput than all baselines.
 Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-60% on B300/B200 (small config).
 100% would mean the kernel does nothing but stream the weight matrix from GMEM at the hardware's maximum rate, with zero overhead for computation, synchronization, or memory access patterns.
-This is the direct mechanism behind the speedups: by fusing the matmul and sampling, FMMS uses the available memory bandwidth more efficiently.
 
 ::::: {.panel-tabset group="workload-size"}
 ### Small
