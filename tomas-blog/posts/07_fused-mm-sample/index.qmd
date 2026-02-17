@@ -330,10 +330,9 @@ Two FlashInfer baselines are compared:
 ::::
 
 Vs `top_k_top_p`, FMMS is up to **2.30x faster** (B300, small config, N=16).
-For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes.
-B300 is a striking outlier: 1.6-2.3x speedups while B200/H200/H100 show 1.2-1.5x.
+For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes^[B300 is a striking outlier: 1.6-2.3x speedups while B200/H200/H100 show 1.2-1.5x.
 B200 and B300 have identical bandwidth and compute specs, and FMMS runs at the same speed on both (within 2%).
-The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 than on B200, likely due to incomplete optimization for the newer B300 architecture (sm_110).
+The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 than on B200, pontentially due to incomplete optimization for the newer B300 architecture (sm_110)].
 
 Vs `sampling_from_logits`, **FMMS is faster at all batch sizes from 1 to 64 on every GPU tested**, with speedups of 3-25%.
 For the small config, FMMS stays above 1.0x up to N=128 on B300/H100.
