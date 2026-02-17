@@ -660,26 +660,24 @@ Here is what each program in the 2D grid does, in pseudocode:
 
 ```python
 def program(v_tile, h_tile, W, H, temperature, seed):
-    logits = zeros(T_V, T_N, dtype=float32)        # <1>
-    for d_start in range(0, d, T_d):                # <2>
+    logits = zeros(T_V, T_N, dtype=float32)
+    for d_start in range(0, d, T_d):                # <1>
         w = W[v_tile, d_start : d_start + T_d]      # load [T_V, T_d] from GMEM
         h = H[h_tile, d_start : d_start + T_d]      # load [T_N, T_d] from GMEM
-        logits += w @ h.T                            # accumulate in SRAM
+        logits += w @ h.T                           # accumulate in SRAM
 
     logits = logits / temperature
-    U = rand(T_V, T_N)                              # <3>
+    U = rand(T_V, T_N)                              # <2>
     gumbel_noise = -log(-log(U))
     noised = logits + gumbel_noise
 
-    max_val, max_idx = max(noised, dim=V)           # <4>
+    max_val, max_idx = max(noised, dim=V)           # <3>
     GMEM_maxs[v_tile, h_tile] = max_val             # [T_N]
-    GMEM_idxs[v_tile, h_tile] = max_idx + v_offset  # <5>
+    GMEM_idxs[v_tile, h_tile] = max_idx
 ```
-1. The accumulator is FP32 for precision, even though the weight and hidden state tiles are loaded in BF16.
-2. The inner loop tiles the $d$ dimension. Each iteration loads one strip of $W$ and $H$ and accumulates a partial dot product. The full logit tile never leaves SRAM.
-3. Gumbel noise is generated in-kernel using Triton's Philox PRNG (`tl.rand`), one draw per logit element. Each `(v, h)` tile uses a different seed offset so tiles produce independent noise.
-4. The argmax over the $V$ dimension reduces the $(T_V, T_N)$ tile to just $T_N$ values. This is where the fusion pays off: the full logit tile is consumed and discarded in SRAM.
-5. The local argmax index is shifted by `v_offset` to produce a global vocabulary index before writing to GMEM.
+1. The inner loop tiles the $d$ dimension. Each iteration loads one strip of $W$ and $H$ and accumulates a partial dot product. The full logit tile never leaves SRAM.
+2. Gumbel noise is generated in-kernel using Triton's Philox PRNG (`tl.rand`), one draw per logit element. Each `(v, h)` tile uses a different seed offset so tiles produce independent noise.
+3. The argmax over the $V$ dimension reduces the $(T_V, T_N)$ tile to just $T_N$ values. The full logit tile is consumed and discarded in SRAM.
 
 # Related Work
 
