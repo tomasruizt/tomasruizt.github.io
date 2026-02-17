@@ -1,12 +1,11 @@
 **New post: FMMS: A Fused Matmul-Sample Kernel for LLM Inference**
 
-During LLM decoding, the LM head computes logits and writes them to global memory, only for the sampler to read them back immediately. FMMS fuses these two steps into a single Triton kernel using the Gumbel-max trick, keeping logits in SRAM and never materializing the full logits tensor.
+During LLM decoding, the LM head computes logits and writes them to global memory, only for the sampler to read them back immediately. FMMS fuses these two steps into a single Triton kernel using the Gumbel-max trick, keeping logits in SRAM and preventing round-trips to GMEM.
 
 In this post I cover:
-* The Gumbel-max reparameterization and why argmax decomposes over tiles, enabling tile-by-tile fusion of matmul and sampling.
-* Kernel microbenchmarks on B300, B200, H200, and H100: up to 1.52x faster than torch compiled baselines and up to 1.25x faster than FlashInfer in the memory-bound regime (batch sizes 1-64).
-* End-to-end vLLM integration: TPOT reductions of 11-19% on Qwen3-1.7B and up to 29% on Qwen3-8B on B200.
-* Correctness verification via chi-squared tests and GSM8K accuracy (no statistically significant difference, p=0.776).
+* Kernel microbenchmarks: up to 1.52x faster than torch compiled baselines and up to 1.25x faster than FlashInfer in the memory-bound regime (batch sizes 1-64, 4 GPUs from H100 to B300).
+* End-to-end vLLM integration on B200: up to 19% lower TPOT on Qwen3-1.7B, 3-7% on Qwen3-8B, and 1-5% on larger models (Qwen3-32B, gpt-oss-120b).
+* The Gumbel-max reparameterization that enables tile-by-tile fusion of matmul and sampling.
 
 Post: https://tomasruizt.github.io/posts/07_fused-mm-sample/
 

@@ -61,7 +61,7 @@ FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in
 
 ![W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.](imgs/baseline-vs-fmms-diagram.png){width="70%" #fig-baseline-vs-fmms}
 
-The trick is the Gumbel-max reparameterization, which replaces softmax + multinomial with a single argmax over noised logits:
+The trick is the Gumbel-max reparameterization [@2110.01515], which replaces softmax + multinomial with a single argmax over noised logits:
 
 $$
 \text{sample} = \text{argmax}_i \left( \frac{\ell_i}{\tau} + G_i \right) \sim \text{Categorical}(\text{softmax}(\ell / \tau))
@@ -89,9 +89,10 @@ I benchmark two workload sizes based on [this analysis](https://github.com/tomas
 
 ## Baselines
 
-Both FlashInfer kernels require the full logits, so their runtimes include the matmul that computes the logits. This is a fair comparison because FMMS also computes a matmul -- the full logits tensor is just not written to GMEM.
+Both FlashInfer kernels require the full logits, so their runtimes include the matmul that computes the logits.
+This is a fair comparison because FMMS also computes a matmul, the full logits tensor is just not written to GMEM.
 
-(1) **Naive PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
+(1) **PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
 (2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
 (3) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
 
@@ -371,35 +372,35 @@ At large batch sizes the matmul becomes compute-bound, and the baselines benefit
 FMMS also has higher register pressure from fusing Gumbel noise generation into the same kernel.
 
 ::::: {.panel-tabset group="workload-size"}
-### Small
+# Small
 ::: {.panel-tabset group="gpu"}
-# B300
+## B300
 ![Roofline model on B300 (V=151,936, d=4,096). The ridge point marks the transition from memory-bound to compute-bound.](imgs/roofline-small-b300.png){width="85%" #fig-roofline}
 
-# B200
+## B200
 ![Roofline model on B200.](imgs/roofline-small-b200.png){width="85%"}
 
-# H200
+## H200
 ![Roofline model on H200.](imgs/roofline-small-h200.png){width="85%"}
 
-# H100
+## H100
 ![Roofline model on H100.](imgs/roofline-small-h100.png){width="85%"}
 :::
-### Large
+# Large
 ::: {.panel-tabset group="gpu"}
-# B300
+## B300
 ![Roofline model on B300 (V=128,256, d=8,192).](imgs/roofline-large-b300.png){width="85%"}
 
-# B200
+## B200
 ![Roofline model on B200.](imgs/roofline-large-b200.png){width="85%"}
 
-# H200
+## H200
 ![Roofline model on H200.](imgs/roofline-large-h200.png){width="85%"}
 
-# H100
+## H100
 ![Roofline model on H100.](imgs/roofline-large-h100.png){width="85%"}
 :::
-::::
+:::::
 
 ## Memory Throughput
 
@@ -409,35 +410,35 @@ Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-6
 100% would mean the kernel does nothing but stream the weight matrix from GMEM at the hardware's maximum rate, with zero overhead for computation, synchronization, or memory access patterns.
 
 ::::: {.panel-tabset group="workload-size"}
-### Small
+# Small
 ::: {.panel-tabset group="gpu"}
-# B300
+## B300
 ![Memory throughput on B300 (V=151,936, d=4,096). The dashed line shows peak HBM bandwidth.](imgs/memory-throughput-small-b300.png){width="85%" #fig-memory-throughput}
 
-# B200
+## B200
 ![Memory throughput on B200.](imgs/memory-throughput-small-b200.png){width="85%"}
 
-# H200
+## H200
 ![Memory throughput on H200.](imgs/memory-throughput-small-h200.png){width="85%"}
 
-# H100
+## H100
 ![Memory throughput on H100.](imgs/memory-throughput-small-h100.png){width="85%"}
 :::
-### Large
+# Large
 ::: {.panel-tabset group="gpu"}
-# B300
+## B300
 ![Memory throughput on B300 (V=128,256, d=8,192).](imgs/memory-throughput-large-b300.png){width="85%"}
 
-# B200
+## B200
 ![Memory throughput on B200.](imgs/memory-throughput-large-b200.png){width="85%"}
 
-# H200
+## H200
 ![Memory throughput on H200.](imgs/memory-throughput-large-h200.png){width="85%"}
 
-# H100
+## H100
 ![Memory throughput on H100.](imgs/memory-throughput-large-h100.png){width="85%"}
 :::
-::::
+:::::
 
 
 # End-to-End Benchmarks (vLLM) {#sec-e2e}
@@ -445,7 +446,7 @@ Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-6
 The kernel benchmarks measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
 I chose four models spanning different sizes and architectures.
-The LM head is a standard dense linear layer in all three, so FMMS applies identically regardless of MoE routing.
+The LM head is a standard dense linear layer in all four, so FMMS applies identically regardless of MoE routing.
 
 | Model | Type | Hidden size (d) | Vocab size (V) |
 | - | --- | - | - |
@@ -611,6 +612,14 @@ FMMS reduces TPOT by 1-2% across concurrency levels.
 </details>
 ::::
 
+## A Note on Variability
+
+The Qwen3-8B trials show substantial run-to-run variability:
+at concurrency 32, trial 1 measures a 17% reduction, while trial 2 measures a 4.5% reduction.
+The absolute runtimes differ by 30%, potentially due to GPU thermal state or other system-level factors.
+This variability is inherent to end-to-end serving benchmarks, where many system-level factors beyond the kernel itself affect TPOT.
+Despite this, the direction is consistent: FMMS outperforms the baseline at every concurrency level in both trials.
+
 # Correctness {#sec-correctness}
 
 FMMS uses the Gumbel-max trick, which produces **exact** samples from the categorical distribution, not an approximation.
@@ -686,7 +695,7 @@ They avoid materializing logits during training by computing the cross-entropy l
 FMMS extends this idea to inference, where the challenge shifts from loss computation to sampling.
 
 _FlashSampling_ [@qin2025flashsampling] presents a conceptually similar algorithm for fused sampling.
-The paper was submitted to ICLR 25 but rejected due to weak justification and experimental evidence.
+The paper was submitted to ICLR 25 but was not accepted.
 This post presents comprehensive benchmarks against strong baselines across multiple GPUs.
 
 _FlashInfer_ [@ye2025flashinfer] provides high-performance sampling kernels used in vLLM [@DBLP:conf/sosp/KwonLZ0ZY0ZS23] and SGLang [@zheng2024sglang], but all its sampling functions take pre-materialized logits or probabilities as input.
@@ -695,22 +704,24 @@ The _online-softmax_ method [@milakov2018onlinenormalizercalculationsoftmax] ena
 
 # Conclusion
 
-FMMS fuses the LM head matmul with token sampling in a single Triton kernel, eliminating the GMEM round-trip for logits that every standard sampling path pays.
-The trade-off is straightforward: at large batch sizes where the matmul becomes compute-bound, cuBLAS-backed baselines are faster.
-But during LLM decode, batch sizes are typically small and the operation is memory-bound.
-In this regime (batch sizes 1-64), FMMS outperforms every baseline on every GPU tested: up to 25% faster than FlashInfer's fastest sampling kernel (`sampling_from_logits`) and 20-43% faster than PyTorch compiled sampling.
+FMMS is most effective when the LM head matmul is memory-bound: batch sizes 1-64, which covers the typical LLM decode regime.
+In this range, it outperforms every baseline on every GPU tested, with kernel-level speedups of up to 25% vs FlashInfer's fastest sampling kernel and 20-52% vs PyTorch compiled sampling.
+At larger batch sizes (128+), the matmul becomes compute-bound and cuBLAS-backed baselines are faster.
 
-Integrated into vLLM, these kernel-level gains translate to real end-to-end improvements on B200: up to 19% lower TPOT on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
+The end-to-end impact depends on how much of the decode step the LM head represents.
+For small models (Qwen3-1.7B), FMMS reduces TPOT by up to 19%.
+For large models (gpt-oss-120b, Qwen3-32B), the LM head is a smaller fraction of the total step, so improvements are modest (1-5%).
+The sweet spot is small-to-medium models served at low-to-moderate concurrency, where the LM head is a significant bottleneck and the matmul stays memory-bound.
 
-The code is open-source at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample). FMMS is currently integrated into vLLM on a [feature branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler), not merged upstream.
+The code is open-source at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
+FMMS is currently integrated into vLLM on a [feature branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler), not merged upstream.
 
 ## Future Work
 
 **Top-k/top-p filtering.**
-FMMS currently implements pure categorical sampling (temperature-scaled Gumbel-max).
-It does not support top-k or top-p filtering.
-Top-k is feasible to fuse: each tile can compute a local top-k during the matmul, and a small merge step combines the per-tile candidates.
-Top-p can be implemented if its applied after top-k, as is done in the FlashInfer top-k-top-p kernel, and also on the vLLM pytorch sampling path.
+FMMS does not yet support top-k or top-p filtering, but it is possible to implement them.
+For Top-k: each tile can compute a local top-k during the matmul, and a small merge step combines the per-tile candidates.
+Top-p can be implemented if it is applied after top-k, as is done in the FlashInfer top-k-top-p kernel, and also on the vLLM PyTorch sampling path.
 In this case, top-p filtering is applied only to the surviving top-k tokens.
 
 # References
