@@ -22,12 +22,30 @@ citation: true
 # draft: true
 ---
 
+<!--
+TODO:
+- Flesh out the Algorithm section: add pseudocode or annotated kernel snippet, explain d-dimension reduction across tiles, Gumbel noise generation in SRAM, tile sizes
+- Add temperature to the Gumbel-max formula (ℓ_i / τ + G_i), so the reader knows temperature is supported before it appears in the algorithm section
+- Explain why FMMS must use a Triton matmul instead of cuBLAS (can't fuse custom logic into a cuBLAS call) where the idea is introduced
+- Add a limitations/future work section: top-k/top-p filtering, multi-GPU/tensor-parallel, path to upstream vLLM integration
+- Reconcile Qwen3-8B summary text ("3-7%") with trial 1 data showing -17.1% at concurrency 32 and -10.4% at concurrency 64
+- TL;DR "up to 29% on Qwen3-8B" is from the concurrency-256 anomaly called unexplained. Use the robust range or qualify it
+- TL;DR "up to 4% on gpt-oss-120b" understates trial 1 data (-4.6%). Say "up to 5%" or "2-5%"
+- Move "Quirks of E2E Benchmarking" out of the Qwen3-8B tab into a standalone subsection under E2E, since the variability lesson applies to all models
+- Add a brief paragraph after the Gumbel-max formula explaining the tile decomposition concretely (stage 1 + stage 2), so the reader has a mental model before 400 lines of benchmarks
+- Make the "Scaling Behavior" prose acknowledge how the pattern differs between small and large configs (large regresses at N=128+)
+- Fix typo: "pontentially" → "potentially"
+- Rephrase line 86: "so I include in their runtime the matmul" → "so their runtimes include the matmul that computes the logits"
+- Explicitly define the vLLM baseline in the E2E section (vLLM default sampling: softmax + multinomial)
+- Add a sentence explaining why argmax decomposes over tiles (the max of sub-maxima equals the global max)
+-->
+
 ## TL;DR
 ::: {.callout-note appearance="simple"}
 I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
 It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime.
 In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the *fastest FlashInfer* sampling kernel.
-Integrated into vLLM on B200, it reduces *end-to-end TPOT* by up to 19% on Qwen3-1.7B, up to 29% on Qwen3-8B, and up to 4% on gpt-oss-120b, with no accuracy loss.
+Integrated into vLLM on B200, it reduces *end-to-end TPOT* across four models: up to 19% on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no accuracy loss.
 
 The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample)
 :::
@@ -438,7 +456,7 @@ Peak SoL varies by GPU and config: up to ~90% on H100/H200 (large config), ~55-6
 
 The kernel benchmarks measure the FMMS kernel in isolation.
 To measure end-to-end impact, I integrated FMMS into vLLM ([branch](https://github.com/tomasruizt/vllm/tree/feature/fmms-sampler)) and benchmarked median time per output token (TPOT) across concurrency levels using `vllm bench sweep`.
-I chose three models spanning different sizes and architectures.
+I chose four models spanning different sizes and architectures.
 The LM head is a standard dense linear layer in all three, so FMMS applies identically regardless of MoE routing.
 
 | Model | Type | Hidden size (d) | Vocab size (V) |
@@ -676,15 +694,13 @@ The _online-softmax_ method [@milakov2018onlinenormalizercalculationsoftmax] ena
 
 ## Conclusion
 
-FMMS demonstrates that fusing matrix multiplication with sampling via the Gumbel-max trick is both correct and practical.
-In kernel microbenchmarks, FMMS outperforms every baseline on every GPU tested at batch sizes 1 to 64: 2-15% faster than the fastest baseline (FlashInfer `sampling_from_logits`) and 19-37% faster than PyTorch compiled sampling.
-These are the batch sizes that matter most for LLM decode, where the operation is memory-bound and eliminating the extra GMEM round-trip for logits directly improves throughput.
+FMMS fuses the LM head matmul with token sampling in a single Triton kernel, eliminating the GMEM round-trip for logits that every standard sampling path pays.
+The trade-off is straightforward: at large batch sizes where the matmul becomes compute-bound, cuBLAS-backed baselines are faster.
+But during LLM decode, batch sizes are typically small and the operation is memory-bound.
+In this regime (batch sizes 1-64), FMMS outperforms every baseline on every GPU tested: up to 25% faster than FlashInfer's fastest sampling kernel (`sampling_from_logits`) and 20-43% faster than PyTorch compiled sampling.
 
-These gains translate to real-world speedups: integrated into vLLM, FMMS reduces median TPOT by 10-19% on Qwen3-1.7B, 3-29% on Qwen3-8B, and 2-4% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
+Integrated into vLLM, these kernel-level gains translate to real end-to-end improvements on B200: up to 19% lower TPOT on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no degradation in model accuracy (verified on GSM8K).
 
-The approach has clear limitations: at large batch sizes where the matmul becomes compute-bound, baseline approaches with optimized cuBLAS matmuls are faster.
-This is a fundamental trade-off, as fusion saves memory bandwidth at the cost of matmul efficiency.
-
-The code is open-source and available at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
+The code is open-source at [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
 
 # References
