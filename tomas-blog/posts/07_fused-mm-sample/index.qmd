@@ -26,7 +26,7 @@ citation: true
 ::: {.callout-note appearance="simple"}
 I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
 It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime.
-In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the *fastest FlashInfer* sampling kernel.
+In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.25x faster than the *fastest FlashInfer* sampling kernel and up to 1.5x faster than PyTorch compiled sampling.
 Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, 7% on Qwen3-8B, 2% on Qwen3-32B, and 5% on gpt-oss-120b, with no accuracy loss.
 
 The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
@@ -92,9 +92,9 @@ I benchmark two workload sizes based on [this analysis](https://github.com/tomas
 Both FlashInfer kernels require the full logits, so their runtimes include the matmul that computes the logits.
 This is a fair comparison because FMMS also computes a matmul, the full logits tensor is just not written to GMEM.
 
-(1) **PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
-(2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
-(3) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
+(1) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
+(2) **FlashInfer `sampling_from_logits`**: FlashInfer's fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.
+(3) **PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
 
 All baselines are torch compiled, so the matmul dispatches to cuBLAS.
 
@@ -165,79 +165,6 @@ At larger batch sizes, the baselines catch up as the matmul approaches the compu
 The relative speedup tables show `baseline_time / fmms_time`, so values > 1.0 mean FMMS is faster.
 
 ::::: {.panel-tabset group="baseline"}
-# PyTorch Compiled
-
-This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + `torch.multinomial`).
-
-:::: {.panel-tabset group="workload-size"}
-### Small
-
-::: {.panel-tabset group="gpu"}
-#### B300
-![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-small-b300.png){width="80%" #fig-relative-perf-vs-pytorch}
-
-#### B200
-![Relative performance vs PyTorch Compiled on B200.](imgs/relative-perf-vs-pytorch-small-b200.png){width="80%"}
-
-#### H200
-![Relative performance vs PyTorch Compiled on H200.](imgs/relative-perf-vs-pytorch-small-h200.png){width="80%"}
-
-#### H100
-![Relative performance vs PyTorch Compiled on H100.](imgs/relative-perf-vs-pytorch-small-h100.png){width="80%"}
-:::
-
-<details>
-<summary>Show data table</summary>
-
-| GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
-| --- | - | - | - | - | - | - | - | - | - |
-| B300 | 1.40 | 1.38 | 1.39 | 1.35 | 1.43 | 1.38 | 1.38 | **1.48** | 1.33 |
-| B200 | 1.36 | 1.38 | 1.37 | 1.41 | 1.41 | 1.39 | 1.36 | **1.48** | 1.31 |
-| H200 | 1.24 | 1.25 | 1.22 | 1.25 | 1.28 | 1.30 | **1.33** | 1.26 | 1.06 |
-| H100 | 1.22 | 1.23 | 1.21 | 1.22 | 1.25 | 1.29 | 1.40 | **1.52** | 1.23 |
-
-: Speedup vs PyTorch Compiled (small config). **Bold** marks the peak speedup per GPU. {.sm .striped}
-
-</details>
-
-### Large
-
-::: {.panel-tabset group="gpu"}
-#### B300
-![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-large-b300.png){width="80%"}
-
-#### B200
-![Relative performance vs PyTorch Compiled on B200.](imgs/relative-perf-vs-pytorch-large-b200.png){width="80%"}
-
-#### H200
-![Relative performance vs PyTorch Compiled on H200.](imgs/relative-perf-vs-pytorch-large-h200.png){width="80%"}
-
-#### H100
-![Relative performance vs PyTorch Compiled on H100.](imgs/relative-perf-vs-pytorch-large-h100.png){width="80%"}
-:::
-
-<details>
-<summary>Show data table</summary>
-
-| GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
-| --- | - | - | - | - | - | - | - | - | - |
-| B300 | **1.34** | 1.33 | 1.23 | 1.26 | 1.28 | 1.29 | 1.23 | 0.96 | 0.71 |
-| B200 | **1.35** | 1.31 | 1.27 | 1.24 | 1.26 | 1.25 | 1.27 | 0.97 | 0.74 |
-| H200 | 1.26 | 1.23 | 1.22 | 1.22 | 1.22 | 1.23 | **1.28** | 0.93 | 0.78 |
-| H100 | 1.22 | 1.22 | 1.20 | 1.21 | 1.21 | 1.21 | **1.28** | 1.13 | 0.87 |
-
-: Speedup vs PyTorch Compiled (large config). **Bold** marks the peak speedup per GPU. {.sm .striped}
-
-</details>
-
-::::
-
-For the small config, FMMS is faster at **all batch sizes on all GPUs** (minimum 1.06x on H200 at N=256), with speedups of 6-52%.
-The larger vocab (V=151,936) means more logits traffic, making fusion valuable even at high batch sizes.
-For the large config, FMMS wins at batch sizes 1-64 (20-35% faster) but regresses at N=128+ on B300/B200/H200.
-H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.13x (large) and 1.52x (small).
-This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.
-
 # FlashInfer
 
 Two FlashInfer baselines are compared:
@@ -344,6 +271,79 @@ The gap is entirely because FlashInfer's `top_k_top_p` is ~35% slower on B300 th
 Vs `sampling_from_logits`, **FMMS is faster at all batch sizes from 1 to 64 on every GPU tested**, with speedups of 3-25%.
 For the small config, FMMS stays above 1.0x up to N=128 on B300/H100.
 For the large config, it regresses at N=128+ on most GPUs.
+
+# PyTorch Compiled
+
+This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + `torch.multinomial`).
+
+:::: {.panel-tabset group="workload-size"}
+### Small
+
+::: {.panel-tabset group="gpu"}
+#### B300
+![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-small-b300.png){width="80%" #fig-relative-perf-vs-pytorch}
+
+#### B200
+![Relative performance vs PyTorch Compiled on B200.](imgs/relative-perf-vs-pytorch-small-b200.png){width="80%"}
+
+#### H200
+![Relative performance vs PyTorch Compiled on H200.](imgs/relative-perf-vs-pytorch-small-h200.png){width="80%"}
+
+#### H100
+![Relative performance vs PyTorch Compiled on H100.](imgs/relative-perf-vs-pytorch-small-h100.png){width="80%"}
+:::
+
+<details>
+<summary>Show data table</summary>
+
+| GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
+| --- | - | - | - | - | - | - | - | - | - |
+| B300 | 1.40 | 1.38 | 1.39 | 1.35 | 1.43 | 1.38 | 1.38 | **1.48** | 1.33 |
+| B200 | 1.36 | 1.38 | 1.37 | 1.41 | 1.41 | 1.39 | 1.36 | **1.48** | 1.31 |
+| H200 | 1.24 | 1.25 | 1.22 | 1.25 | 1.28 | 1.30 | **1.33** | 1.26 | 1.06 |
+| H100 | 1.22 | 1.23 | 1.21 | 1.22 | 1.25 | 1.29 | 1.40 | **1.52** | 1.23 |
+
+: Speedup vs PyTorch Compiled (small config). **Bold** marks the peak speedup per GPU. {.sm .striped}
+
+</details>
+
+### Large
+
+::: {.panel-tabset group="gpu"}
+#### B300
+![Relative performance vs PyTorch Compiled on B300.](imgs/relative-perf-vs-pytorch-large-b300.png){width="80%"}
+
+#### B200
+![Relative performance vs PyTorch Compiled on B200.](imgs/relative-perf-vs-pytorch-large-b200.png){width="80%"}
+
+#### H200
+![Relative performance vs PyTorch Compiled on H200.](imgs/relative-perf-vs-pytorch-large-h200.png){width="80%"}
+
+#### H100
+![Relative performance vs PyTorch Compiled on H100.](imgs/relative-perf-vs-pytorch-large-h100.png){width="80%"}
+:::
+
+<details>
+<summary>Show data table</summary>
+
+| GPU / Batch Size | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
+| --- | - | - | - | - | - | - | - | - | - |
+| B300 | **1.34** | 1.33 | 1.23 | 1.26 | 1.28 | 1.29 | 1.23 | 0.96 | 0.71 |
+| B200 | **1.35** | 1.31 | 1.27 | 1.24 | 1.26 | 1.25 | 1.27 | 0.97 | 0.74 |
+| H200 | 1.26 | 1.23 | 1.22 | 1.22 | 1.22 | 1.23 | **1.28** | 0.93 | 0.78 |
+| H100 | 1.22 | 1.22 | 1.20 | 1.21 | 1.21 | 1.21 | **1.28** | 1.13 | 0.87 |
+
+: Speedup vs PyTorch Compiled (large config). **Bold** marks the peak speedup per GPU. {.sm .striped}
+
+</details>
+
+::::
+
+For the small config, FMMS is faster at **all batch sizes on all GPUs** (minimum 1.06x on H200 at N=256), with speedups of 6-52%.
+The larger vocab (V=151,936) means more logits traffic, making fusion valuable even at high batch sizes.
+For the large config, FMMS wins at batch sizes 1-64 (20-35% faster) but regresses at N=128+ on B300/B200/H200.
+H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.13x (large) and 1.52x (small).
+This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.
 :::::
 
 ## Roofline Analysis

@@ -1,4 +1,4 @@
-**New Kernel Release: FMMS keeps LLM sampling on-chip. It beats torch compiled sampling and FlashInfer**
+**New Kernel Release: FMMS keeps LLM sampling on-chip. It beats FlashInfer and PyTorch compiled sampling**
 
 The LM head writes the full logits tensor to GMEM. The sampler immediately reads them back. This round-trip is wasteful in the memory-bound decoding regime. FMMS replaces both with one Triton kernel that does matmul + sampling in SRAM.
 
@@ -15,9 +15,10 @@ End-to-end vLLM on B200:
 
 The key insight: the Gumbel-max trick turns sampling into a per-tile argmax, so you never need to materialize the full logit matrix. Each tile computes its local winner, a tiny cross-tile reduction picks the global winner. That's it. No softmax, no multinomial, no GMEM traffic.
 
-Blog post with benchmarks, Triton code, and vLLM integration details:
+Kernel code: https://github.com/tomasruizt/fmms-kernel
+
+Blog post with benchmarks, algorithm explanation, and vLLM integration details:
 https://tomasruizt.github.io/posts/07_fused-mm-sample/
 
-Github: https://github.com/tomasruizt/fused-mm-sample
 
-#Triton #LLM #inference #vLLM #CUDA #GPUs #HPC
+#Triton #LLM #inference #vLLM #CUDA #GPUs
