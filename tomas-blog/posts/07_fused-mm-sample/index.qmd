@@ -55,7 +55,7 @@ Can the matmul and sampling be fused into a single kernel that never writes logi
 
 ## The Idea: Fuse Everything
 
-FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, never writing logits to GMEM.
+FMMS (Fused Matrix Multiplication & Sampling) computes the matmul and samples in one kernel, without writing the full logits tensor to GMEM.
 @fig-baseline-vs-fmms contrasts the two approaches.
 
 ![W is the LM head weight matrix, H is the hidden states for sampling. PyTorch materializes the full [N, V] logits in global memory (GMEM). FMMS keeps logits in shared memory (SHMEM) and writes only one scalar per tile. Red arrows are loads/stores to GMEM, green arrows stay in SHMEM.](imgs/baseline-vs-fmms-diagram.png){width="100%" #fig-baseline-vs-fmms}
@@ -83,7 +83,7 @@ I benchmark two workload sizes based on [this analysis](https://github.com/tomas
 
 ### Baselines
 
-Both FlashInfer kernels require the full logits, so I include in their runtime the matmul to compute the logits. This is a fair comparison because FMMS also computes a matmul -- the logits are just never written to VRAM.
+Both FlashInfer kernels require the full logits, so I include in their runtime the matmul to compute the logits. This is a fair comparison because FMMS also computes a matmul -- the full logits tensor is just not written to GMEM.
 
 (1) **Naive PyTorch Compiled**: torch compiled matmul + softmax + `torch.multinomial`.
 (2) **FlashInfer `top_k_top_p_sampling_from_logits`**: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.
@@ -361,7 +361,9 @@ $$
 
 The roofline plot in @fig-roofline confirms this: all methods track the memory-bound slope up to N=64, then flatten as they approach the compute ceiling.
 Each point is labeled with its batch size.
-FMMS sits slightly above the baselines in the memory-bound region, reflecting its bandwidth savings from avoiding the logits round-trip.
+FMMS sits slightly above the baselines in the memory-bound region because it reads the weight matrix once and writes only two scalars per tile to GMEM, while the baselines write and read back the full logits tensor.
+At large batch sizes the matmul becomes compute-bound, and the baselines benefit from cuBLAS (via `torch.compile`), while FMMS implements the matmul in Triton.
+FMMS also has higher register pressure from fusing Gumbel noise generation into the same kernel.
 
 ::::: {.panel-tabset group="workload-size"}
 ### Small
@@ -433,27 +435,6 @@ This is the direct mechanism behind the speedups: by fusing the matmul and sampl
 :::
 ::::
 
-### Takeaway
-
-| $N$ | Regime on H100 (ridge = 295) |
-| - | - |
-| 1 | Memory-bound (295x below ridge) |
-| 32 | Memory-bound (9x below) |
-| 64 | Memory-bound (5x below) |
-| 295 | Crossover to compute-bound |
-
-: {.sm}
-
-**When memory-bound**, the kernel's throughput is determined by how fast it reads the weight matrix from GMEM. FMMS wins here because it reads the weights **once** and performs both the matmul and sampling in-kernel. The unfused baselines read the weights for the matmul, write logits to GMEM, then read them back for sampling. This extra round-trip wastes bandwidth on the bottleneck path.
-
-**When compute-bound**, the matmul dominates runtime and the cost of the extra GMEM traffic for logits becomes negligible relative to the computation. 
-The baselines can use highly optimized matmul implementations (cuBLAS via `torch.compile`), while FMMS implements the matmul in Triton.
-It also suffers from higher register pressure, because it fuses Gumbel noise generation and the max-reduction into the same kernel.
-
-The theoretical crossover is the GPU's ops:byte ratio (the ridge point in @fig-roofline): 295 for H100, 281 for B300/B200, 206 for H200.
-In practice, the transition is gradual: @fig-memory-throughput shows that achieved throughput already drops at N=128, well before the ridge point.
-This is why FMMS loses its advantage at large batch sizes despite still being "memory-bound" in roofline terms.
-The sweet spot for FMMS is the typical LLM decode regime (N $\leq$ 64), where the operation is deeply memory-bound and fusion pays off the most.
 
 ## End-to-End Benchmarks (vLLM)
 
