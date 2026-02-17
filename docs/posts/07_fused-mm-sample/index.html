@@ -305,7 +305,7 @@ window.Quarto = {
 <i class="callout-icon"></i>
 </div>
 <div class="callout-body-container">
-<p>I present <strong>FMMS</strong>, a Triton kernel to do fast and exact LLM sampling. It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime. In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the <em>fastest FlashInfer</em> sampling kernel. Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no accuracy loss.</p>
+<p>I present <strong>FMMS</strong>, a Triton kernel to do fast and exact LLM sampling. It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime. In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.25x faster than the <em>fastest FlashInfer</em> sampling kernel and up to 1.5x faster than PyTorch compiled sampling. Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, 7% on Qwen3-8B, 2% on Qwen3-32B, and 5% on gpt-oss-120b, with no accuracy loss.</p>
 <p>The code is available on GitHub: <a href="https://github.com/tomasruizt/fused-mm-sample">github.com/tomasruizt/fused-mm-sample</a>. The algorithm is explained in <a href="#sec-solution" class="quarto-xref">Section&nbsp;3</a> and <a href="#sec-algorithm" class="quarto-xref">Section&nbsp;7</a>, kernel microbenchmarks are in <a href="#sec-microbenchmarks" class="quarto-xref">Section&nbsp;4</a>, and end-to-end benchmarks on vLLM are in <a href="#sec-e2e" class="quarto-xref">Section&nbsp;5</a>.</p>
 </div>
 </div>
@@ -355,9 +355,9 @@ Figure&nbsp;1: W is the LM head weight matrix, H is the hidden states for sampli
 <h2 class="anchored" data-anchor-id="baselines">Baselines</h2>
 <p>Both FlashInfer kernels require the full logits, so their runtimes include the matmul that computes the logits. This is a fair comparison because FMMS also computes a matmul, the full logits tensor is just not written to GMEM.</p>
 <ol type="1">
-<li><strong>PyTorch Compiled</strong>: torch compiled matmul + softmax + <code>torch.multinomial</code>.</li>
 <li><strong>FlashInfer <code>top_k_top_p_sampling_from_logits</code></strong>: A dual-pivot rejection sampling kernel used in vLLM for top-k/top-p sampling.</li>
 <li><strong>FlashInfer <code>sampling_from_logits</code></strong>: FlashInfer’s fastest sampling kernel. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.</li>
+<li><strong>PyTorch Compiled</strong>: torch compiled matmul + softmax + <code>torch.multinomial</code>.</li>
 </ol>
 <p>All baselines are torch compiled, so the matmul dispatches to cuBLAS.</p>
 </section>
@@ -498,10 +498,14 @@ Figure&nbsp;2: Batch scaling on B300 (V=151,936, d=4,096).
 <h2 class="anchored" data-anchor-id="relative-performance-across-gpus">Relative Performance Across GPUs</h2>
 <p>The relative speedup tables show <code>baseline_time / fmms_time</code>, so values &gt; 1.0 mean FMMS is faster.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="baseline">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-10-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-1" role="tab" aria-controls="tabset-10-1" aria-selected="true">PyTorch Compiled</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-10-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-2" role="tab" aria-controls="tabset-10-2" aria-selected="false">FlashInfer</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-10-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-1" role="tab" aria-controls="tabset-10-1" aria-selected="true">FlashInfer</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-10-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-2" role="tab" aria-controls="tabset-10-2" aria-selected="false">PyTorch Compiled</a></li></ul>
 <div class="tab-content" data-group="baseline">
 <div id="tabset-10-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-10-1-tab">
-<p>This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + <code>torch.multinomial</code>).</p>
+<p>Two FlashInfer baselines are compared:</p>
+<ul>
+<li><code>flashinfer:sampling_from_logits()</code> is FlashInfer’s fastest sampling kernel, but not used in vLLM. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.</li>
+<li><code>flashinfer:top_k_top_p_sampling_from_logits()</code> is the sampling function used in vLLM when top-k or top-p is set (I set top-k=-1 and top-p=1.0 to disable filtering).</li>
+</ul>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" role="tab" aria-controls="tabset-6-1" aria-selected="true">Small</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" role="tab" aria-controls="tabset-6-2" aria-selected="false">Large</a></li></ul>
 <div class="tab-content" data-group="workload-size">
@@ -510,13 +514,13 @@ Figure&nbsp;2: Batch scaling on B300 (V=151,936, d=4,096).
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-3" role="tab" aria-controls="tabset-4-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-4" role="tab" aria-controls="tabset-4-4" aria-selected="false">H100</a></li></ul>
 <div class="tab-content" data-group="gpu">
 <div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
-<div id="fig-relative-perf-vs-pytorch" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div id="fig-relative-perf-vs-flashinfer" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-relative-perf-vs-pytorch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/relative-perf-vs-pytorch-small-b300.png" class="img-fluid figure-img" style="width:80.0%">
+<div aria-describedby="fig-relative-perf-vs-flashinfer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="imgs/relative-perf-vs-flashinfer-small-b300.png" class="img-fluid figure-img" style="width:80.0%">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-relative-perf-vs-pytorch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Relative performance vs PyTorch Compiled on B300.
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-relative-perf-vs-flashinfer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Relative performance vs FlashInfer baselines on B300.
 </figcaption>
 </figure>
 </div>
@@ -524,275 +528,12 @@ Figure&nbsp;3: Relative performance vs PyTorch Compiled on B300.
 <div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-small-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on B200.</figcaption>
-</figure>
-</div>
-</div>
-<div id="tabset-4-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-3-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-small-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on H200.</figcaption>
-</figure>
-</div>
-</div>
-<div id="tabset-4-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-4-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-small-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on H100.</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</div>
-<details>
-<summary>
-Show data table
-</summary>
-<table class="table-sm table-striped small caption-top table">
-<caption>Speedup vs PyTorch Compiled (small config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
-<colgroup>
-<col style="width: 25%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>GPU / Batch Size</th>
-<th>1</th>
-<th>2</th>
-<th>4</th>
-<th>8</th>
-<th>16</th>
-<th>32</th>
-<th>64</th>
-<th>128</th>
-<th>256</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>B300</td>
-<td>1.40</td>
-<td>1.38</td>
-<td>1.39</td>
-<td>1.35</td>
-<td>1.43</td>
-<td>1.38</td>
-<td>1.38</td>
-<td><strong>1.48</strong></td>
-<td>1.33</td>
-</tr>
-<tr class="even">
-<td>B200</td>
-<td>1.36</td>
-<td>1.38</td>
-<td>1.37</td>
-<td>1.41</td>
-<td>1.41</td>
-<td>1.39</td>
-<td>1.36</td>
-<td><strong>1.48</strong></td>
-<td>1.31</td>
-</tr>
-<tr class="odd">
-<td>H200</td>
-<td>1.24</td>
-<td>1.25</td>
-<td>1.22</td>
-<td>1.25</td>
-<td>1.28</td>
-<td>1.30</td>
-<td><strong>1.33</strong></td>
-<td>1.26</td>
-<td>1.06</td>
-</tr>
-<tr class="even">
-<td>H100</td>
-<td>1.22</td>
-<td>1.23</td>
-<td>1.21</td>
-<td>1.22</td>
-<td>1.25</td>
-<td>1.29</td>
-<td>1.40</td>
-<td><strong>1.52</strong></td>
-<td>1.23</td>
-</tr>
-</tbody>
-</table>
-</details>
-</div>
-<div id="tabset-6-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-2-tab">
-<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" role="tab" aria-controls="tabset-5-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" role="tab" aria-controls="tabset-5-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-4" role="tab" aria-controls="tabset-5-4" aria-selected="false">H100</a></li></ul>
-<div class="tab-content" data-group="gpu">
-<div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-large-b300.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on B300.</figcaption>
-</figure>
-</div>
-</div>
-<div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-large-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on B200.</figcaption>
-</figure>
-</div>
-</div>
-<div id="tabset-5-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-3-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-large-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on H200.</figcaption>
-</figure>
-</div>
-</div>
-<div id="tabset-5-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-4-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="imgs/relative-perf-vs-pytorch-large-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
-<figcaption>Relative performance vs PyTorch Compiled on H100.</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</div>
-<details>
-<summary>
-Show data table
-</summary>
-<table class="table-sm table-striped small caption-top table">
-<caption>Speedup vs PyTorch Compiled (large config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
-<colgroup>
-<col style="width: 25%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 8%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>GPU / Batch Size</th>
-<th>1</th>
-<th>2</th>
-<th>4</th>
-<th>8</th>
-<th>16</th>
-<th>32</th>
-<th>64</th>
-<th>128</th>
-<th>256</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>B300</td>
-<td><strong>1.34</strong></td>
-<td>1.33</td>
-<td>1.23</td>
-<td>1.26</td>
-<td>1.28</td>
-<td>1.29</td>
-<td>1.23</td>
-<td>0.96</td>
-<td>0.71</td>
-</tr>
-<tr class="even">
-<td>B200</td>
-<td><strong>1.35</strong></td>
-<td>1.31</td>
-<td>1.27</td>
-<td>1.24</td>
-<td>1.26</td>
-<td>1.25</td>
-<td>1.27</td>
-<td>0.97</td>
-<td>0.74</td>
-</tr>
-<tr class="odd">
-<td>H200</td>
-<td>1.26</td>
-<td>1.23</td>
-<td>1.22</td>
-<td>1.22</td>
-<td>1.22</td>
-<td>1.23</td>
-<td><strong>1.28</strong></td>
-<td>0.93</td>
-<td>0.78</td>
-</tr>
-<tr class="even">
-<td>H100</td>
-<td>1.22</td>
-<td>1.22</td>
-<td>1.20</td>
-<td>1.21</td>
-<td>1.21</td>
-<td>1.21</td>
-<td><strong>1.28</strong></td>
-<td>1.13</td>
-<td>0.87</td>
-</tr>
-</tbody>
-</table>
-</details>
-</div>
-</div>
-</div>
-<p>For the small config, FMMS is faster at <strong>all batch sizes on all GPUs</strong> (minimum 1.06x on H200 at N=256), with speedups of 6-52%. The larger vocab (V=151,936) means more logits traffic, making fusion valuable even at high batch sizes. For the large config, FMMS wins at batch sizes 1-64 (20-35% faster) but regresses at N=128+ on B300/B200/H200. H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.13x (large) and 1.52x (small). This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.</p>
-</div>
-<div id="tabset-10-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-10-2-tab">
-<p>Two FlashInfer baselines are compared:</p>
-<ul>
-<li><code>flashinfer:sampling_from_logits()</code> is FlashInfer’s fastest sampling kernel, but not used in vLLM. It also uses the Gumbel-max trick internally, but operates on pre-materialized logits.</li>
-<li><code>flashinfer:top_k_top_p_sampling_from_logits()</code> is the sampling function used in vLLM when top-k or top-p is set (I set top-k=-1 and top-p=1.0 to disable filtering).</li>
-</ul>
-<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" role="tab" aria-controls="tabset-9-1" aria-selected="true">Small</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" role="tab" aria-controls="tabset-9-2" aria-selected="false">Large</a></li></ul>
-<div class="tab-content" data-group="workload-size">
-<div id="tabset-9-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-9-1-tab">
-<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" role="tab" aria-controls="tabset-7-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-3" role="tab" aria-controls="tabset-7-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-4" role="tab" aria-controls="tabset-7-4" aria-selected="false">H100</a></li></ul>
-<div class="tab-content" data-group="gpu">
-<div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
-<div id="fig-relative-perf-vs-flashinfer" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-relative-perf-vs-flashinfer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/relative-perf-vs-flashinfer-small-b300.png" class="img-fluid figure-img" style="width:80.0%">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-relative-perf-vs-flashinfer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;4: Relative performance vs FlashInfer baselines on B300.
-</figcaption>
-</figure>
-</div>
-</div>
-<div id="tabset-7-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-2-tab">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-small-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
 <figcaption>Relative performance vs FlashInfer baselines on B200.</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-7-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-3-tab">
+<div id="tabset-4-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-3-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-small-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
@@ -800,7 +541,7 @@ Figure&nbsp;4: Relative performance vs FlashInfer baselines on B300.
 </figure>
 </div>
 </div>
-<div id="tabset-7-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-4-tab">
+<div id="tabset-4-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-4-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-small-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
@@ -979,11 +720,11 @@ Show data table: vs <code>sampling_from_logits</code>
 </table>
 </details>
 </div>
-<div id="tabset-9-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-9-2-tab">
+<div id="tabset-6-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-2-tab">
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-3" role="tab" aria-controls="tabset-8-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-4" role="tab" aria-controls="tabset-8-4" aria-selected="false">H100</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" role="tab" aria-controls="tabset-5-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" role="tab" aria-controls="tabset-5-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-4" role="tab" aria-controls="tabset-5-4" aria-selected="false">H100</a></li></ul>
 <div class="tab-content" data-group="gpu">
-<div id="tabset-8-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-8-1-tab">
+<div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-large-b300.png" class="img-fluid figure-img" style="width:80.0%"></p>
@@ -991,7 +732,7 @@ Show data table: vs <code>sampling_from_logits</code>
 </figure>
 </div>
 </div>
-<div id="tabset-8-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-2-tab">
+<div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-large-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
@@ -999,7 +740,7 @@ Show data table: vs <code>sampling_from_logits</code>
 </figure>
 </div>
 </div>
-<div id="tabset-8-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-3-tab">
+<div id="tabset-5-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-3-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-large-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
@@ -1007,7 +748,7 @@ Show data table: vs <code>sampling_from_logits</code>
 </figure>
 </div>
 </div>
-<div id="tabset-8-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-4-tab">
+<div id="tabset-5-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-4-tab">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="imgs/relative-perf-vs-flashinfer-large-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
@@ -1190,6 +931,265 @@ Show data table: vs <code>sampling_from_logits</code>
 </div>
 <p>Vs <code>top_k_top_p</code>, FMMS is up to <strong>2.30x faster</strong> (B300, small config, N=16). For the small config on B300, FMMS is 1.63-2.30x faster across all batch sizes<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>.</p>
 <p>Vs <code>sampling_from_logits</code>, <strong>FMMS is faster at all batch sizes from 1 to 64 on every GPU tested</strong>, with speedups of 3-25%. For the small config, FMMS stays above 1.0x up to N=128 on B300/H100. For the large config, it regresses at N=128+ on most GPUs.</p>
+</div>
+<div id="tabset-10-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-10-2-tab">
+<p>This is the sampling path used in vLLM when top-k and top-p are unset (torch compiled matmul + softmax + <code>torch.multinomial</code>).</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="workload-size">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" role="tab" aria-controls="tabset-9-1" aria-selected="true">Small</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" role="tab" aria-controls="tabset-9-2" aria-selected="false">Large</a></li></ul>
+<div class="tab-content" data-group="workload-size">
+<div id="tabset-9-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-9-1-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" role="tab" aria-controls="tabset-7-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-3" role="tab" aria-controls="tabset-7-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-4" role="tab" aria-controls="tabset-7-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
+<div id="fig-relative-perf-vs-pytorch" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-relative-perf-vs-pytorch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="imgs/relative-perf-vs-pytorch-small-b300.png" class="img-fluid figure-img" style="width:80.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-relative-perf-vs-pytorch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Relative performance vs PyTorch Compiled on B300.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-small-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-small-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-7-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-small-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Show data table
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs PyTorch Compiled (small config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td>1.40</td>
+<td>1.38</td>
+<td>1.39</td>
+<td>1.35</td>
+<td>1.43</td>
+<td>1.38</td>
+<td>1.38</td>
+<td><strong>1.48</strong></td>
+<td>1.33</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td>1.36</td>
+<td>1.38</td>
+<td>1.37</td>
+<td>1.41</td>
+<td>1.41</td>
+<td>1.39</td>
+<td>1.36</td>
+<td><strong>1.48</strong></td>
+<td>1.31</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>1.24</td>
+<td>1.25</td>
+<td>1.22</td>
+<td>1.25</td>
+<td>1.28</td>
+<td>1.30</td>
+<td><strong>1.33</strong></td>
+<td>1.26</td>
+<td>1.06</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td>1.22</td>
+<td>1.23</td>
+<td>1.21</td>
+<td>1.22</td>
+<td>1.25</td>
+<td>1.29</td>
+<td>1.40</td>
+<td><strong>1.52</strong></td>
+<td>1.23</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+<div id="tabset-9-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-9-2-tab">
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="gpu">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true">B300</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false">B200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-3" role="tab" aria-controls="tabset-8-3" aria-selected="false">H200</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-4" role="tab" aria-controls="tabset-8-4" aria-selected="false">H100</a></li></ul>
+<div class="tab-content" data-group="gpu">
+<div id="tabset-8-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-8-1-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-large-b300.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on B300.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-large-b200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on B200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-3-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-large-h200.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H200.</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-4-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="imgs/relative-perf-vs-pytorch-large-h100.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<figcaption>Relative performance vs PyTorch Compiled on H100.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<details>
+<summary>
+Show data table
+</summary>
+<table class="table-sm table-striped small caption-top table">
+<caption>Speedup vs PyTorch Compiled (large config). <strong>Bold</strong> marks the peak speedup per GPU.</caption>
+<colgroup>
+<col style="width: 25%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU / Batch Size</th>
+<th>1</th>
+<th>2</th>
+<th>4</th>
+<th>8</th>
+<th>16</th>
+<th>32</th>
+<th>64</th>
+<th>128</th>
+<th>256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>B300</td>
+<td><strong>1.34</strong></td>
+<td>1.33</td>
+<td>1.23</td>
+<td>1.26</td>
+<td>1.28</td>
+<td>1.29</td>
+<td>1.23</td>
+<td>0.96</td>
+<td>0.71</td>
+</tr>
+<tr class="even">
+<td>B200</td>
+<td><strong>1.35</strong></td>
+<td>1.31</td>
+<td>1.27</td>
+<td>1.24</td>
+<td>1.26</td>
+<td>1.25</td>
+<td>1.27</td>
+<td>0.97</td>
+<td>0.74</td>
+</tr>
+<tr class="odd">
+<td>H200</td>
+<td>1.26</td>
+<td>1.23</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.23</td>
+<td><strong>1.28</strong></td>
+<td>0.93</td>
+<td>0.78</td>
+</tr>
+<tr class="even">
+<td>H100</td>
+<td>1.22</td>
+<td>1.22</td>
+<td>1.20</td>
+<td>1.21</td>
+<td>1.21</td>
+<td>1.21</td>
+<td><strong>1.28</strong></td>
+<td>1.13</td>
+<td>0.87</td>
+</tr>
+</tbody>
+</table>
+</details>
+</div>
+</div>
+</div>
+<p>For the small config, FMMS is faster at <strong>all batch sizes on all GPUs</strong> (minimum 1.06x on H200 at N=256), with speedups of 6-52%. The larger vocab (V=151,936) means more logits traffic, making fusion valuable even at high batch sizes. For the large config, FMMS wins at batch sizes 1-64 (20-35% faster) but regresses at N=128+ on B300/B200/H200. H100 retains its advantage at larger batch sizes than other GPUs: at N=128, it still achieves 1.13x (large) and 1.52x (small). This is likely because H100 has the highest ops:byte ratio (295), keeping the matmul memory-bound longer.</p>
 </div>
 </div>
 </div>
@@ -1957,7 +1957,7 @@ Figure&nbsp;7: Tiling the computation of the logits.
 <section id="related-work" class="level1">
 <h1>Related Work</h1>
 <p><em>Cut Your Losses in Large-Vocabulary Language Models</em> <span class="citation" data-cites="wijmans2025cut">(<a href="#ref-wijmans2025cut" role="doc-biblioref">Wijmans et al. 2025</a>)</span> is the direct inspiration for this work. They avoid materializing logits during training by computing the cross-entropy loss incrementally on SRAM, reducing memory from 24GB to 1MB for Gemma 2 (2B). FMMS extends this idea to inference, where the challenge shifts from loss computation to sampling.</p>
-<p><em>FlashSampling</em> <span class="citation" data-cites="qin2025flashsampling">(<a href="#ref-qin2025flashsampling" role="doc-biblioref">Qin et al. 2025</a>)</span> presents a conceptually similar algorithm for fused sampling. The paper was submitted to ICLR 25 but was not accepted. This post presents comprehensive benchmarks against strong baselines across multiple GPUs.</p>
+<p><em>FlashSampling</em> <span class="citation" data-cites="qin2025flashsampling">(<a href="#ref-qin2025flashsampling" role="doc-biblioref">Qin et al. 2025</a>)</span> presents a conceptually very similar algorithm for fused sampling. The paper was submitted to ICLR 25 but was not accepted, and no open-source implementation is available.</p>
 <p><em>FlashInfer</em> <span class="citation" data-cites="ye2025flashinfer">(<a href="#ref-ye2025flashinfer" role="doc-biblioref">Ye et al. 2025</a>)</span> provides high-performance sampling kernels used in vLLM <span class="citation" data-cites="DBLP:conf/sosp/KwonLZ0ZY0ZS23">(<a href="#ref-DBLP:conf/sosp/KwonLZ0ZY0ZS23" role="doc-biblioref">Kwon et al. 2023</a>)</span> and SGLang <span class="citation" data-cites="zheng2024sglang">(<a href="#ref-zheng2024sglang" role="doc-biblioref">Zheng et al. 2024</a>)</span>, but all its sampling functions take pre-materialized logits or probabilities as input. <em>Liger Kernel</em> <span class="citation" data-cites="hsu2025ligerkernelefficienttriton">(<a href="#ref-hsu2025ligerkernelefficienttriton" role="doc-biblioref">Hsu et al. 2025</a>)</span> focuses on training-time kernel fusion and includes no sampling primitives. The <em>online-softmax</em> method <span class="citation" data-cites="milakov2018onlinenormalizercalculationsoftmax">(<a href="#ref-milakov2018onlinenormalizercalculationsoftmax" role="doc-biblioref">Milakov and Gimelshein 2018</a>)</span> enables incremental normalization and is used in <em>FlashAttention</em> <span class="citation" data-cites="dao2022flashattention">(<a href="#ref-dao2022flashattention" role="doc-biblioref">Dao et al. 2022</a>)</span>, but neither applies it to sampling from the LM head.</p>
 </section>
 <section id="conclusion" class="level1">
@@ -2448,7 +2448,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <input type="hidden" id="giscus-base-theme" value="light">
 <input type="hidden" id="giscus-alt-theme" value="light">
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"selector":".lightbox","openEffect":"zoom","descPosition":"bottom","closeEffect":"zoom","loop":false});
+<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","closeEffect":"zoom","selector":".lightbox","openEffect":"zoom","loop":false});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
