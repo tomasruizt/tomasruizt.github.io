@@ -27,7 +27,7 @@ citation: true
 I present **FMMS**, a Triton kernel to do fast and exact LLM sampling.
 It fuses the LM head matmul with token sampling, minimizing memory traffic in the memory-bound decoding regime.
 In kernel microbenchmarks across 4 datacenter GPUs (H100, H200, B200, B300), it is up to 1.5x faster than PyTorch compiled sampling and up to 1.25x faster than the *fastest FlashInfer* sampling kernel.
-Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, up to 7% on Qwen3-8B, 1-2% on Qwen3-32B, and up to 5% on gpt-oss-120b, with no accuracy loss.
+Integrated into vLLM on B200, it reduces end-to-end TPOT across four models: up to 19% on Qwen3-1.7B, 7% on Qwen3-8B, 2% on Qwen3-32B, and 5% on gpt-oss-120b, with no accuracy loss.
 
 The code is available on GitHub: [github.com/tomasruizt/fused-mm-sample](https://github.com/tomasruizt/fused-mm-sample).
 The algorithm is explained in @sec-solution and @sec-algorithm, kernel microbenchmarks are in @sec-microbenchmarks, and end-to-end benchmarks on vLLM are in @sec-e2e.
