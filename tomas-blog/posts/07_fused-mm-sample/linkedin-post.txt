@@ -4,14 +4,14 @@ The LM head writes the full logits tensor to GMEM. The sampler immediately reads
 
 Key results:
 
-Kernel microbenchmarks (batch 1-64, H100 to B300):
-  - Up to 1.52x faster than torch compiled baselines
-  - Up to 1.25x faster than FlashInfer sampling kernels
+Kernel microbenchmarks (batch 1-64, GPUs: H100 to B300):
+- Up to 1.52x faster than torch compiled baselines
+- Up to 1.25x faster than FlashInfer sampling kernels
 
-End-to-end vLLM on B200:
-  - 19% lower TPOT on Qwen3-1.7B
-  - 3-7% on Qwen3-8B
-  - 1-5% on Qwen3-32B and gpt-oss-120b
+End-to-end (!) benchmarks on vLLM (GPU: B200):
+- 19% lower TPOT on Qwen3-1.7B
+- 3-7% on Qwen3-8B
+- 1-5% on Qwen3-32B and gpt-oss-120b
 
 The key insight: the Gumbel-max trick turns sampling into a per-tile argmax, so you never need to materialize the full logit matrix. Each tile computes its local winner, a tiny cross-tile reduction picks the global winner. That's it. No softmax, no multinomial, no GMEM traffic.
 
