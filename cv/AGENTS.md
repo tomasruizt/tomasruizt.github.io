@@ -20,7 +20,7 @@
 - Header says "Resume" (not "CV") — targeting US companies
 
 ## Content Guidelines
-- Target audience: US-based companies (industry internships)
+- Target audience: US-based companies & inference optimization teams
 - Avoid redundancy between summary and detailed sections
 - Use bullet points (`\begin{itemize}`) inside `\cvevent` descriptions for scannability
 - Keep to one page
