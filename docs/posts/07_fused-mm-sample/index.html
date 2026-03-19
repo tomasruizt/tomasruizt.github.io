@@ -9,7 +9,7 @@
 <meta name="author" content="Tomas Ruiz">
 <meta name="dcterms.date" content="2026-02-16">
 
-<title>FMMS: The Fused Matmul-Sample Kernel – All Posts</title>
+<title>FlashSampling / FMMS: The Fused Matmul-Sample Kernel – All Posts</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -210,7 +210,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">FMMS: The Fused Matmul-Sample Kernel</h1>
+      <h1 class="title">FlashSampling / FMMS: The Fused Matmul-Sample Kernel</h1>
             <p class="subtitle lead">An Efficient and Exact LLM Sampling Algorithm</p>
                                 <div class="quarto-categories">
                 <div class="quarto-category">GPUs</div>
@@ -245,6 +245,12 @@ window.Quarto = {
       </div>
     </div>
     
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">March 19, 2026</p>
+      </div>
+    </div>
       
     </div>
     
@@ -297,6 +303,7 @@ window.Quarto = {
 
 
 
+<p><strong>Update:</strong> We renamed FMMS to <em>FlashSampling</em>, and we released a <a href="https://arxiv.org/abs/2603.15854">paper (arXiv)</a> about it. Github <a href="https://github.com/FlashSampling/FlashSampling">Link</a>.</p>
 <section id="tldr" class="level1">
 <h1>TL;DR</h1>
 <div class="callout callout-style-simple callout-note">
@@ -1903,7 +1910,7 @@ Data table
 <section id="sec-algorithm" class="level1">
 <h1>The Algorithm</h1>
 <p>The matmul <span class="math inline">\(W_{[V,d]} \times H_{[N,d]}^T\)</span> is tiled across the <span class="math inline">\(V\)</span>, <span class="math inline">\(d\)</span>, and <span class="math inline">\(N\)</span> dimensions as shown in <a href="#fig-tiled-mm" class="quarto-xref">Figure&nbsp;7</a>. Each tile produces a <span class="math inline">\((T_V, T_N)\)</span> block of logits in SRAM.</p>
-<div id="fig-tiled-mm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Tiling the computation of the logits">
+<div id="fig-tiled-mm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Tiling the computation of the logits" data-text-align="left">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-tiled-mm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="imgs/Fused MM sample.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;7: Tiling the computation of the logits."><img src="imgs/Fused MM sample.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Tiling the computation of the logits"></a>
@@ -2014,14 +2021,15 @@ Zheng, Lianmin, Liangsheng Yin, Zhiqiang Xie, Chuyue Sun, Jeff Huang, Cody Hao Y
 </ol>
 </section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
   author = {Ruiz, Tomas},
-  title = {FMMS: {The} {Fused} {Matmul-Sample} {Kernel}},
+  title = {FlashSampling / {FMMS:} {The} {Fused} {Matmul-Sample}
+    {Kernel}},
   date = {2026-02-16},
   url = {https://tomasruizt.github.io/posts/07_fused-mm-sample/},
   langid = {en}
 }
 </code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2026" class="csl-entry quarto-appendix-citeas" role="listitem">
-Ruiz, Tomas. 2026. <span>“FMMS: The Fused Matmul-Sample Kernel.”</span>
-February 16, 2026. <a href="https://tomasruizt.github.io/posts/07_fused-mm-sample/">https://tomasruizt.github.io/posts/07_fused-mm-sample/</a>.
+Ruiz, Tomas. 2026. <span>“FlashSampling / FMMS: The Fused Matmul-Sample
+Kernel.”</span> February 16, 2026. <a href="https://tomasruizt.github.io/posts/07_fused-mm-sample/">https://tomasruizt.github.io/posts/07_fused-mm-sample/</a>.
 </div></div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
@@ -2448,7 +2456,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <input type="hidden" id="giscus-base-theme" value="light">
 <input type="hidden" id="giscus-alt-theme" value="light">
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","closeEffect":"zoom","selector":".lightbox","openEffect":"zoom","loop":false});
+<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","descPosition":"bottom","selector":".lightbox","closeEffect":"zoom","loop":false});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
