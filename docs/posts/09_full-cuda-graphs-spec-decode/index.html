@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.57">
+<meta content="quarto-1.5.57" name="generator">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta content="width=device-width, initial-scale=1.0, user-scalable=yes" name="viewport">
 
-<meta name="author" content="Tomas Ruiz">
-<meta name="dcterms.date" content="2026-01-29">
+<meta content="Tomas Ruiz" name="author">
+<meta content="2026-01-29" name="dcterms.date">
 
 <title>Forecasting the Performance of Full CUDA Graphs for Speculative Decoding – All Posts</title>
 <style>
@@ -31,16 +31,16 @@ ul.task-list li input[type="checkbox"] {
 <script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
 <script src="../../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../../site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="../../">
+<meta content="../../" name="quarto:offset">
 <script src="../../site_libs/quarto-html/quarto.js"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" id="quarto-text-highlighting-styles" rel="stylesheet">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link data-mode="light" href="../../site_libs/bootstrap/bootstrap.min.css" id="quarto-bootstrap" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -99,13 +99,13 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="../../styles.css">
+<link href="../../styles.css" rel="stylesheet">
 </head>
 
 <body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+  <header class="headroom fixed-top quarto-banner" id="quarto-header">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -113,8 +113,8 @@ window.Quarto = {
     <span class="navbar-title">All Posts</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div class="" id="quarto-search" title="Search"></div>
+          <button aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-bs-target="#navbarCollapse" data-bs-toggle="collapse" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }" role="menu" type="button">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -150,7 +150,7 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+<header class="quarto-title-block default page-columns page-full" id="title-block-header">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">Forecasting the Performance of Full CUDA Graphs for Speculative Decoding</h1>
@@ -168,7 +168,7 @@ window.Quarto = {
     <div class="quarto-title-meta-heading">Affiliation</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+      <p class="author">Tomas Ruiz <a class="quarto-title-author-email" href="mailto:t.ruiz@lmu.de"><i class="bi bi-envelope"></i></a> </p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
@@ -191,18 +191,18 @@ window.Quarto = {
     </div>
     
   
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+  </header><div class="quarto-container page-columns page-rows-contents page-layout-article page-navbar" id="quarto-content">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
+    <div class="sidebar margin-sidebar" id="quarto-margin-sidebar">
+        <nav class="toc-active" id="TOC" role="doc-toc">
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#background" id="toc-background" class="nav-link active" data-scroll-target="#background">Background</a></li>
-  <li><a href="#method" id="toc-method" class="nav-link" data-scroll-target="#method">Method</a></li>
-  <li><a href="#forecasted-end-to-end-impact" id="toc-forecasted-end-to-end-impact" class="nav-link" data-scroll-target="#forecasted-end-to-end-impact">Forecasted End-to-end Impact</a></li>
-  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  <li><a class="nav-link active" data-scroll-target="#background" href="#background" id="toc-background">Background</a></li>
+  <li><a class="nav-link" data-scroll-target="#method" href="#method" id="toc-method">Method</a></li>
+  <li><a class="nav-link" data-scroll-target="#forecasted-end-to-end-impact" href="#forecasted-end-to-end-impact" id="toc-forecasted-end-to-end-impact">Forecasted End-to-end Impact</a></li>
+  <li><a class="nav-link" data-scroll-target="#summary" href="#summary" id="toc-summary">Summary</a></li>
   </ul>
 </nav>
     </div>
@@ -214,33 +214,33 @@ window.Quarto = {
 
 
 <p>In a <a href="../../posts/06_vllm-spec-decode/index.html">previous post</a>, I benchmarked speculative decoding with draft models in vLLM V1. This follow-up analyzes the potential performance gains from supporting full CUDA graphs (Full CG) for draft-model speculative decoding. My results suggest that the speedup ratio over vanilla decoding would <strong>improve by ~5%</strong>, growing from from 2.26× to 2.37 (Qwen3-32B on MT-Bench).</p>
-<section id="background" class="level2">
+<section class="level2" id="background">
 <h2 class="anchored" data-anchor-id="background">Background</h2>
 <p>Currently, vLLM supports two CG modes: <strong>Piecewise CG</strong> and <strong>Full CG</strong>. The Full CG mode is typically fastest, but it comes with stricter constraints and isn’t compatible with all execution paths. At the moment, draft models (both EAGLE-3 and draft_model) use Piecewise CG.</p>
 </section>
-<section id="method" class="level2">
+<section class="level2" id="method">
 <h2 class="anchored" data-anchor-id="method">Method</h2>
 <p>What speedups could we achieve by supporting Full CG for speculative decoding? I measure the similar work under both Piecewise CG and Full CG, and compare the results.</p>
 <ol type="1">
 <li><p><strong>Standalone (Full CG):</strong> I disable speculative decoding, run each model (Qwen3-32B and Qwen3-1.7B) separately on a single InstructCoder request with 1000 output tokens, and measure ITL. This estimates the per-token runtime under Full CG.</p></li>
-<li><p><strong>Within speculative decoding (Piecewise CG):</strong> I enable speculative decoding (<code>draft_model</code>), run draft + target, and measure ITL while varying the number of speculative tokens (K). Because each additional speculative token triggers one extra draft forward pass, a linear fit of ITL vs K is a good approximation. The regression in <a href="#fig-itl-vs-num-spec-toks" class="quarto-xref">Figure&nbsp;1</a> can be interpreted as follows:</p>
+<li><p><strong>Within speculative decoding (Piecewise CG):</strong> I enable speculative decoding (<code>draft_model</code>), run draft + target, and measure ITL while varying the number of speculative tokens (K). Because each additional speculative token triggers one extra draft forward pass, a linear fit of ITL vs K is a good approximation. The regression in <a class="quarto-xref" href="#fig-itl-vs-num-spec-toks">Figure&nbsp;1</a> can be interpreted as follows:</p>
 <ul>
 <li><em>The Intercept</em>: the target-model cost inside the SD loop</li>
 <li><em>The Slope</em>: the incremental draft-model cost per additional speculative token</li>
 </ul></li>
 </ol>
-<div id="fig-itl-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="Regression of ITL over number of speculative tokens.">
+<div alt="Regression of ITL over number of speculative tokens." class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-itl-vs-num-spec-toks">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-itl-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/itl_k_comparison.png" class="img-fluid figure-img" style="width:50.0%" data-text-align="left" alt="Regression of ITL over number of speculative tokens.">
+<img alt="Regression of ITL over number of speculative tokens." class="img-fluid figure-img" data-text-align="left" src="imgs/itl_k_comparison.png" style="width:50.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-itl-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Regression of ITL over number of speculative tokens. The linear fit is good.
 </figcaption>
 </figure>
 </div>
-<p>With those two measurements, we can compare per-token runtimes across graph modes in <a href="#tbl-speed-comparison-full-vs-piecewise" class="quarto-xref">Table&nbsp;1</a>. “SD Runtime” comes from the ITL regression (Piecewise CG, inside SD), and “Standalone Runtime” is the median ITL from <code>vllm bench serve</code> without SD (Full CG). For this setup, the draft model is <strong>9.10% faster</strong> under full graphs, while the target model is <strong>2.91% faster</strong>.</p>
-<div id="tbl-speed-comparison-full-vs-piecewise" class="quarto-float quarto-figure quarto-figure-center anchored">
+<p>With those two measurements, we can compare per-token runtimes across graph modes in <a class="quarto-xref" href="#tbl-speed-comparison-full-vs-piecewise">Table&nbsp;1</a>. “SD Runtime” comes from the ITL regression (Piecewise CG, inside SD), and “Standalone Runtime” is the median ITL from <code>vllm bench serve</code> without SD (Full CG). For this setup, the draft model is <strong>9.10% faster</strong> under full graphs, while the target model is <strong>2.91% faster</strong>.</p>
+<div class="quarto-float quarto-figure quarto-figure-center anchored" id="tbl-speed-comparison-full-vs-piecewise">
 <figure class="quarto-float quarto-float-tbl figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-speed-comparison-full-vs-piecewise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Table&nbsp;1: Table: Speed comparison of Full CG and Piecewise CG.
@@ -280,16 +280,16 @@ Table&nbsp;1: Table: Speed comparison of Full CG and Piecewise CG.
 </figure>
 </div>
 </section>
-<section id="forecasted-end-to-end-impact" class="level2">
+<section class="level2" id="forecasted-end-to-end-impact">
 <h2 class="anchored" data-anchor-id="forecasted-end-to-end-impact">Forecasted End-to-end Impact</h2>
 <p>Assuming we could realize those per-token reductions inside speculative decoding, what does that translate to in terms of TPOT? I use the formula below to forecast the speedups for full CUDA graphs. <span class="math display">\[
 \text{TPOT} = \frac{\text{ITL}}{\text{AL}} = \frac{T_{d} \cdot K + T_{t}}{\text{AL}}
 \]</span></p>
-<p>where <span class="math inline">\(T_{d}\)</span> is the runtime of the draft model, <span class="math inline">\(T_{t}\)</span> is the runtime of the target model, <span class="math inline">\(K\)</span> is the number of speculative tokens, and <span class="math inline">\(\text{AL}\)</span> is the acceptance length. <a href="#fig-tpot-comparison-full-vs-piecewise" class="quarto-xref">Figure&nbsp;2</a> shows the TPOT values under Piecewise CG (Current), and Full CG (Expected). The minimum (best) TPOT values for each curve are marked with a cross. At <span class="math inline">\(K=5\)</span><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>, the TPOT improves from 10.43ms to 9.91ms <strong>(4.9% improvement)</strong>. The speedup ratios over vanilla decoding grow from 2.26× to 2.37× for Qwen3-32B (1.7B drafter) on MT-Bench.</p>
-<div id="fig-tpot-comparison-full-vs-piecewise" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" alt="TPOT calculation">
+<p>where <span class="math inline">\(T_{d}\)</span> is the runtime of the draft model, <span class="math inline">\(T_{t}\)</span> is the runtime of the target model, <span class="math inline">\(K\)</span> is the number of speculative tokens, and <span class="math inline">\(\text{AL}\)</span> is the acceptance length. <a class="quarto-xref" href="#fig-tpot-comparison-full-vs-piecewise">Figure&nbsp;2</a> shows the TPOT values under Piecewise CG (Current), and Full CG (Expected). The minimum (best) TPOT values for each curve are marked with a cross. At <span class="math inline">\(K=5\)</span><a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a>, the TPOT improves from 10.43ms to 9.91ms <strong>(4.9% improvement)</strong>. The speedup ratios over vanilla decoding grow from 2.26× to 2.37× for Qwen3-32B (1.7B drafter) on MT-Bench.</p>
+<div alt="TPOT calculation" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-tpot-comparison-full-vs-piecewise">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-tpot-comparison-full-vs-piecewise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/tpot_k_comparison.png" class="img-fluid figure-img" style="width:50.0%" data-text-align="left" alt="TPOT calculation">
+<img alt="TPOT calculation" class="img-fluid figure-img" data-text-align="left" src="imgs/tpot_k_comparison.png" style="width:50.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tpot-comparison-full-vs-piecewise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: TPOT Comparison between Piecewise CG and Full CG (forecast).
@@ -297,7 +297,7 @@ Figure&nbsp;2: TPOT Comparison between Piecewise CG and Full CG (forecast).
 </figure>
 </div>
 </section>
-<section id="summary" class="level2">
+<section class="level2" id="summary">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
 <p>Supporting Full CG for speculative decoding could improve speedup ratios by ~5% from 2.26× to 2.37× over vanilla decoding. When I started this analysis, I expected larger improvements (closer to 20%), but the target model dominates overall ITL, so draft-side gains translate to single-digit TPOT gains. Nevertheless, this improvement would positively impact the performance of draft_model across all workloads. The same method could be applied to estimate the performance gains for other combinations of draft, target models, and datasets.</p>
 
@@ -305,10 +305,10 @@ Figure&nbsp;2: TPOT Comparison between Piecewise CG and Full CG (forecast).
 </section>
 
 
-<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+<div class="default" id="quarto-appendix"><section class="footnotes footnotes-end-of-document" id="footnotes" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
 
 <ol>
-<li id="fn1"><p>In this experiment, I used only a single request from the InstructCoder dataset, with <code>--output-len=1000</code>. The best TPOT values were achieved at <span class="math inline">\(K=5\)</span> rather than the <span class="math inline">\(K=4\)</span> for the larger benchmark, but the TPOT differences are insignificant. The code for this analysis is available on <a href="https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb">Github</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn1"><p>In this experiment, I used only a single request from the InstructCoder dataset, with <code>--output-len=1000</code>. The best TPOT values were achieved at <span class="math inline">\(K=5\)</span> rather than the <span class="math inline">\(K=4\)</span> for the larger benchmark, but the TPOT differences are insignificant. The code for this analysis is available on <a href="https://github.com/tomasruizt/vllm-scripts/blob/4c80edd944e7c71d89e343ecc742cab22fae349b/profiling/analysis.ipynb">Github</a><a class="footnote-back" href="#fnref1" role="doc-backlink">↩︎</a></p></li>
 </ol>
 </section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -731,10 +731,10 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script>
-<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+<script async="" crossorigin="anonymous" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="lazy" data-mapping="pathname" data-reactions-enabled="1" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-theme="light" src="https://giscus.app/client.js">
 </script>
-<input type="hidden" id="giscus-base-theme" value="light">
-<input type="hidden" id="giscus-alt-theme" value="light">
+<input id="giscus-base-theme" type="hidden" value="light">
+<input id="giscus-alt-theme" type="hidden" value="light">
 </div> <!-- /content -->
 
 

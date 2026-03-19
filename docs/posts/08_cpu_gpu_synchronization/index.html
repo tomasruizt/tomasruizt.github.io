@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.57">
+<meta content="quarto-1.5.57" name="generator">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta content="width=device-width, initial-scale=1.0, user-scalable=yes" name="viewport">
 
-<meta name="author" content="Tomas Ruiz">
-<meta name="dcterms.date" content="2026-01-07">
+<meta content="Tomas Ruiz" name="author">
+<meta content="2026-01-07" name="dcterms.date">
 
 <title>PyTorch and CPU-GPU Synchronizations – All Posts</title>
 <style>
@@ -65,16 +65,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
 <script src="../../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../../site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="../../">
+<meta content="../../" name="quarto:offset">
 <script src="../../site_libs/quarto-html/quarto.js"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" id="quarto-text-highlighting-styles" rel="stylesheet">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link data-mode="light" href="../../site_libs/bootstrap/bootstrap.min.css" id="quarto-bootstrap" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -104,13 +104,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 }</script>
 
 
-<link rel="stylesheet" href="../../styles.css">
+<link href="../../styles.css" rel="stylesheet">
 </head>
 
 <body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+  <header class="headroom fixed-top quarto-banner" id="quarto-header">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -118,8 +118,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <span class="navbar-title">All Posts</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div class="" id="quarto-search" title="Search"></div>
+          <button aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-bs-target="#navbarCollapse" data-bs-toggle="collapse" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }" role="menu" type="button">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -155,7 +155,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+<header class="quarto-title-block default page-columns page-full" id="title-block-header">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">PyTorch and CPU-GPU Synchronizations</h1>
@@ -173,7 +173,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div class="quarto-title-meta-heading">Affiliation</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+      <p class="author">Tomas Ruiz <a class="quarto-title-author-email" href="mailto:t.ruiz@lmu.de"><i class="bi bi-envelope"></i></a> </p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
@@ -202,27 +202,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>
     
   
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+  </header><div class="quarto-container page-columns page-rows-contents page-layout-article page-navbar" id="quarto-content">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
+    <div class="sidebar margin-sidebar" id="quarto-margin-sidebar">
+        <nav class="toc-active" id="TOC" role="doc-toc">
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
-  <li><a href="#what-is-a-cpu-gpu-synchronization" id="toc-what-is-a-cpu-gpu-synchronization" class="nav-link" data-scroll-target="#what-is-a-cpu-gpu-synchronization">What is a CPU-GPU Synchronization?</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
-  <li><a href="#sec-profiling-analysis" id="toc-sec-profiling-analysis" class="nav-link" data-scroll-target="#sec-profiling-analysis">Profiling Analysis</a>
+  <li><a class="nav-link active" data-scroll-target="#introduction" href="#introduction" id="toc-introduction">Introduction</a></li>
+  <li><a class="nav-link" data-scroll-target="#what-is-a-cpu-gpu-synchronization" href="#what-is-a-cpu-gpu-synchronization" id="toc-what-is-a-cpu-gpu-synchronization">What is a CPU-GPU Synchronization?</a></li>
+  <li><a class="nav-link" data-scroll-target="#example" href="#example" id="toc-example">Example</a></li>
+  <li><a class="nav-link" data-scroll-target="#sec-profiling-analysis" href="#sec-profiling-analysis" id="toc-sec-profiling-analysis">Profiling Analysis</a>
   <ul class="collapse">
-  <li><a href="#run-with-cpu-gpu-synchronization" id="toc-run-with-cpu-gpu-synchronization" class="nav-link" data-scroll-target="#run-with-cpu-gpu-synchronization">Run With CPU-GPU Synchronization</a></li>
-  <li><a href="#healthy-run" id="toc-healthy-run" class="nav-link" data-scroll-target="#healthy-run">Healthy Run</a></li>
+  <li><a class="nav-link" data-scroll-target="#run-with-cpu-gpu-synchronization" href="#run-with-cpu-gpu-synchronization" id="toc-run-with-cpu-gpu-synchronization">Run With CPU-GPU Synchronization</a></li>
+  <li><a class="nav-link" data-scroll-target="#healthy-run" href="#healthy-run" id="toc-healthy-run">Healthy Run</a></li>
   </ul></li>
-  <li><a href="#dynamic-shapes-can-trigger-synchronizations" id="toc-dynamic-shapes-can-trigger-synchronizations" class="nav-link" data-scroll-target="#dynamic-shapes-can-trigger-synchronizations">Dynamic Shapes Can Trigger Synchronizations</a></li>
-  <li><a href="#unit-testing-for-cpu-gpu-synchronizations" id="toc-unit-testing-for-cpu-gpu-synchronizations" class="nav-link" data-scroll-target="#unit-testing-for-cpu-gpu-synchronizations">Unit Testing for CPU-GPU Synchronizations</a></li>
-  <li><a href="#sec-in-practice" id="toc-sec-in-practice" class="nav-link" data-scroll-target="#sec-in-practice">In Practice: vLLM</a></li>
-  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
-  <li><a href="#further-references" id="toc-further-references" class="nav-link" data-scroll-target="#further-references">Further References</a></li>
+  <li><a class="nav-link" data-scroll-target="#dynamic-shapes-can-trigger-synchronizations" href="#dynamic-shapes-can-trigger-synchronizations" id="toc-dynamic-shapes-can-trigger-synchronizations">Dynamic Shapes Can Trigger Synchronizations</a></li>
+  <li><a class="nav-link" data-scroll-target="#unit-testing-for-cpu-gpu-synchronizations" href="#unit-testing-for-cpu-gpu-synchronizations" id="toc-unit-testing-for-cpu-gpu-synchronizations">Unit Testing for CPU-GPU Synchronizations</a></li>
+  <li><a class="nav-link" data-scroll-target="#sec-in-practice" href="#sec-in-practice" id="toc-sec-in-practice">In Practice: vLLM</a></li>
+  <li><a class="nav-link" data-scroll-target="#summary" href="#summary" id="toc-summary">Summary</a></li>
+  <li><a class="nav-link" data-scroll-target="#further-references" href="#further-references" id="toc-further-references">Further References</a></li>
   </ul>
 </nav>
     </div>
@@ -234,41 +234,41 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p><strong>TL;DR:</strong> This post is a guide to understand and prevent CPU-GPU synchronizations, which will help you write fast and efficient PyTorch programs 🚀. I explain the concept with concrete PyTorch examples from <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90">this Github Gist</a>, and profiles from NVIDIA Nsight Systems.</p>
-<section id="introduction" class="level1">
+<section class="level1" id="introduction">
 <h1>Introduction</h1>
 <p>CPU-GPU synchronizations (also known as <em>host-device</em> synchronizations) are a subtle but important mechanism to write fast and efficient PyTorch programs. The CPU-GPU synchronization is a blocking operation that prevents the CPU from scheduling new work (PyTorch ops) on the GPU. The <a href="https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization">PyTorch Tuning Guide</a> makes some basic suggestions about how to avoid CPU-GPU synchronizations, e.g.&nbsp;by avoiding calls to <code>tensor.item()</code>, printing a device tensor, or calling <code>tensor.cpu()</code> / <code>tensor.cuda()</code>, but doesn’t explain in depth what is happening under the hood. Furthermore, there are other subtle ways to run into CPU-GPU synchronizations. In this post I dive deeper into synchronizations and explain how they slow down a PyTorch program. I show how to use the NVIDIA <strong>Nsight Systems</strong> profiler to identify and diagnose CPU-GPU synchronization issues. Finally, I also show how to use the experimental PyTorch API <code>torch.cuda.set_sync_debug_mode</code> in <strong>unit tests</strong> to verify the absence of CPU-GPU synchronizations in production code.</p>
-<div id="fig-profile-do-print-overview" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div class="quarto-float quarto-figure quarto-figure-center anchored" id="fig-profile-do-print-overview">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-profile-do-print-overview-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="./imgs/example-code-do-print.png" class="img-fluid figure-img">
+<img class="img-fluid figure-img" src="./imgs/example-code-do-print.png">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-profile-do-print-overview-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Profile showing CPU-GPU synchronization issues (here triggered by printing a CUDA tensor). A deep dive into the profile details is in <a href="#sec-profiling-analysis" class="quarto-xref">Section&nbsp;4</a>.
+Figure&nbsp;1: Profile showing CPU-GPU synchronization issues (here triggered by printing a CUDA tensor). A deep dive into the profile details is in <a class="quarto-xref" href="#sec-profiling-analysis">Section&nbsp;4</a>.
 </figcaption>
 </figure>
 </div>
 </section>
-<section id="what-is-a-cpu-gpu-synchronization" class="level1">
+<section class="level1" id="what-is-a-cpu-gpu-synchronization">
 <h1>What is a CPU-GPU Synchronization?</h1>
 <p>To fully take advantage of the speed of a GPU, it must be kept busy (high GPU utilization). This depends on the CPU scheduling enough work to keep the GPU busy. Typically, in a well-performing PyTorch program, the CPU schedules many instructions quickly, which are executed by the GPU. The CPU is said to <em>run ahead</em> of the GPU, because it issues instructions without waiting for the previous ones to complete. This is why PyTorch is said to be <em>asynchronous</em>. If the CPU fails to schedule enough work, the GPU will sit idle waiting for work.</p>
 <p><strong>The intuition:</strong> As an analogy to understand CPU-GPU synchronizations, think of a restaurant where a chef (CPU) schedules all the steps (PyTorch ops) for a big dinner party in advance. A CPU-GPU synchronization would be like the chef waiting to observe how a specific step in a specific dish turned out <em>during the dinner</em>, before scheduling the rest of the dishes and telling the cooks what to do. Obviously, this latency in communication will lead to the cooks being idle, waiting for the chef to schedule the dishes. Instead, the chef should schedule the entire dinner plan in advance (<em>run ahead</em>).</p>
 </section>
-<section id="example" class="level1">
+<section class="level1" id="example">
 <h1>Example</h1>
-<p>Let’s look at a concrete example. Below we have a PyTorch program that executes a <code>slow_operation()</code> on the GPU, followed by a <code>quick_operation()</code> on the GPU. The quick operation just counts the number of 1s in the result tensor. The result of the quick operation is gathered in <code>results</code> tensor. Both functions are executed in a loop, to simulate a long-running program like LLM inference, where the slow operation could be the LLM forward pass, and the quick operation could be bookkeeping with the sampled tokens (a real vLLM example is explained in <a href="#sec-in-practice" class="quarto-xref">Section&nbsp;7</a>). To warm up the torch code, I run both the <code>slow_operation()</code> and <code>quick_operation()</code> once before the hot loop. I annotated regions of code with <code>nvtx.annotate()</code>, to keep track of GPU and CPU runtime during profiling.</p>
+<p>Let’s look at a concrete example. Below we have a PyTorch program that executes a <code>slow_operation()</code> on the GPU, followed by a <code>quick_operation()</code> on the GPU. The quick operation just counts the number of 1s in the result tensor. The result of the quick operation is gathered in <code>results</code> tensor. Both functions are executed in a loop, to simulate a long-running program like LLM inference, where the slow operation could be the LLM forward pass, and the quick operation could be bookkeeping with the sampled tokens (a real vLLM example is explained in <a class="quarto-xref" href="#sec-in-practice">Section&nbsp;7</a>). To warm up the torch code, I run both the <code>slow_operation()</code> and <code>quick_operation()</code> once before the hot loop. I annotated regions of code with <code>nvtx.annotate()</code>, to keep track of GPU and CPU runtime during profiling.</p>
 <script src="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90.js?file=cpu_gpu_sync_example.py"></script>
 </section>
-<section id="sec-profiling-analysis" class="level1">
+<section class="level1" id="sec-profiling-analysis">
 <h1>Profiling Analysis</h1>
-<p>We can run the NVIDIA Nsight Systems profiler with the command below to produce the timelines shown in <a href="#fig-profile-do-print" class="quarto-xref">Figure&nbsp;2</a> and <a href="#fig-profile-no-print" class="quarto-xref">Figure&nbsp;3</a>. The script takes a flag <code>--do-print</code> to include a CPU-GPU synchronization in the quick operation: a <code>print</code> of a GPU tensor, which forces data back from the GPU to the CPU.</p>
+<p>We can run the NVIDIA Nsight Systems profiler with the command below to produce the timelines shown in <a class="quarto-xref" href="#fig-profile-do-print">Figure&nbsp;2</a> and <a class="quarto-xref" href="#fig-profile-no-print">Figure&nbsp;3</a>. The script takes a flag <code>--do-print</code> to include a CPU-GPU synchronization in the quick operation: a <code>print</code> of a GPU tensor, which forces data back from the GPU to the CPU.</p>
 <p><strong>Without</strong> CPU-GPU synchronization:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1"><a href="#cb1-1"></a>nsys profile \</span>
 <span id="cb1-2"><a href="#cb1-2"></a>  -o profile-no-print.nsys-rep \</span>
-<span id="cb1-3"><a href="#cb1-3"></a>  python cpu_gpu_sync_example.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-3"><a href="#cb1-3"></a>  python cpu_gpu_sync_example.py</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p><strong>With</strong> CPU-GPU synchronization:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb2-1"><a href="#cb2-1"></a>nsys profile \</span>
 <span id="cb2-2"><a href="#cb2-2"></a>  -o profile-do-print.nsys-rep \</span>
-<span id="cb2-3"><a href="#cb2-3"></a>  python cpu_gpu_sync_example.py --do-print</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-3"><a href="#cb2-3"></a>  python cpu_gpu_sync_example.py --do-print</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p>The resulting profiles are shown below and annotated. I ran the code on an NVIDIA RTX3090 GPU and Nsight Systems 2025.3.1.90.</p>
 <p>To inspect the report:</p>
 <ul>
@@ -276,12 +276,12 @@ Figure&nbsp;1: Profile showing CPU-GPU synchronization issues (here triggered by
 <li>Zoom into the NVTX-annotated region.</li>
 <li>Look for long CPU-side CUDA API calls like <code>cudaStreamSynchronize</code> and correlate them with gaps in GPU utilization.</li>
 </ul>
-<section id="run-with-cpu-gpu-synchronization" class="level3">
+<section class="level3" id="run-with-cpu-gpu-synchronization">
 <h3 class="anchored" data-anchor-id="run-with-cpu-gpu-synchronization">Run With CPU-GPU Synchronization</h3>
-<div id="fig-profile-do-print" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div class="quarto-float quarto-figure quarto-figure-center anchored" id="fig-profile-do-print">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-profile-do-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="./imgs/example-code-do-print-annotated.jpg" class="img-fluid figure-img">
+<img class="img-fluid figure-img" src="./imgs/example-code-do-print-annotated.jpg">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-profile-do-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: Profile with CPU-GPU synchronization.
@@ -295,12 +295,12 @@ Figure&nbsp;2: Profile with CPU-GPU synchronization.
 <li>On the GPU ops timeline we observe that the slow operation takes longer than the quick operation, while in the CPU ops timeline we observe the reverse. This means that the quick operation is the one blocking the CPU.</li>
 </ul>
 </section>
-<section id="healthy-run" class="level3">
+<section class="level3" id="healthy-run">
 <h3 class="anchored" data-anchor-id="healthy-run">Healthy Run</h3>
-<div id="fig-profile-no-print" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div class="quarto-float quarto-figure quarto-figure-center anchored" id="fig-profile-no-print">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-profile-no-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="./imgs/example-code-no-print-annotated.jpg" class="img-fluid figure-img">
+<img class="img-fluid figure-img" src="./imgs/example-code-no-print-annotated.jpg">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-profile-no-print-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: Profile without CPU-GPU synchronization.
@@ -315,15 +315,15 @@ Figure&nbsp;3: Profile without CPU-GPU synchronization.
 </ul>
 </section>
 </section>
-<section id="dynamic-shapes-can-trigger-synchronizations" class="level1">
+<section class="level1" id="dynamic-shapes-can-trigger-synchronizations">
 <h1>Dynamic Shapes Can Trigger Synchronizations</h1>
 <p>Besides the code mentioned in the <a href="https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization">PyTorch Tuning Guide</a> there is another common pattern that triggers CPU-GPU synchronizations, namely <strong>dynamic shapes</strong>. One example of dynamic shapes is boolean indexing <code>x = t[bool_mask]</code>, where <code>bool_mask</code> is a boolean tensor on GPU. The size of the tensor <code>x</code> cannot be determined by the CPU alone, because it depends on the number of true values in <code>bool_mask</code>. Therefore, PyTorch typically needs to fetch data from the GPU to determine the amount of memory to allocate for <code>x</code>. This creates a CPU-GPU synchronization.</p>
 <p>Another example of this same problem is slicing <code>x = t[:gpu_index]</code>, where <code>gpu_index</code> is a scalar integer tensor on GPU. Once again, the size of the tensor <code>x</code> cannot be determined by the CPU alone, because it depends on the value of <code>gpu_index</code>.</p>
 <p>There are other ways to slice a torch tensor, e.g.&nbsp;<code>x = t.narrow(dim=0, start, length)</code> (<a href="https://docs.pytorch.org/docs/stable/generated/torch.narrow.html">link</a>). However, this operation requires <code>length</code> to be a Python <code>int</code>. Passing a GPU tensor as <code>length</code> will typically trigger a cast to Python <code>int</code> on CPU, which introduces a CPU-GPU synchronization.</p>
 <p>A similar situation arises with <code>x = torch.repeat_interleave(y, repeats)</code>. But interestingly, this API exposes an optional argument <code>output_size</code> that can be used to prevent the synchronization (<a href="https://docs.pytorch.org/docs/stable/generated/torch.repeat_interleave.html">link</a>).</p>
-<p>What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU. This is why <strong>dynamic shapes</strong> are so problematic. Instead, if the length of the resulting tensor can be known <em>statically</em> on the CPU side, then we can find a way to avoid the CPU-GPU synchronization. PyTorch might not provide the precise API you need to avoid the synchronization. In that case, you might want to write a custom kernel in <strong>Triton</strong> to avoid the synchronization. The advantage of doing this is that you can fuse many sequential PyTorch operations into a single Triton kernel, which reduces the overhead of dispatching many small kernels on the CPU-side (around 2µs to 3µs per kernel). A concrete example is explained in <a href="#sec-in-practice" class="quarto-xref">Section&nbsp;7</a>. The accompanying Github Gist also uses <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py-L299">Triton kernels</a> to fuse together PyTorch ops, and prevent CPU-GPU synchronizations.</p>
+<p>What all these synchronization triggers have in common is that the length of the resulting tensor depends on data residing on the GPU. This is why <strong>dynamic shapes</strong> are so problematic. Instead, if the length of the resulting tensor can be known <em>statically</em> on the CPU side, then we can find a way to avoid the CPU-GPU synchronization. PyTorch might not provide the precise API you need to avoid the synchronization. In that case, you might want to write a custom kernel in <strong>Triton</strong> to avoid the synchronization. The advantage of doing this is that you can fuse many sequential PyTorch operations into a single Triton kernel, which reduces the overhead of dispatching many small kernels on the CPU-side (around 2µs to 3µs per kernel). A concrete example is explained in <a class="quarto-xref" href="#sec-in-practice">Section&nbsp;7</a>. The accompanying Github Gist also uses <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py-L299">Triton kernels</a> to fuse together PyTorch ops, and prevent CPU-GPU synchronizations.</p>
 </section>
-<section id="unit-testing-for-cpu-gpu-synchronizations" class="level1">
+<section class="level1" id="unit-testing-for-cpu-gpu-synchronizations">
 <h1>Unit Testing for CPU-GPU Synchronizations</h1>
 <p>So we need to prevent synchronization in our code. How can we do this without running a profiler on each code section we are interested in? PyTorch provides an experimental feature that can raise warnings or errors when CPU-GPU synchronizations occur: The <code>torch.cuda.set_sync_debug_mode()</code> function <a href="https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html">(link)</a>. Since it raises errors immediately, it can be used in unit tests to verify that the code is free of CPU-GPU synchronizations. For example it can be used in a context manager:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1"></a><span class="im">import</span> functools</span>
@@ -346,7 +346,7 @@ Figure&nbsp;3: Profile without CPU-GPU synchronization.
 <span id="cb3-18"><a href="#cb3-18"></a></span>
 <span id="cb3-19"><a href="#cb3-19"></a>x <span class="op">=</span> torch.arange(<span class="dv">10</span>, device<span class="op">=</span><span class="st">"cuda"</span>)</span>
 <span id="cb3-20"><a href="#cb3-20"></a><span class="cf">with</span> fail_if_gpu_cpu_synchronization(fail<span class="op">=</span><span class="va">True</span>):</span>
-<span id="cb3-21"><a href="#cb3-21"></a>    <span class="bu">print</span>(x)  <span class="co"># Raises an error</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-21"><a href="#cb3-21"></a>    <span class="bu">print</span>(x)  <span class="co"># Raises an error</span></span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p>The context manager can be used in a decorator as well, to decorate functions that should fail if they contain CPU-GPU synchronizations.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">def</span> on_gpu_cpu_synchronization(fail: <span class="bu">bool</span>):</span>
 <span id="cb4-2"><a href="#cb4-2"></a>    <span class="co">"""</span></span>
@@ -367,7 +367,7 @@ Figure&nbsp;3: Profile without CPU-GPU synchronization.
 <span id="cb4-17"><a href="#cb4-17"></a><span class="at">@on_gpu_cpu_synchronization</span>(fail<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb4-18"><a href="#cb4-18"></a><span class="kw">def</span> test_should_not_sync():</span>
 <span id="cb4-19"><a href="#cb4-19"></a>    x <span class="op">=</span> torch.arange(<span class="dv">10</span>, device<span class="op">=</span><span class="st">"cuda"</span>)</span>
-<span id="cb4-20"><a href="#cb4-20"></a>    y <span class="op">=</span> x <span class="op">**</span> <span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-20"><a href="#cb4-20"></a>    y <span class="op">=</span> x <span class="op">**</span> <span class="dv">2</span></span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p>Note that the decorator is used <strong>only on test functions</strong>, meaning that the PyTorch API to raise synchronization errors is never applied to production code, but only to the test code. This keeps this experimental feature isolated from production code while still providing quick and valuable feedback on CPU-GPU synchronizations. I used this pattern to verify the absence of synchronizations in my Github Gist about <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_tokengroup-py">vLLM TokenGroup</a>. The mechanism itself of raising errors is also unit tested in the <a href="https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90#file-test_helpers-py">test_helpers.py file</a> in the Github Gist.</p>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -383,15 +383,15 @@ Warning
 </div>
 </div>
 </section>
-<section id="sec-in-practice" class="level1">
+<section class="level1" id="sec-in-practice">
 <h1>In Practice: vLLM</h1>
 <p>I encountered CPU-GPU synchronizations in the context of contributing speculative decoding to vLLM (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>). In particular, the LLM forward passes are heavy operations, and preparing the input tokens for the forward pass requires lots of small PyTorch operations, which can introduce CPU-GPU synchronizations, if not carefully written. Senior NVIDIA engineer <a href="https://www.linkedin.com/in/benjamin-chislett-05502818a/">Benjamin Chislett</a> helped me understand what causes the synchronizations, in particular dynamic shapes, and the value of writing custom kernels in Triton to fuse together multiple sequential PyTorch operations (example: <a href="https://github.com/vllm-project/vllm/pull/28597">PR #28597</a>). I thank him for his support and feedback! 💪</p>
 </section>
-<section id="summary" class="level1">
+<section class="level1" id="summary">
 <h1>Summary</h1>
 <p>In this post, I explained what CPU-GPU synchronizations are, and how to identify and diagnose them with the NVIDIA Nsight Systems profiler. I discussed dynamic shapes as a common trigger for CPU-GPU synchronizations, and the value of writing custom kernels in Triton to fuse together multiple sequential PyTorch operations. I also showed how to use the experimental PyTorch API <code>torch.cuda.set_sync_debug_mode</code> in unit tests to verify the absence of CPU-GPU synchronizations in production code. This guide aims to help engineers prevent CPU-GPU synchronizations, which is key to write fast and efficient PyTorch programs.</p>
 </section>
-<section id="further-references" class="level1">
+<section class="level1" id="further-references">
 <h1>Further References</h1>
 <p>For a deep dive into kernel benchmarking in practice, I recommend this <a href="https://www.youtube.com/watch?v=CtrqBmYtSEk">YouTube lecture</a> by NVIDIA engineering manager <a href="https://www.linkedin.com/in/g-evtushenko/">Georgii Evtushenko</a>.</p>
 <!-- 
@@ -406,14 +406,14 @@ Warning
 
 </section>
 
-<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
+<div class="default" id="quarto-appendix"><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
   author = {Ruiz, Tomas},
   title = {PyTorch and {CPU-GPU} {Synchronizations}},
   date = {2026-01-07},
   url = {https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/},
   langid = {en}
 }
-</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2026" class="csl-entry quarto-appendix-citeas" role="listitem">
+</code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div class="csl-entry quarto-appendix-citeas" id="ref-ruiz2026" role="listitem">
 Ruiz, Tomas. 2026. <span>“PyTorch and CPU-GPU Synchronizations.”</span>
 January 7, 2026. <a href="https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/">https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/</a>.
 </div></div></section></div></main> <!-- /main -->
@@ -837,10 +837,10 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script>
-<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+<script async="" crossorigin="anonymous" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="lazy" data-mapping="pathname" data-reactions-enabled="1" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-theme="light" src="https://giscus.app/client.js">
 </script>
-<input type="hidden" id="giscus-base-theme" value="light">
-<input type="hidden" id="giscus-alt-theme" value="light">
+<input id="giscus-base-theme" type="hidden" value="light">
+<input id="giscus-alt-theme" type="hidden" value="light">
 </div> <!-- /content -->
 
 

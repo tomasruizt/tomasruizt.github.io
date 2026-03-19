@@ -4,6 +4,7 @@ clean:
 render-for-publish:
 	make clean
 	quarto render tomas-blog && mv tomas-blog/docs .
+	python normalize_html.py
 preview:
 	quarto preview tomas-blog --port 3000
 install:

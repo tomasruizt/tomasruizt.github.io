@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.57">
+<meta content="quarto-1.5.57" name="generator">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta content="width=device-width, initial-scale=1.0, user-scalable=yes" name="viewport">
 
-<meta name="author" content="Tomas Ruiz">
-<meta name="dcterms.date" content="2026-01-28">
+<meta content="Tomas Ruiz" name="author">
+<meta content="2026-01-28" name="dcterms.date">
 
 <title>Up to 3.55x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1 – All Posts</title>
 <style>
@@ -85,16 +85,16 @@ div.csl-indent {
 <script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
 <script src="../../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../../site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="../../">
+<meta content="../../" name="quarto:offset">
 <script src="../../site_libs/quarto-html/quarto.js"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" id="quarto-text-highlighting-styles" rel="stylesheet">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link data-mode="light" href="../../site_libs/bootstrap/bootstrap.min.css" id="quarto-bootstrap" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -153,13 +153,13 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="../../styles.css">
+<link href="../../styles.css" rel="stylesheet">
 </head>
 
 <body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+  <header class="headroom fixed-top quarto-banner" id="quarto-header">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -167,8 +167,8 @@ window.Quarto = {
     <span class="navbar-title">All Posts</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div class="" id="quarto-search" title="Search"></div>
+          <button aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-bs-target="#navbarCollapse" data-bs-toggle="collapse" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }" role="menu" type="button">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -204,7 +204,7 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+<header class="quarto-title-block default page-columns page-full" id="title-block-header">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">Up to 3.55x Faster: Contributing Speculative Decoding with Draft Models to vLLM V1</h1>
@@ -223,7 +223,7 @@ window.Quarto = {
     <div class="quarto-title-meta-heading">Affiliation</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+      <p class="author">Tomas Ruiz <a class="quarto-title-author-email" href="mailto:t.ruiz@lmu.de"><i class="bi bi-envelope"></i></a> </p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
@@ -246,49 +246,49 @@ window.Quarto = {
     </div>
     
   
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+  </header><div class="quarto-container page-columns page-rows-contents page-layout-article page-navbar" id="quarto-content">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
+    <div class="sidebar margin-sidebar" id="quarto-margin-sidebar">
+        <nav class="toc-active" id="TOC" role="doc-toc">
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#background" id="toc-background" class="nav-link active" data-scroll-target="#background">Background</a></li>
-  <li><a href="#using-speculative-decoding" id="toc-using-speculative-decoding" class="nav-link" data-scroll-target="#using-speculative-decoding">Using Speculative Decoding</a></li>
-  <li><a href="#benchmarking-setup" id="toc-benchmarking-setup" class="nav-link" data-scroll-target="#benchmarking-setup">Benchmarking Setup</a>
+  <li><a class="nav-link active" data-scroll-target="#background" href="#background" id="toc-background">Background</a></li>
+  <li><a class="nav-link" data-scroll-target="#using-speculative-decoding" href="#using-speculative-decoding" id="toc-using-speculative-decoding">Using Speculative Decoding</a></li>
+  <li><a class="nav-link" data-scroll-target="#benchmarking-setup" href="#benchmarking-setup" id="toc-benchmarking-setup">Benchmarking Setup</a>
   <ul class="collapse">
-  <li><a href="#models-evaluated" id="toc-models-evaluated" class="nav-link" data-scroll-target="#models-evaluated">Models Evaluated</a></li>
-  <li><a href="#datasets" id="toc-datasets" class="nav-link" data-scroll-target="#datasets">Datasets</a></li>
-  <li><a href="#benchmarking-methodology" id="toc-benchmarking-methodology" class="nav-link" data-scroll-target="#benchmarking-methodology">Benchmarking Methodology</a></li>
+  <li><a class="nav-link" data-scroll-target="#models-evaluated" href="#models-evaluated" id="toc-models-evaluated">Models Evaluated</a></li>
+  <li><a class="nav-link" data-scroll-target="#datasets" href="#datasets" id="toc-datasets">Datasets</a></li>
+  <li><a class="nav-link" data-scroll-target="#benchmarking-methodology" href="#benchmarking-methodology" id="toc-benchmarking-methodology">Benchmarking Methodology</a></li>
   </ul></li>
-  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">Results</a>
+  <li><a class="nav-link" data-scroll-target="#results" href="#results" id="toc-results">Results</a>
   <ul class="collapse">
-  <li><a href="#versus-vanilla-decoding" id="toc-versus-vanilla-decoding" class="nav-link" data-scroll-target="#versus-vanilla-decoding">Versus Vanilla Decoding</a></li>
-  <li><a href="#optimal-number-of-speculative-tokens-k" id="toc-optimal-number-of-speculative-tokens-k" class="nav-link" data-scroll-target="#optimal-number-of-speculative-tokens-k">Optimal Number of Speculative Tokens <span class="math inline">\(K\)</span></a></li>
-  <li><a href="#versus-eagle-3" id="toc-versus-eagle-3" class="nav-link" data-scroll-target="#versus-eagle-3">Versus EAGLE-3</a></li>
-  <li><a href="#inference-metrics" id="toc-inference-metrics" class="nav-link" data-scroll-target="#inference-metrics">Inference Metrics</a></li>
+  <li><a class="nav-link" data-scroll-target="#versus-vanilla-decoding" href="#versus-vanilla-decoding" id="toc-versus-vanilla-decoding">Versus Vanilla Decoding</a></li>
+  <li><a class="nav-link" data-scroll-target="#optimal-number-of-speculative-tokens-k" href="#optimal-number-of-speculative-tokens-k" id="toc-optimal-number-of-speculative-tokens-k">Optimal Number of Speculative Tokens <span class="math inline">\(K\)</span></a></li>
+  <li><a class="nav-link" data-scroll-target="#versus-eagle-3" href="#versus-eagle-3" id="toc-versus-eagle-3">Versus EAGLE-3</a></li>
+  <li><a class="nav-link" data-scroll-target="#inference-metrics" href="#inference-metrics" id="toc-inference-metrics">Inference Metrics</a></li>
   </ul></li>
-  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion">Discussion</a>
+  <li><a class="nav-link" data-scroll-target="#discussion" href="#discussion" id="toc-discussion">Discussion</a>
   <ul class="collapse">
-  <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations">Limitations</a></li>
-  <li><a href="#when-to-use-draft-models-vs.-eagle-3" id="toc-when-to-use-draft-models-vs.-eagle-3" class="nav-link" data-scroll-target="#when-to-use-draft-models-vs.-eagle-3">When to Use Draft Models vs.&nbsp;EAGLE-3</a></li>
+  <li><a class="nav-link" data-scroll-target="#limitations" href="#limitations" id="toc-limitations">Limitations</a></li>
+  <li><a class="nav-link" data-scroll-target="#when-to-use-draft-models-vs.-eagle-3" href="#when-to-use-draft-models-vs.-eagle-3" id="toc-when-to-use-draft-models-vs.-eagle-3">When to Use Draft Models vs.&nbsp;EAGLE-3</a></li>
   </ul></li>
-  <li><a href="#key-learnings" id="toc-key-learnings" class="nav-link" data-scroll-target="#key-learnings">Key Learnings</a>
+  <li><a class="nav-link" data-scroll-target="#key-learnings" href="#key-learnings" id="toc-key-learnings">Key Learnings</a>
   <ul class="collapse">
-  <li><a href="#side-effects" id="toc-side-effects" class="nav-link" data-scroll-target="#side-effects">Side-Effects</a></li>
-  <li><a href="#performance-optimizations" id="toc-performance-optimizations" class="nav-link" data-scroll-target="#performance-optimizations">Performance Optimizations</a></li>
+  <li><a class="nav-link" data-scroll-target="#side-effects" href="#side-effects" id="toc-side-effects">Side-Effects</a></li>
+  <li><a class="nav-link" data-scroll-target="#performance-optimizations" href="#performance-optimizations" id="toc-performance-optimizations">Performance Optimizations</a></li>
   </ul></li>
-  <li><a href="#contributing-to-vllm" id="toc-contributing-to-vllm" class="nav-link" data-scroll-target="#contributing-to-vllm">Contributing to vLLM</a>
+  <li><a class="nav-link" data-scroll-target="#contributing-to-vllm" href="#contributing-to-vllm" id="toc-contributing-to-vllm">Contributing to vLLM</a>
   <ul class="collapse">
-  <li><a href="#sec-start-high-level" id="toc-sec-start-high-level" class="nav-link" data-scroll-target="#sec-start-high-level">Start High-Level</a></li>
-  <li><a href="#use-the-debugger" id="toc-use-the-debugger" class="nav-link" data-scroll-target="#use-the-debugger">Use the Debugger</a></li>
-  <li><a href="#test-extensively" id="toc-test-extensively" class="nav-link" data-scroll-target="#test-extensively">Test Extensively</a></li>
-  <li><a href="#code-evolution" id="toc-code-evolution" class="nav-link" data-scroll-target="#code-evolution">Code Evolution</a></li>
+  <li><a class="nav-link" data-scroll-target="#sec-start-high-level" href="#sec-start-high-level" id="toc-sec-start-high-level">Start High-Level</a></li>
+  <li><a class="nav-link" data-scroll-target="#use-the-debugger" href="#use-the-debugger" id="toc-use-the-debugger">Use the Debugger</a></li>
+  <li><a class="nav-link" data-scroll-target="#test-extensively" href="#test-extensively" id="toc-test-extensively">Test Extensively</a></li>
+  <li><a class="nav-link" data-scroll-target="#code-evolution" href="#code-evolution" id="toc-code-evolution">Code Evolution</a></li>
   </ul></li>
-  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
-  <li><a href="#acknowledgments" id="toc-acknowledgments" class="nav-link" data-scroll-target="#acknowledgments">Acknowledgments</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a class="nav-link" data-scroll-target="#summary" href="#summary" id="toc-summary">Summary</a></li>
+  <li><a class="nav-link" data-scroll-target="#acknowledgments" href="#acknowledgments" id="toc-acknowledgments">Acknowledgments</a></li>
+  <li><a class="nav-link" data-scroll-target="#references" href="#references" id="toc-references">References</a></li>
   </ul>
 </nav>
     </div>
@@ -313,12 +313,12 @@ Note
 <p>This is <strong>not a tutorial</strong> on speculative decoding. I assume you are already familiar with the technique and its basic trade-offs. The focus here is on benchmarking the new code and sharing key learnings.</p>
 </div>
 </div>
-<section id="background" class="level2">
+<section class="level2" id="background">
 <h2 class="anchored" data-anchor-id="background">Background</h2>
 <p>Speculative decoding is a technique that accelerates LLM inference by using a smaller “draft” model to predict multiple tokens ahead, which are then verified in parallel by the larger target model. This approach can significantly improve throughput, especially in memory-bound regimes with small batch sizes.</p>
 <p><strong>A bit of history:</strong> Speculative decoding with draft models was previously available in vLLM V0. There’s an excellent <a href="https://www.youtube.com/watch?v=9wNAgpX6z_4">GPU Mode lecture</a> by <a href="https://www.linkedin.com/in/cade-daniel/">Daniel Cade</a> from June 2024 that outlines the original implementation. However, during the rearchitecting to V1, this feature was removed and hadn’t been reimplemented until now.</p>
 </section>
-<section id="using-speculative-decoding" class="level2">
+<section class="level2" id="using-speculative-decoding">
 <h2 class="anchored" data-anchor-id="using-speculative-decoding">Using Speculative Decoding</h2>
 <p>To use speculative decoding with vLLM, simply pass additional arguments to the <code>vllm serve</code> command. You’ll need to specify the draft model and the number of speculative tokens to generate. I also recommend setting <code>--max-model-len</code> to leave more memory for the KV cache.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode numberSource shell number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1"><a href="#cb1-1"></a>vllm serve Qwen/Qwen3-32B \</span>
@@ -326,14 +326,14 @@ Note
 <span id="cb1-3"><a href="#cb1-3"></a>    --speculative_config.model=Qwen/Qwen3-1.7B \</span>
 <span id="cb1-4"><a href="#cb1-4"></a>    --speculative_config.num_speculative_tokens=4 \</span>
 <span id="cb1-5"><a href="#cb1-5"></a>    --speculative_config.max_model_len=5000 \</span>
-<span id="cb1-6"><a href="#cb1-6"></a>    --max-model-len 5000</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-6"><a href="#cb1-6"></a>    --max-model-len 5000</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 </section>
-<section id="benchmarking-setup" class="level2">
+<section class="level2" id="benchmarking-setup">
 <h2 class="anchored" data-anchor-id="benchmarking-setup">Benchmarking Setup</h2>
-<section id="models-evaluated" class="level3">
+<section class="level3" id="models-evaluated">
 <h3 class="anchored" data-anchor-id="models-evaluated">Models Evaluated</h3>
-<p>I evaluated two model families: Qwen3 (dense) and LLaMa 3.3 70B. A summary of the models evaluated is shown in <a href="#tbl-models" class="quarto-xref">Table&nbsp;1</a>. For vanilla decoding, I evaluate the target model without any speculative decoding. Within the Qwen3 family, using the 0.6B model as a draft_model raised a runtime exception (likely a bug). The Qwen3 familiy was evaluated on a single NVIDIA H100 GPU, while the LlaMa 3.3 family required 2× H100 GPUs (tensor-parallelism).</p>
-<div id="tbl-models" class="quarto-float quarto-figure quarto-figure-center anchored">
+<p>I evaluated two model families: Qwen3 (dense) and LLaMa 3.3 70B. A summary of the models evaluated is shown in <a class="quarto-xref" href="#tbl-models">Table&nbsp;1</a>. For vanilla decoding, I evaluate the target model without any speculative decoding. Within the Qwen3 family, using the 0.6B model as a draft_model raised a runtime exception (likely a bug). The Qwen3 familiy was evaluated on a single NVIDIA H100 GPU, while the LlaMa 3.3 family required 2× H100 GPUs (tensor-parallelism).</p>
+<div class="quarto-float quarto-figure quarto-figure-center anchored" id="tbl-models">
 <figure class="quarto-float quarto-float-tbl figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-models-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Table&nbsp;1: Model configurations evaluated
@@ -352,16 +352,16 @@ Table&nbsp;1: Model configurations evaluated
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>Qwen3</strong></td>
-<td style="text-align: left;">Qwen3-32B<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></td>
-<td style="text-align: left;">Qwen3-1.7B<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> <br> Qwen3-4B<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a></td>
-<td style="text-align: left;">Qwen3-32B-speculator.eagle3<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a></td>
+<td style="text-align: left;">Qwen3-32B<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a></td>
+<td style="text-align: left;">Qwen3-1.7B<a class="footnote-ref" href="#fn2" id="fnref2" role="doc-noteref"><sup>2</sup></a> <br> Qwen3-4B<a class="footnote-ref" href="#fn3" id="fnref3" role="doc-noteref"><sup>3</sup></a></td>
+<td style="text-align: left;">Qwen3-32B-speculator.eagle3<a class="footnote-ref" href="#fn4" id="fnref4" role="doc-noteref"><sup>4</sup></a></td>
 <td style="text-align: left;">1× H100 96GB</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>LLaMa-3.3</strong></td>
-<td style="text-align: left;">Llama-3.3-70B-Instruct<a href="#fn5" class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a></td>
-<td style="text-align: left;">Llama-3.2-1B<a href="#fn6" class="footnote-ref" id="fnref6" role="doc-noteref"><sup>6</sup></a></td>
-<td style="text-align: left;">EAGLE3-LLaMA3.3-Instruct-70B<a href="#fn7" class="footnote-ref" id="fnref7" role="doc-noteref"><sup>7</sup></a></td>
+<td style="text-align: left;">Llama-3.3-70B-Instruct<a class="footnote-ref" href="#fn5" id="fnref5" role="doc-noteref"><sup>5</sup></a></td>
+<td style="text-align: left;">Llama-3.2-1B<a class="footnote-ref" href="#fn6" id="fnref6" role="doc-noteref"><sup>6</sup></a></td>
+<td style="text-align: left;">EAGLE3-LLaMA3.3-Instruct-70B<a class="footnote-ref" href="#fn7" id="fnref7" role="doc-noteref"><sup>7</sup></a></td>
 <td style="text-align: left;">2× H100 80GB</td>
 </tr>
 </tbody>
@@ -370,15 +370,15 @@ Table&nbsp;1: Model configurations evaluated
 </figure>
 </div>
 </section>
-<section id="datasets" class="level3">
+<section class="level3" id="datasets">
 <h3 class="anchored" data-anchor-id="datasets">Datasets</h3>
 <p>I evaluated performance on two datasets:</p>
 <ul>
-<li><p><strong>MT-Bench</strong><a href="#fn8" class="footnote-ref" id="fnref8" role="doc-noteref"><sup>8</sup></a>: A dataset of 80 multi-turn questions used to benchmark speedups in the EAGLE-3 paper by <span class="citation" data-cites="li2025eagle">Li et al. (<a href="#ref-li2025eagle" role="doc-biblioref">2025</a>)</span>. This dataset is too small to test batch sizes larger than 80 without repeating prompts.</p></li>
-<li><p><strong>InstructCoder</strong><a href="#fn9" class="footnote-ref" id="fnref9" role="doc-noteref"><sup>9</sup></a>: A dataset of 114k prompts about programming tasks. This larger dataset enables testing at higher batch sizes (I benchmark up to 256<a href="#fn10" class="footnote-ref" id="fnref10" role="doc-noteref"><sup>10</sup></a>). Programming tasks typically contain substantial repetition between input and output tokens, which may be beneficial for speculative decoding.</p></li>
+<li><p><strong>MT-Bench</strong><a class="footnote-ref" href="#fn8" id="fnref8" role="doc-noteref"><sup>8</sup></a>: A dataset of 80 multi-turn questions used to benchmark speedups in the EAGLE-3 paper by <span class="citation" data-cites="li2025eagle">Li et al. (<a href="#ref-li2025eagle" role="doc-biblioref">2025</a>)</span>. This dataset is too small to test batch sizes larger than 80 without repeating prompts.</p></li>
+<li><p><strong>InstructCoder</strong><a class="footnote-ref" href="#fn9" id="fnref9" role="doc-noteref"><sup>9</sup></a>: A dataset of 114k prompts about programming tasks. This larger dataset enables testing at higher batch sizes (I benchmark up to 256<a class="footnote-ref" href="#fn10" id="fnref10" role="doc-noteref"><sup>10</sup></a>). Programming tasks typically contain substantial repetition between input and output tokens, which may be beneficial for speculative decoding.</p></li>
 </ul>
 </section>
-<section id="benchmarking-methodology" class="level3">
+<section class="level3" id="benchmarking-methodology">
 <h3 class="anchored" data-anchor-id="benchmarking-methodology">Benchmarking Methodology</h3>
 <p>The benchmarking code can be found on <a href="https://github.com/tomasruizt/vllm-scripts/blob/3564bb62538d75b2337e3aa65f502a17f5408dc7/README.md">Github</a>. All benchmark results are available in a single <a href="https://github.com/tomasruizt/vllm-scripts/blob/d94d714fa4e451591f628542a57bbc7f9c2d2619/results/full-bench-data.parquet">Parquet file</a> for download.</p>
 <p>I benchmarked performance using <code>vllm bench serve</code> to inference metrics: token throughput (toks/s), TTFT, TPOT, and ITL. The <strong>speedup ratio</strong> metric is computed as the token throughput of speculative decoding over vanilla decoding. All experiments were run with temperature set to 0.0 (greedy sampling) because vLLM does not yet support lossless sampling with temperature &gt; 0.0. This feature has an <a href="https://github.com/vllm-project/vllm/pull/20459">open PR</a>. I ran benchmarks across different batch sizes, since speculative decoding is known to be most effective in lower batch sizes. The batch size is implemented as concurrent requests sent to the server (<code>--max-concurrency</code>). I set <code>--request-rate</code> equal to <code>--max-concurrency</code> to prevent all prefills from happening at the exact same time, which would inflate the TTFT for vanilla decoding.</p>
@@ -395,7 +395,7 @@ Example Benchmarking Command
 <span id="cb2-7"><a href="#cb2-7"></a>  --num-prompts 320 \</span>
 <span id="cb2-8"><a href="#cb2-8"></a>  --temperature 0.0 \</span>
 <span id="cb2-9"><a href="#cb2-9"></a>  --top-p 1.0 \</span>
-<span id="cb2-10"><a href="#cb2-10"></a>  --ready-check-timeout-sec 600</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-10"><a href="#cb2-10"></a>  --ready-check-timeout-sec 600</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 For <code>--num-prompts</code>, I use 10 times <code>--max-concurrency</code> or at least 50 prompts.
 </details>
 <details>
@@ -437,27 +437,27 @@ Example Benchmarking Output
 <span id="cb3-33"><a href="#cb3-33"></a>  Position 1:                            49.82     </span>
 <span id="cb3-34"><a href="#cb3-34"></a>  Position 2:                            36.32     </span>
 <span id="cb3-35"><a href="#cb3-35"></a>  Position 3:                            26.96     </span>
-<span id="cb3-36"><a href="#cb3-36"></a>==================================================</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-36"><a href="#cb3-36"></a>==================================================</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 </details>
-<section id="hardware" class="level4">
+<section class="level4" id="hardware">
 <h4 class="anchored" data-anchor-id="hardware">Hardware</h4>
 <p>The Qwen3 experiments were run on an NVIDIA H100 96GB GPU, within the SLURM cluster of the <a href="https://doku.lrz.de/lrz-ai-systems-11484278.html">LRZ AI Systems</a>, while the LLaMa 3.3 experiments were run on a 2× H100 80GB GPU launched from <a href="https://developer.nvidia.com/brev">NVIDIA Brev</a>.</p>
 </section>
 </section>
 </section>
-<section id="results" class="level2">
+<section class="level2" id="results">
 <h2 class="anchored" data-anchor-id="results">Results</h2>
-<section id="versus-vanilla-decoding" class="level3">
+<section class="level3" id="versus-vanilla-decoding">
 <h3 class="anchored" data-anchor-id="versus-vanilla-decoding">Versus Vanilla Decoding</h3>
-<p>I compare the token throughput of speculative decoding (draft_model) vs.&nbsp;vanilla decoding on <a href="#fig-total-token-throughput-short" class="quarto-xref">Figure&nbsp;1</a>. We observe that using speculative decoding <strong>dramatically increases</strong> token throughput compared to vanilla decoding. The number of speculative tokens <span class="math inline">\(K\)</span> was chosen to maximize the speedup ratio. In the next section, we see what happens when we change <span class="math inline">\(K\)</span>.</p>
+<p>I compare the token throughput of speculative decoding (draft_model) vs.&nbsp;vanilla decoding on <a class="quarto-xref" href="#fig-total-token-throughput-short">Figure&nbsp;1</a>. We observe that using speculative decoding <strong>dramatically increases</strong> token throughput compared to vanilla decoding. The number of speculative tokens <span class="math inline">\(K\)</span> was chosen to maximize the speedup ratio. In the next section, we see what happens when we change <span class="math inline">\(K\)</span>.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-1-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-1-1" data-bs-toggle="tab" id="tabset-1-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-1-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-1-2" data-bs-toggle="tab" id="tabset-1-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-1-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-1-3" data-bs-toggle="tab" id="tabset-1-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
-<div id="fig-total-token-throughput-short" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Token throughput metrics" data-text-align="left">
+<div aria-labelledby="tabset-1-1-tab" class="tab-pane active" id="tabset-1-1" role="tabpanel">
+<div alt="Token throughput metrics" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-total-token-throughput-short">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-total-token-throughput-short-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics">
+<img alt="Token throughput metrics" class="img-fluid figure-img" data-text-align="left" src="imgs/llama70b/InstructCoder/total_token_throughput_short.png" style="width:60.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-total-token-throughput-short-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Token Throughput Metrics.
@@ -465,18 +465,18 @@ Figure&nbsp;1: Token Throughput Metrics.
 </figure>
 </div>
 </div>
-<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div aria-labelledby="tabset-1-2-tab" class="tab-pane" id="tabset-1-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics"></p>
+<p><img alt="Token throughput metrics" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/mt-bench/total_token_throughput_short.png" style="width:60.0%"></p>
 <figcaption>Token Throughput Metrics.</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<div aria-labelledby="tabset-1-3-tab" class="tab-pane" id="tabset-1-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/total_token_throughput_short.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token throughput metrics"></p>
+<p><img alt="Token throughput metrics" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/InstructCoder/total_token_throughput_short.png" style="width:60.0%"></p>
 <figcaption>Token Throughput Metrics.</figcaption>
 </figure>
 </div>
@@ -484,18 +484,18 @@ Figure&nbsp;1: Token Throughput Metrics.
 </div>
 </div>
 </section>
-<section id="optimal-number-of-speculative-tokens-k" class="level3">
+<section class="level3" id="optimal-number-of-speculative-tokens-k">
 <h3 class="anchored" data-anchor-id="optimal-number-of-speculative-tokens-k">Optimal Number of Speculative Tokens <span class="math inline">\(K\)</span></h3>
 <p>The optimal value of <span class="math inline">\(K\)</span> depends on the acceptance rate of draft tokens, which varies with the data distribution. If <span class="math inline">\(K\)</span> is set too high, the model wastes time predicting draft tokens that will be rejected. If <span class="math inline">\(K\)</span> is set too low, we miss potential speedups.</p>
-<p>To highlight this dynamic, I compared speedup ratios across different values of <span class="math inline">\(K\)</span>. The results are shown in <a href="#fig-draft-model-ratios" class="quarto-xref">Figure&nbsp;2</a>. The y-axis shows the <strong>speedup ratio</strong> (or simply <strong>speedup</strong>), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time). A speedup of 2× means speculative decoding finishes the workload in half the time of vanilla decoding.</p>
+<p>To highlight this dynamic, I compared speedup ratios across different values of <span class="math inline">\(K\)</span>. The results are shown in <a class="quarto-xref" href="#fig-draft-model-ratios">Figure&nbsp;2</a>. The y-axis shows the <strong>speedup ratio</strong> (or simply <strong>speedup</strong>), which measures how much faster speculative decoding is compared to vanilla decoding (in wall-clock time). A speedup of 2× means speculative decoding finishes the workload in half the time of vanilla decoding.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" role="tab" aria-controls="tabset-2-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-2-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-2-1" data-bs-toggle="tab" id="tabset-2-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-2-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-2-2" data-bs-toggle="tab" id="tabset-2-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-2-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-2-3" data-bs-toggle="tab" id="tabset-2-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
-<div id="fig-draft-model-ratios" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div aria-labelledby="tabset-2-1-tab" class="tab-pane active" id="tabset-2-1" role="tabpanel">
+<div class="quarto-float quarto-figure quarto-figure-center anchored" id="fig-draft-model-ratios">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-draft-model-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/draft_model_ratios.png" class="img-fluid figure-img" style="width:60.0%">
+<img class="img-fluid figure-img" src="imgs/llama70b/InstructCoder/draft_model_ratios.png" style="width:60.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-draft-model-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: Throughput as a function of <span class="math inline">\(K\)</span>, evaluating both the 1.7 and the 4B models as draft models.
@@ -503,18 +503,18 @@ Figure&nbsp;2: Throughput as a function of <span class="math inline">\(K\)</span
 </figure>
 </div>
 </div>
-<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
+<div aria-labelledby="tabset-2-2-tab" class="tab-pane" id="tabset-2-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/draft_model_ratios.png" class="img-fluid figure-img"></p>
+<p><img class="img-fluid figure-img" src="imgs/qwen/mt-bench/draft_model_ratios.png"></p>
 <figcaption>Throughput as a function of <span class="math inline">\(K\)</span>, evaluating both the 1.7 and the 4B models as draft models.</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-2-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-3-tab">
+<div aria-labelledby="tabset-2-3-tab" class="tab-pane" id="tabset-2-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/draft_model_ratios.png" class="img-fluid figure-img"></p>
+<p><img class="img-fluid figure-img" src="imgs/qwen/InstructCoder/draft_model_ratios.png"></p>
 <figcaption>Throughput as a function of <span class="math inline">\(K\)</span>, evaluating both the 1.7 and the 4B models as draft models.</figcaption>
 </figure>
 </div>
@@ -526,22 +526,22 @@ Figure&nbsp;2: Throughput as a function of <span class="math inline">\(K\)</span
 <li><p><strong>Multi-GPU Setting</strong>: The greatest speedups (3.55×) were achieved with LLaMa 70B on 2× H100s. Surprisingly, inter-GPU communication overhead doesn’t dominate. draft_model works well with tensor parallelism &gt; 1.</p></li>
 <li><p><strong>Batch Size Dependency</strong>: Speedups peak at small batch sizes (concurrency 1-4) and decay at larger ones. At batch size 128+, speculative decoding becomes slower than vanilla decoding. This aligns with the literature <span class="citation" data-cites="li2025eagle tang2025efficientspeculativedecodingllama">(<a href="#ref-li2025eagle" role="doc-biblioref">Li et al. 2025</a>; <a href="#ref-tang2025efficientspeculativedecodingllama" role="doc-biblioref">Tang et al. 2025</a>)</span>: speculative decoding helps most in the <strong>memory-bound regime</strong>, but adds overhead in the <strong>compute-bound regime</strong>.</p></li>
 <li><p><strong>Saturation Effect</strong>: Increasing <span class="math inline">\(K\)</span> beyond a threshold yields no further gains. Saturation occurs around <span class="math inline">\(K=3\)</span>-<span class="math inline">\(4\)</span> for Qwen3 and <span class="math inline">\(K=7\)</span> for LLaMa 70B.</p></li>
-<li><p><strong>Draft Model Size Trade-off</strong>: The smaller 1.7B draft model achieves higher speedups than the 4B, despite the 4B having better acceptance rates (<a href="#fig-acceptance-lengths-vs-num-spec-toks" class="quarto-xref">Figure&nbsp;5</a>). The 4B’s slower inference limits its overall speedup.</p></li>
+<li><p><strong>Draft Model Size Trade-off</strong>: The smaller 1.7B draft model achieves higher speedups than the 4B, despite the 4B having better acceptance rates (<a class="quarto-xref" href="#fig-acceptance-lengths-vs-num-spec-toks">Figure&nbsp;5</a>). The 4B’s slower inference limits its overall speedup.</p></li>
 <li><p><strong>Low <span class="math inline">\(K\)</span> Robustness</strong>: In InstructCoder (Qwen3), <span class="math inline">\(K=1\)</span> achieves modest speedups at small batch sizes, but degrades more gracefully at large batch sizes than higher <span class="math inline">\(K\)</span> values.</p></li>
 </ul>
 </section>
-<section id="versus-eagle-3" class="level3">
+<section class="level3" id="versus-eagle-3">
 <h3 class="anchored" data-anchor-id="versus-eagle-3">Versus EAGLE-3</h3>
-<p>EAGLE-3 is a modern speculative decoding technique supported by vLLM that uses lightweight draft models trained specifically for speculative decoding. The EAGLE-3 paper by <span class="citation" data-cites="li2025eagle">Li et al. (<a href="#ref-li2025eagle" role="doc-biblioref">2025</a>)</span> reports speedup ratios on SGLang<a href="#fn11" class="footnote-ref" id="fnref11" role="doc-noteref"><sup>11</sup></a> between 1.38× and 1.82× at batch sizes ranging from 2 to 64 (table 3), and slightly lower speedups on vLLM (table 5).</p>
-<p>My own benchmark results in <a href="#fig-eagle3-ratios" class="quarto-xref">Figure&nbsp;3</a> show <strong>greater speedups on vLLM</strong>: peaking at 2.94× for the LLaMa 70B family and 2.10× for the Qwen3 family. This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline against which to compare my draft_model implementation.</p>
+<p>EAGLE-3 is a modern speculative decoding technique supported by vLLM that uses lightweight draft models trained specifically for speculative decoding. The EAGLE-3 paper by <span class="citation" data-cites="li2025eagle">Li et al. (<a href="#ref-li2025eagle" role="doc-biblioref">2025</a>)</span> reports speedup ratios on SGLang<a class="footnote-ref" href="#fn11" id="fnref11" role="doc-noteref"><sup>11</sup></a> between 1.38× and 1.82× at batch sizes ranging from 2 to 64 (table 3), and slightly lower speedups on vLLM (table 5).</p>
+<p>My own benchmark results in <a class="quarto-xref" href="#fig-eagle3-ratios">Figure&nbsp;3</a> show <strong>greater speedups on vLLM</strong>: peaking at 2.94× for the LLaMa 70B family and 2.10× for the Qwen3 family. This confirms that EAGLE-3 works very well on vLLM and provides a strong baseline against which to compare my draft_model implementation.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" role="tab" aria-controls="tabset-3-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-3-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-3-1" data-bs-toggle="tab" id="tabset-3-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-3-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-3-2" data-bs-toggle="tab" id="tabset-3-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-3-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-3-3" data-bs-toggle="tab" id="tabset-3-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
-<div id="fig-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Speedup ratios of EAGLE-3" data-text-align="left">
+<div aria-labelledby="tabset-3-1-tab" class="tab-pane active" id="tabset-3-1" role="tabpanel">
+<div alt="Speedup ratios of EAGLE-3" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-eagle3-ratios">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3">
+<img alt="Speedup ratios of EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/llama70b/InstructCoder/eagle3_ratios.png" style="width:60.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: Speedup ratios of EAGLE-3
@@ -549,33 +549,33 @@ Figure&nbsp;3: Speedup ratios of EAGLE-3
 </figure>
 </div>
 </div>
-<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
+<div aria-labelledby="tabset-3-2-tab" class="tab-pane" id="tabset-3-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3"></p>
+<p><img alt="Speedup ratios of EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/mt-bench/eagle3_ratios.png" style="width:60.0%"></p>
 <figcaption>Speedup ratios of EAGLE-3</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-3-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-3-tab">
+<div aria-labelledby="tabset-3-3-tab" class="tab-pane" id="tabset-3-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Speedup ratios of EAGLE-3"></p>
+<p><img alt="Speedup ratios of EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/InstructCoder/eagle3_ratios.png" style="width:60.0%"></p>
 <figcaption>Speedup ratios of EAGLE-3</figcaption>
 </figure>
 </div>
 </div>
 </div>
 </div>
-<p><a href="#fig-draft-model-vs-eagle3-ratios" class="quarto-xref">Figure&nbsp;4</a> compares the speedup ratios of both speculative decoding methods. I used <span class="math inline">\(K=4\)</span> in the Qwen3 family and <span class="math inline">\(K=7\)</span> in the LLaMa 70B family. The speedups of draft_model are surprisingly good, often exceeding those of EAGLE-3 by a significant margin. This is particularly visible on InstructCoder (LLaMa 70B setting) and MT-Bench (Qwen3 setting). Both methods have very similar speedups on InstructCoder (Qwen3 setting).</p>
+<p><a class="quarto-xref" href="#fig-draft-model-vs-eagle3-ratios">Figure&nbsp;4</a> compares the speedup ratios of both speculative decoding methods. I used <span class="math inline">\(K=4\)</span> in the Qwen3 family and <span class="math inline">\(K=7\)</span> in the LLaMa 70B family. The speedups of draft_model are surprisingly good, often exceeding those of EAGLE-3 by a significant margin. This is particularly visible on InstructCoder (LLaMa 70B setting) and MT-Bench (Qwen3 setting). Both methods have very similar speedups on InstructCoder (Qwen3 setting).</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-3" role="tab" aria-controls="tabset-4-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-4-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-4-1" data-bs-toggle="tab" id="tabset-4-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-4-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-4-2" data-bs-toggle="tab" id="tabset-4-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-4-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-4-3" data-bs-toggle="tab" id="tabset-4-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
-<div id="fig-draft-model-vs-eagle3-ratios" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Comparison of Speedups of Draft Model and EAGLE-3" data-text-align="left">
+<div aria-labelledby="tabset-4-1-tab" class="tab-pane active" id="tabset-4-1" role="tabpanel">
+<div alt="Comparison of Speedups of Draft Model and EAGLE-3" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-draft-model-vs-eagle3-ratios">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-draft-model-vs-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3">
+<img alt="Comparison of Speedups of Draft Model and EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/llama70b/InstructCoder/draft_model_vs_eagle3_ratios.png" style="width:60.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-draft-model-vs-eagle3-ratios-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;4: Comparison of Speedups of Draft Model and EAGLE-3
@@ -583,33 +583,33 @@ Figure&nbsp;4: Comparison of Speedups of Draft Model and EAGLE-3
 </figure>
 </div>
 </div>
-<div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
+<div aria-labelledby="tabset-4-2-tab" class="tab-pane" id="tabset-4-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3"></p>
+<p><img alt="Comparison of Speedups of Draft Model and EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/mt-bench/draft_model_vs_eagle3_ratios.png" style="width:60.0%"></p>
 <figcaption>Comparison of Speedups of Draft Model and EAGLE-3</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-4-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-3-tab">
+<div aria-labelledby="tabset-4-3-tab" class="tab-pane" id="tabset-4-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/draft_model_vs_eagle3_ratios.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Comparison of Speedups of Draft Model and EAGLE-3"></p>
+<p><img alt="Comparison of Speedups of Draft Model and EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/InstructCoder/draft_model_vs_eagle3_ratios.png" style="width:60.0%"></p>
 <figcaption>Comparison of Speedups of Draft Model and EAGLE-3</figcaption>
 </figure>
 </div>
 </div>
 </div>
 </div>
-<p>Both EAGLE-3 and draft_model have very different <strong>Acceptance Lengths</strong> (AL), shown in <a href="#fig-acceptance-lengths-vs-num-spec-toks" class="quarto-xref">Figure&nbsp;5</a>. The AL curve for EAGLE-3 is flatter, meaning that predicting more tokens leads to diminishing returns. In contrast, the AL curve for draft models continues to climb with more speculative tokens. The shaded area represents (min, max) ALs over different batch sizes<a href="#fn12" class="footnote-ref" id="fnref12" role="doc-noteref"><sup>12</sup></a>. Despite the EAGLE-3 draft models being lighter, the lower AL is a limiting factor that prevents it from reaching the same speedups as draft_model.</p>
+<p>Both EAGLE-3 and draft_model have very different <strong>Acceptance Lengths</strong> (AL), shown in <a class="quarto-xref" href="#fig-acceptance-lengths-vs-num-spec-toks">Figure&nbsp;5</a>. The AL curve for EAGLE-3 is flatter, meaning that predicting more tokens leads to diminishing returns. In contrast, the AL curve for draft models continues to climb with more speculative tokens. The shaded area represents (min, max) ALs over different batch sizes<a class="footnote-ref" href="#fn12" id="fnref12" role="doc-noteref"><sup>12</sup></a>. Despite the EAGLE-3 draft models being lighter, the lower AL is a limiting factor that prevents it from reaching the same speedups as draft_model.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" role="tab" aria-controls="tabset-5-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" role="tab" aria-controls="tabset-5-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-5-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-5-1" data-bs-toggle="tab" id="tabset-5-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-5-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-5-2" data-bs-toggle="tab" id="tabset-5-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-5-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-5-3" data-bs-toggle="tab" id="tabset-5-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
-<div id="fig-acceptance-lengths-vs-num-spec-toks" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Acceptance Lengths for draft_model and EAGLE-3" data-text-align="left">
+<div aria-labelledby="tabset-5-1-tab" class="tab-pane active" id="tabset-5-1" role="tabpanel">
+<div alt="Acceptance Lengths for draft_model and EAGLE-3" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-acceptance-lengths-vs-num-spec-toks">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-acceptance-lengths-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3">
+<img alt="Acceptance Lengths for draft_model and EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/llama70b/InstructCoder/acceptance_length_vs_num_spec_toks.png" style="width:90.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-acceptance-lengths-vs-num-spec-toks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;5: Acceptance Lengths for draft_model and EAGLE-3.
@@ -617,35 +617,35 @@ Figure&nbsp;5: Acceptance Lengths for draft_model and EAGLE-3.
 </figure>
 </div>
 </div>
-<div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
+<div aria-labelledby="tabset-5-2-tab" class="tab-pane" id="tabset-5-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3"></p>
+<p><img alt="Acceptance Lengths for draft_model and EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/mt-bench/acceptance_length_vs_num_spec_toks.png" style="width:90.0%"></p>
 <figcaption>Acceptance Lengths for draft_model and EAGLE-3.</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-5-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-3-tab">
+<div aria-labelledby="tabset-5-3-tab" class="tab-pane" id="tabset-5-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/acceptance_length_vs_num_spec_toks.png" class="img-fluid figure-img" style="width:90.0%" data-text-align="left" alt="Acceptance Lengths for draft_model and EAGLE-3"></p>
+<p><img alt="Acceptance Lengths for draft_model and EAGLE-3" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/InstructCoder/acceptance_length_vs_num_spec_toks.png" style="width:90.0%"></p>
 <figcaption>Acceptance Lengths for draft_model and EAGLE-3.</figcaption>
 </figure>
 </div>
 </div>
 </div>
 </div>
-<section id="token-throughput" class="level4">
+<section class="level4" id="token-throughput">
 <h4 class="anchored" data-anchor-id="token-throughput">Token Throughput</h4>
-<p><a href="#fig-total-token-throughput-full" class="quarto-xref">Figure&nbsp;6</a> shows the Output Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None). Using a speculative decoding method outperforms vanilla decoding up to batch size 64. Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.</p>
+<p><a class="quarto-xref" href="#fig-total-token-throughput-full">Figure&nbsp;6</a> shows the Output Token Throughput (toks/s) metric for both speculative decoding methods and vanilla decoding (SD=None). Using a speculative decoding method outperforms vanilla decoding up to batch size 64. Beyond this point, the throughput of speculative decoding methods plateaus, while vanilla decoding continues to scale with larger batch sizes.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" role="tab" aria-controls="tabset-6-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" role="tab" aria-controls="tabset-6-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-6-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-3" role="tab" aria-controls="tabset-6-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-6-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-6-1" data-bs-toggle="tab" id="tabset-6-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-6-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-6-2" data-bs-toggle="tab" id="tabset-6-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-6-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-6-3" data-bs-toggle="tab" id="tabset-6-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-6-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-6-1-tab">
-<div id="fig-total-token-throughput-full" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Token Throughputs of all Methods" data-text-align="left">
+<div aria-labelledby="tabset-6-1-tab" class="tab-pane active" id="tabset-6-1" role="tabpanel">
+<div alt="Token Throughputs of all Methods" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-total-token-throughput-full">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-total-token-throughput-full-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods">
+<img alt="Token Throughputs of all Methods" class="img-fluid figure-img" data-text-align="left" src="imgs/llama70b/InstructCoder/total_token_throughput_full.png" style="width:60.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-total-token-throughput-full-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;6: Token Throughputs of all Methods
@@ -653,18 +653,18 @@ Figure&nbsp;6: Token Throughputs of all Methods
 </figure>
 </div>
 </div>
-<div id="tabset-6-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-2-tab">
+<div aria-labelledby="tabset-6-2-tab" class="tab-pane" id="tabset-6-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods"></p>
+<p><img alt="Token Throughputs of all Methods" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/mt-bench/total_token_throughput_full.png" style="width:60.0%"></p>
 <figcaption>Token Throughputs of all Methods</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-6-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-3-tab">
+<div aria-labelledby="tabset-6-3-tab" class="tab-pane" id="tabset-6-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/total_token_throughput_full.png" class="img-fluid figure-img" style="width:60.0%" data-text-align="left" alt="Token Throughputs of all Methods"></p>
+<p><img alt="Token Throughputs of all Methods" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/InstructCoder/total_token_throughput_full.png" style="width:60.0%"></p>
 <figcaption>Token Throughputs of all Methods</figcaption>
 </figure>
 </div>
@@ -673,7 +673,7 @@ Figure&nbsp;6: Token Throughputs of all Methods
 </div>
 </section>
 </section>
-<section id="inference-metrics" class="level3">
+<section class="level3" id="inference-metrics">
 <h3 class="anchored" data-anchor-id="inference-metrics">Inference Metrics</h3>
 <p>The <code>vllm bench serve</code> command reports several request-level inference metrics (lower is better for all):</p>
 <ul>
@@ -681,15 +681,15 @@ Figure&nbsp;6: Token Throughputs of all Methods
 <li><strong>TPOT</strong>: Time per output token (excluding the first token)</li>
 <li><strong>ITL</strong>: Inter-token latency</li>
 </ul>
-<p>The benchmark reports means, medians, and 99th percentiles for these metrics. <a href="#fig-ttft-itl-tpot" class="quarto-xref">Figure&nbsp;7</a> shows the 99th percentile values for both speculative decoding methods and vanilla decoding.</p>
+<p>The benchmark reports means, medians, and 99th percentiles for these metrics. <a class="quarto-xref" href="#fig-ttft-itl-tpot">Figure&nbsp;7</a> shows the 99th percentile values for both speculative decoding methods and vanilla decoding.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="dataset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" role="tab" aria-controls="tabset-7-2" aria-selected="false">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-3" role="tab" aria-controls="tabset-7-3" aria-selected="false">InstructCoder (Qwen3)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a aria-controls="tabset-7-1" aria-selected="true" class="nav-link active" data-bs-target="#tabset-7-1" data-bs-toggle="tab" id="tabset-7-1-tab" role="tab">InstructCoder (LLaMa 70B)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-7-2" aria-selected="false" class="nav-link" data-bs-target="#tabset-7-2" data-bs-toggle="tab" id="tabset-7-2-tab" role="tab">MT-Bench (Qwen3)</a></li><li class="nav-item" role="presentation"><a aria-controls="tabset-7-3" aria-selected="false" class="nav-link" data-bs-target="#tabset-7-3" data-bs-toggle="tab" id="tabset-7-3-tab" role="tab">InstructCoder (Qwen3)</a></li></ul>
 <div class="tab-content" data-group="dataset">
-<div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
-<div id="fig-ttft-itl-tpot" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Inference Metrics" data-text-align="left">
+<div aria-labelledby="tabset-7-1-tab" class="tab-pane active" id="tabset-7-1" role="tabpanel">
+<div alt="Inference Metrics" class="quarto-float quarto-figure quarto-figure-center anchored" data-text-align="left" id="fig-ttft-itl-tpot">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-ttft-itl-tpot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="imgs/llama70b/InstructCoder/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics">
+<img alt="Inference Metrics" class="img-fluid figure-img" data-text-align="left" src="imgs/llama70b/InstructCoder/ttft_itl_tpot.png" style="width:100.0%">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-ttft-itl-tpot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;7: Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.
@@ -697,18 +697,18 @@ Figure&nbsp;7: Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower 
 </figure>
 </div>
 </div>
-<div id="tabset-7-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-2-tab">
+<div aria-labelledby="tabset-7-2-tab" class="tab-pane" id="tabset-7-2" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/mt-bench/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics"></p>
+<p><img alt="Inference Metrics" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/mt-bench/ttft_itl_tpot.png" style="width:100.0%"></p>
 <figcaption>Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.</figcaption>
 </figure>
 </div>
 </div>
-<div id="tabset-7-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-3-tab">
+<div aria-labelledby="tabset-7-3-tab" class="tab-pane" id="tabset-7-3" role="tabpanel">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="imgs/qwen/InstructCoder/ttft_itl_tpot.png" class="img-fluid figure-img" style="width:100.0%" data-text-align="left" alt="Inference Metrics"></p>
+<p><img alt="Inference Metrics" class="img-fluid figure-img" data-text-align="left" src="imgs/qwen/InstructCoder/ttft_itl_tpot.png" style="width:100.0%"></p>
 <figcaption>Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower is better.</figcaption>
 </figure>
 </div>
@@ -723,113 +723,113 @@ Figure&nbsp;7: Inference Metrics. 99th percentile of TPOT, ITL, and TTFT. Lower 
 </ul>
 </section>
 </section>
-<section id="discussion" class="level2">
+<section class="level2" id="discussion">
 <h2 class="anchored" data-anchor-id="discussion">Discussion</h2>
-<section id="limitations" class="level3">
+<section class="level3" id="limitations">
 <h3 class="anchored" data-anchor-id="limitations">Limitations</h3>
 <p>The draft model must share the same tokenizer as the target model, i.e., both models must “speak the same language.” This is typically the case when models belong to the same family.</p>
 <p>At the moment, draft_model is limited to models with only a single KV-cache group. There is an open issue about this on Github <a href="https://github.com/vllm-project/vllm/issues/33133">(#33133)</a></p>
 <p>My benchmarks use the default <code>--output-len=200</code> parameter, which means that the speedups presented are valid for short-context inference. Long context inference is more complex: performance is bottlenecked KV-cache loading, and batch sizes must become a lot smaller to fit in VRAM. I might publish an analysis of long-context performance in the future.</p>
 </section>
-<section id="when-to-use-draft-models-vs.-eagle-3" class="level3">
+<section class="level3" id="when-to-use-draft-models-vs.-eagle-3">
 <h3 class="anchored" data-anchor-id="when-to-use-draft-models-vs.-eagle-3">When to Use Draft Models vs.&nbsp;EAGLE-3</h3>
-<p>My benchmarks show that draft_model outperforms EAGLE-3 in 2 of 3 tested settings, primarily due to higher acceptance lengths (<a href="#fig-acceptance-lengths-vs-num-spec-toks" class="quarto-xref">Figure&nbsp;5</a>). <strong>Prefer draft_model</strong> when a smaller model from the same family is available, no training required. Distilled models (trained to mimic the larger model’s logits) work especially well. <strong>Consider EAGLE-3</strong> when a pre-trained EAGLE-3 drafter exists on Hugging Face and you want the lowest possible overhead. When in doubt, benchmark both methods on your workload. You can also train your own using the vLLM speculators library<a href="#fn13" class="footnote-ref" id="fnref13" role="doc-noteref"><sup>13</sup></a>.</p>
+<p>My benchmarks show that draft_model outperforms EAGLE-3 in 2 of 3 tested settings, primarily due to higher acceptance lengths (<a class="quarto-xref" href="#fig-acceptance-lengths-vs-num-spec-toks">Figure&nbsp;5</a>). <strong>Prefer draft_model</strong> when a smaller model from the same family is available, no training required. Distilled models (trained to mimic the larger model’s logits) work especially well. <strong>Consider EAGLE-3</strong> when a pre-trained EAGLE-3 drafter exists on Hugging Face and you want the lowest possible overhead. When in doubt, benchmark both methods on your workload. You can also train your own using the vLLM speculators library<a class="footnote-ref" href="#fn13" id="fnref13" role="doc-noteref"><sup>13</sup></a>.</p>
 </section>
 </section>
-<section id="key-learnings" class="level2">
+<section class="level2" id="key-learnings">
 <h2 class="anchored" data-anchor-id="key-learnings">Key Learnings</h2>
-<section id="side-effects" class="level3">
+<section class="level3" id="side-effects">
 <h3 class="anchored" data-anchor-id="side-effects">Side-Effects</h3>
-<p>The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are. The most important example to understand is the <code>forward_context</code> object, which is a global variable that contains information about every layer in the model and references its KV cache. The forward context is manipulated at runtime with the <code>set_forward_context()</code> function, <a href="https://github.com/vllm-project/vllm/blob/5da4c7d789fe0c4ca2c49913441f99df24715a97/vllm/v1/worker/gpu_model_runner.py#L3287">here</a> in the main loop of the <code>gpu_model_runner.py</code> file. It looks similar to <a href="#lst-set-forward-context" class="quarto-xref">Listing&nbsp;1</a>, and it’s important to understand that it partially determines the inputs to the model.</p>
-<div id="lst-set-forward-context" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<p>The vLLM project uses a lot of side effects, which can make it difficult to understand what the inputs to the model really are. The most important example to understand is the <code>forward_context</code> object, which is a global variable that contains information about every layer in the model and references its KV cache. The forward context is manipulated at runtime with the <code>set_forward_context()</code> function, <a href="https://github.com/vllm-project/vllm/blob/5da4c7d789fe0c4ca2c49913441f99df24715a97/vllm/v1/worker/gpu_model_runner.py#L3287">here</a> in the main loop of the <code>gpu_model_runner.py</code> file. It looks similar to <a class="quarto-xref" href="#lst-set-forward-context">Listing&nbsp;1</a>, and it’s important to understand that it partially determines the inputs to the model.</p>
+<div class="python listing quarto-float quarto-figure quarto-figure-left anchored" id="lst-set-forward-context">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-set-forward-context-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Listing&nbsp;1: Set Forward Context
 </figcaption>
 <div aria-describedby="lst-set-forward-context-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-set-forward-context"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-set-forward-context-1"><a href="#lst-set-forward-context-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> set_forward_context(</span>
-<span id="lst-set-forward-context-2"><a href="#lst-set-forward-context-2" aria-hidden="true" tabindex="-1"></a>  ... <span class="co"># A bunch of params that determine the inputs to the model</span></span>
-<span id="lst-set-forward-context-3"><a href="#lst-set-forward-context-3" aria-hidden="true" tabindex="-1"></a>):</span>
-<span id="lst-set-forward-context-4"><a href="#lst-set-forward-context-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>._model_forward(</span>
-<span id="lst-set-forward-context-5"><a href="#lst-set-forward-context-5" aria-hidden="true" tabindex="-1"></a>      ...  <span class="co"># What you THINK are the only inputs to the model</span></span>
-<span id="lst-set-forward-context-6"><a href="#lst-set-forward-context-6" aria-hidden="true" tabindex="-1"></a>    )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="lst-set-forward-context"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-set-forward-context-1"><a aria-hidden="true" href="#lst-set-forward-context-1" tabindex="-1"></a><span class="cf">with</span> set_forward_context(</span>
+<span id="lst-set-forward-context-2"><a aria-hidden="true" href="#lst-set-forward-context-2" tabindex="-1"></a>  ... <span class="co"># A bunch of params that determine the inputs to the model</span></span>
+<span id="lst-set-forward-context-3"><a aria-hidden="true" href="#lst-set-forward-context-3" tabindex="-1"></a>):</span>
+<span id="lst-set-forward-context-4"><a aria-hidden="true" href="#lst-set-forward-context-4" tabindex="-1"></a>    <span class="va">self</span>._model_forward(</span>
+<span id="lst-set-forward-context-5"><a aria-hidden="true" href="#lst-set-forward-context-5" tabindex="-1"></a>      ...  <span class="co"># What you THINK are the only inputs to the model</span></span>
+<span id="lst-set-forward-context-6"><a aria-hidden="true" href="#lst-set-forward-context-6" tabindex="-1"></a>    )</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 </div>
 </figure>
 </div>
 <p>The forward context contains, for example, the <code>AttentionMetadata.slot_mapping</code> object containing <strong>pointers to the KV cache</strong>. If these pointers are incorrect, the KV cache will be corrupted at runtime, and your outputs will be garbage. Saving to the KV cache happens concretely in the function <code>reshape_and_cache_flash()</code> (FlashAttention code path: <a href="https://github.com/vllm-project/vllm/blob/13d8746c545576bcb6e0771ee4dc0b6fae694fa1/vllm/v1/attention/backends/flash_attn.py#L670">permalink</a>). The function directly takes this <code>slot_mapping</code> tensor as an input.</p>
 </section>
-<section id="performance-optimizations" class="level3">
+<section class="level3" id="performance-optimizations">
 <h3 class="anchored" data-anchor-id="performance-optimizations">Performance Optimizations</h3>
 <p>The three biggest performance themes I ran into were: <strong>CUDA graphs</strong>, avoiding <strong>CPU–GPU synchronizations</strong>, and <strong>Triton kernels and Fusion</strong>.</p>
-<section id="cuda-graphs" class="level4">
+<section class="level4" id="cuda-graphs">
 <h4 class="anchored" data-anchor-id="cuda-graphs">CUDA Graphs</h4>
-<p>CUDA graphs are a complex topic by themselves, but in short: they make the code within the graph run impressively fast. There is an introduction to CUDA graphs in the vLLM docs<a href="#fn14" class="footnote-ref" id="fnref14" role="doc-noteref"><sup>14</sup></a>. What’s important to understand is that CUDA graphs require the input and output tensors (<strong>buffers</strong>) to be allocated before running the code (i.e.&nbsp;no dynamic-shape allocation of PyTorch tensors during the graph’s execution). All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects. I found that if you run CUDA graphs, but don’t reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again. The forward context I mentioned earlier includes the <code>batch_descriptor</code> and <code>cudagraph_runtime_mode</code> objects, which together determine which <em>CUDA graph mode</em> the model will dispatch to. This is why you find comments like <a href="#lst-use-persistent-buffers" class="quarto-xref">Listing&nbsp;2</a> everywhere in the codebase.</p>
-<div id="lst-use-persistent-buffers" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<p>CUDA graphs are a complex topic by themselves, but in short: they make the code within the graph run impressively fast. There is an introduction to CUDA graphs in the vLLM docs<a class="footnote-ref" href="#fn14" id="fnref14" role="doc-noteref"><sup>14</sup></a>. What’s important to understand is that CUDA graphs require the input and output tensors (<strong>buffers</strong>) to be allocated before running the code (i.e.&nbsp;no dynamic-shape allocation of PyTorch tensors during the graph’s execution). All operations on buffers must be done in-place, rather than creating new tensors, so the code becomes heavy in side-effects. I found that if you run CUDA graphs, but don’t reuse the buffers, you will not get hard exceptions, but rather your outputs will be garbage, again. The forward context I mentioned earlier includes the <code>batch_descriptor</code> and <code>cudagraph_runtime_mode</code> objects, which together determine which <em>CUDA graph mode</em> the model will dispatch to. This is why you find comments like <a class="quarto-xref" href="#lst-use-persistent-buffers">Listing&nbsp;2</a> everywhere in the codebase.</p>
+<div class="python listing quarto-float quarto-figure quarto-figure-left anchored" id="lst-use-persistent-buffers">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-use-persistent-buffers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Listing&nbsp;2: Example Comment About CUDA Graphs
 </figcaption>
 <div aria-describedby="lst-use-persistent-buffers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-use-persistent-buffers"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-use-persistent-buffers-1"><a href="#lst-use-persistent-buffers-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the model.</span></span>
-<span id="lst-use-persistent-buffers-2"><a href="#lst-use-persistent-buffers-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Use persistent buffers for CUDA graphs.</span></span>
-<span id="lst-use-persistent-buffers-3"><a href="#lst-use-persistent-buffers-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> set_forward_context(...):</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="lst-use-persistent-buffers"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-use-persistent-buffers-1"><a aria-hidden="true" href="#lst-use-persistent-buffers-1" tabindex="-1"></a><span class="co"># Run the model.</span></span>
+<span id="lst-use-persistent-buffers-2"><a aria-hidden="true" href="#lst-use-persistent-buffers-2" tabindex="-1"></a><span class="co"># Use persistent buffers for CUDA graphs.</span></span>
+<span id="lst-use-persistent-buffers-3"><a aria-hidden="true" href="#lst-use-persistent-buffers-3" tabindex="-1"></a><span class="cf">with</span> set_forward_context(...):</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 </div>
 </figure>
 </div>
 </section>
-<section id="cpu-gpu-synchronizations" class="level4">
+<section class="level4" id="cpu-gpu-synchronizations">
 <h4 class="anchored" data-anchor-id="cpu-gpu-synchronizations">CPU-GPU synchronizations</h4>
 <p>To write fast and efficient PyTorch code, it’s important to avoid CPU-GPU synchronizations. Synchronizations prevent the CPU from scheduling enough work for the GPU to keep it busy, leading to low GPU utilization. I wrote a full-length <a href="https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization/">separate post</a> about them, which I recommend reading for a deeper explanation including PyTorch examples.</p>
 </section>
-<section id="triton-kernels" class="level4">
+<section class="level4" id="triton-kernels">
 <h4 class="anchored" data-anchor-id="triton-kernels">Triton Kernels</h4>
 <p>Preparing the input tokens for the speculative decoding draft model required a lot of small PyTorch operations. Launching many small kernels incurs unnecessary overhead (2-3µs per kernel). To fuse all these operations into a single one, I implemented a custom <a href="https://github.com/vllm-project/vllm/blob/1209b784f2ba976eff2ea24bc33c61f35c6eb213/vllm/v1/spec_decode/draft_model.py#L234">Triton kernel</a>. The kernel is quite simple, but it replaced around 8 calls to PyTorch functions, avoiding their launch overhead. If you are interested in learning about Triton kernels, I recommend looking at the <a href="https://triton-lang.org/main/getting-started/tutorials/index.html">tutorial examples</a>. The language is easy to learn and it gets you 85% of the way to speed-of-light performance.</p>
 </section>
 </section>
 </section>
-<section id="contributing-to-vllm" class="level2">
+<section class="level2" id="contributing-to-vllm">
 <h2 class="anchored" data-anchor-id="contributing-to-vllm">Contributing to vLLM</h2>
 <p>In this section, I share some tips about how to approach the vLLM codebase as a new contributor.</p>
-<section id="sec-start-high-level" class="level3">
+<section class="level3" id="sec-start-high-level">
 <h3 class="anchored" data-anchor-id="sec-start-high-level">Start High-Level</h3>
 <p>Introduce one or more unit tests for your desired API (e.g., <code>method=draft_model</code> for speculative decoding). Think about how, as a user, you would observe the outputs to identify if the API is correct (e.g., <code>acceptance_rate=100%</code> in greedy decoding). Then go ahead and run the tests. You will find yourself waiting for vLLM to spin up and compile the model, so you want to deactivate all features that make you wait for your code to execute (e.g., pass <code>--enforce-eager</code>). The reason is that slow <strong>feedback loops</strong> sap your focus and kill your flow. You will obviously hit errors that prevent your feature from working, but that is the goal. You are working from the inside out, catching and solving problems locally one at a time without having to understand the whole codebase at once. Set a debugger and try to understand only one error at a time, interactively and with the local context. vLLM is a very complex system, and trying to understand the whole codebase at once would be overwhelming and lead to frustration. Reading about the big picture of the codebase can be useful after getting some exposure to the codebase, e.g., <a href="https://www.aleksagordic.com/blog/vllm">in this post</a> by Aleksa Gordić.</p>
 </section>
-<section id="use-the-debugger" class="level3">
+<section class="level3" id="use-the-debugger">
 <h3 class="anchored" data-anchor-id="use-the-debugger">Use the Debugger</h3>
 <p>Most features require you to manipulate tensors and change their shape or content. This type of PyTorch code is often not simple to read or write, because it’s often more imperative than declarative. Good contributors comment their code to communicate the intent without repeating the code itself, and without making the code so verbose that it’s buried in noisy comments. For code regions heavy in PyTorch code, I suggest factoring out a pure Python function that you can test independently. Then you can create a unit test for it and easily set breakpoints in the function without having to restart the entire vLLM server (which is very slow).</p>
 </section>
-<section id="test-extensively" class="level3">
+<section class="level3" id="test-extensively">
 <h3 class="anchored" data-anchor-id="test-extensively">Test Extensively</h3>
-<p>I mentioned that you speed up your feedback cycles by passing, e.g., <code>--enforce-eager</code>, but that leaves the most important paths of the codebase untested. In production, you never run in eager mode, so you want to test these paths as well. I recommend the <code>pytest.mark.parametrize</code> decorator to test your code with different inputs, e.g., as shown in <a href="#lst-pytest-mark-parametrize" class="quarto-xref">Listing&nbsp;3</a> to test both eager and compiled mode. If you look at my <a href="https://github.com/vllm-project/vllm/pull/24322/changes#diff-51dd765a6984b59836ab7ec3c6c12c904afe4c325d72659fb82611b40521d008R658-R659">draft_model PR</a>, you will find that I used parametrizations almost obsessively to test many combinations. For example: Is the <em>target</em> model in FP8 or FP16? Is the <em>draft</em> model in FP8/FP16? Are we using greedy sampling or temperature &gt;= 0.0? Is the target model using tensor parallelism of 1 or more? What happens if we pass invalid combinations of these parameters? Obviously, these are specific cases for speculative decoding, and the code paths that are relevant to your feature will become apparent as you understand the code from the outside in.</p>
-<div id="lst-pytest-mark-parametrize" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<p>I mentioned that you speed up your feedback cycles by passing, e.g., <code>--enforce-eager</code>, but that leaves the most important paths of the codebase untested. In production, you never run in eager mode, so you want to test these paths as well. I recommend the <code>pytest.mark.parametrize</code> decorator to test your code with different inputs, e.g., as shown in <a class="quarto-xref" href="#lst-pytest-mark-parametrize">Listing&nbsp;3</a> to test both eager and compiled mode. If you look at my <a href="https://github.com/vllm-project/vllm/pull/24322/changes#diff-51dd765a6984b59836ab7ec3c6c12c904afe4c325d72659fb82611b40521d008R658-R659">draft_model PR</a>, you will find that I used parametrizations almost obsessively to test many combinations. For example: Is the <em>target</em> model in FP8 or FP16? Is the <em>draft</em> model in FP8/FP16? Are we using greedy sampling or temperature &gt;= 0.0? Is the target model using tensor parallelism of 1 or more? What happens if we pass invalid combinations of these parameters? Obviously, these are specific cases for speculative decoding, and the code paths that are relevant to your feature will become apparent as you understand the code from the outside in.</p>
+<div class="python listing quarto-float quarto-figure quarto-figure-left anchored" id="lst-pytest-mark-parametrize">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pytest-mark-parametrize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Listing&nbsp;3: Pytest Parametrization
 </figcaption>
 <div aria-describedby="lst-pytest-mark-parametrize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-pytest-mark-parametrize"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-pytest-mark-parametrize-1"><a href="#lst-pytest-mark-parametrize-1" aria-hidden="true" tabindex="-1"></a><span class="at">@pytest.mark.parametrize</span>(<span class="st">"enforce_eager"</span>, [<span class="va">True</span>, <span class="va">False</span>])</span>
-<span id="lst-pytest-mark-parametrize-2"><a href="#lst-pytest-mark-parametrize-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_draft_model_correctness(enforce_eager):</span>
-<span id="lst-pytest-mark-parametrize-3"><a href="#lst-pytest-mark-parametrize-3" aria-hidden="true" tabindex="-1"></a>  ...</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="lst-pytest-mark-parametrize"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-pytest-mark-parametrize-1"><a aria-hidden="true" href="#lst-pytest-mark-parametrize-1" tabindex="-1"></a><span class="at">@pytest.mark.parametrize</span>(<span class="st">"enforce_eager"</span>, [<span class="va">True</span>, <span class="va">False</span>])</span>
+<span id="lst-pytest-mark-parametrize-2"><a aria-hidden="true" href="#lst-pytest-mark-parametrize-2" tabindex="-1"></a><span class="kw">def</span> test_draft_model_correctness(enforce_eager):</span>
+<span id="lst-pytest-mark-parametrize-3"><a aria-hidden="true" href="#lst-pytest-mark-parametrize-3" tabindex="-1"></a>  ...</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 </div>
 </figure>
 </div>
 </section>
-<section id="code-evolution" class="level3">
+<section class="level3" id="code-evolution">
 <h3 class="anchored" data-anchor-id="code-evolution">Code Evolution</h3>
 <p>The vLLM project has far more contributors than reviewers, so many PRs sit unreviewed for extended periods. My <a href="https://github.com/vllm-project/vllm/pull/24322">PR</a> was open from 2025-09-05 and merged on 2026-01-19, which is 136 days, or about <strong>4.5 months</strong>, despite having relatively engaged reviewers. With the vLLM codebase evolving so quickly, this long review cycle meant I had to resolve merge conflicts at least 10 times.</p>
 <p>After resolving several painful conflicts, I learned that certain types of changes and patterns are more likely to cause conflicts. For example, moving a function to a new file <em>and</em> changing its body creates painful merge conflicts, because the function continues to evolve on the main branch in its old location. The same applies to extracting a superclass or child class, changing its body, and then moving it to a new file.</p>
 <p>While we shouldn’t plan for PRs to stay open this long, we should be prepared for the main branch to evolve in parallel to our PR. One strategy is to modify functions and classes in-place (within the same file) and defer moving them to other files in a subsequent PR. This might sound counterintuitive to experienced engineers, but it proved effective to minimize merge conflicts.</p>
 </section>
 </section>
-<section id="summary" class="level2">
+<section class="level2" id="summary">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
 <p>In this post, I benchmarked the implementation of speculative decoding with draft models I contributed to vLLM V1 (<a href="https://github.com/vllm-project/vllm/pull/24322">PR #24322</a>) and compared it against vanilla decoding and EAGLE-3. It delivers substantial speedups over vanilla decoding (up to 3.55×) without specialized training. Speedups are most pronounced at smaller batch sizes and fade at larger batch sizes. The performance numbers are meant as a reference as of today (2026-01-28, commit <code>e1a34c3</code>), and can vary with model, workload, and deployment. Finally, I hope the key learnings and contributor tips I shared here help other new vLLM contributors get productive faster.</p>
 </section>
-<section id="acknowledgments" class="level2">
+<section class="level2" id="acknowledgments">
 <h2 class="anchored" data-anchor-id="acknowledgments">Acknowledgments</h2>
 <p>I thank the reviewers and collaborators of the vLLM project who engaged with my PR and provided valuable feedback: <a href="https://www.linkedin.com/in/benjamin-chislett-05502818a/">Benjamin Chislett</a> from NVIDIA, <a href="https://www.linkedin.com/in/ekagra-ranjan/">Ekagra Ranjan</a> from Cohere, <a href="https://www.linkedin.com/in/lily-xiaoxuan-liu-170bb4b1/">Lily Liu</a> from OpenAI, <a href="https://www.linkedin.com/in/yewentao/">Wentao Ye</a> from Red Hat, <a href="https://www.linkedin.com/in/harrymellor/">Harry Mellor</a> from Hugging Face.</p>
 </section>
-<section id="references" class="level2">
+<section class="level2" id="references">
 
 
 
@@ -837,30 +837,30 @@ Listing&nbsp;3: Pytest Parametrization
 </section>
 
 
-<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
-<div id="ref-li2025eagle" class="csl-entry" role="listitem">
+<div class="default" id="quarto-appendix"><section class="quarto-appendix-contents" id="quarto-bibliography" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div class="references csl-bib-body hanging-indent" data-entry-spacing="0" id="refs" role="list">
+<div class="csl-entry" id="ref-li2025eagle" role="listitem">
 Li, Yuhui, Fangyun Wei, Chao Zhang, and Hongyang Zhang. 2025. <span>“<span>EAGLE</span>-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test.”</span> In <em>The Thirty-Ninth Annual Conference on Neural Information Processing Systems</em>. <a href="https://openreview.net/forum?id=4exx1hUffq">https://openreview.net/forum?id=4exx1hUffq</a>.
 </div>
-<div id="ref-tang2025efficientspeculativedecodingllama" class="csl-entry" role="listitem">
+<div class="csl-entry" id="ref-tang2025efficientspeculativedecodingllama" role="listitem">
 Tang, Bangsheng, Carl Chengyan Fu, Fei Kou, Grigory Sizov, Haoci Zhang, Jason Park, Jiawen Liu, et al. 2025. <span>“Efficient Speculative Decoding for Llama at Scale: Challenges and Solutions.”</span> <a href="https://arxiv.org/abs/2508.08192">https://arxiv.org/abs/2508.08192</a>.
 </div>
-</div></section><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+</div></section><section class="footnotes footnotes-end-of-document" id="footnotes" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
 
 <ol>
-<li id="fn1"><p><a href="https://huggingface.co/Qwen/Qwen3-32B" class="uri">https://huggingface.co/Qwen/Qwen3-32B</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn2"><p><a href="https://huggingface.co/Qwen/Qwen3-1.7B" class="uri">https://huggingface.co/Qwen/Qwen3-1.7B</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn3"><p><a href="https://huggingface.co/Qwen/Qwen3-4B" class="uri">https://huggingface.co/Qwen/Qwen3-4B</a><a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn4"><p><a href="https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3" class="uri">https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3</a><a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn5"><p><a href="https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct" class="uri">https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct</a><a href="#fnref5" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn6"><p><a href="https://huggingface.co/meta-llama/Llama-3.2-1B" class="uri">https://huggingface.co/meta-llama/Llama-3.2-1B</a><a href="#fnref6" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn7"><p><a href="https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B" class="uri">https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B</a><a href="#fnref7" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn8"><p><a href="https://huggingface.co/datasets/philschmid/mt-bench" class="uri">https://huggingface.co/datasets/philschmid/mt-bench</a><a href="#fnref8" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn9"><p><a href="https://huggingface.co/datasets/likaixin/InstructCoder" class="uri">https://huggingface.co/datasets/likaixin/InstructCoder</a><a href="#fnref9" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn10"><p>On InstructCoder with LLaMa 70B the KV cache fills up completely at batch size 64, meaning some requests are put to wait. Increasing the batch size beyond doesn’t increase the parallelism, so I only benchmark up to 64 in this case.<a href="#fnref10" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn11"><p><a href="https://github.com/sgl-project/sglang" class="uri">https://github.com/sgl-project/sglang</a><a href="#fnref11" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn12"><p>I had not expected AL variation with batch size. Perhaps batch invariance would solve this.<a href="#fnref12" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn13"><p><a href="https://github.com/vllm-project/speculators" class="uri">https://github.com/vllm-project/speculators</a><a href="#fnref13" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn14"><p><a href="https://docs.vllm.ai/en/stable/design/cuda_graphs/" class="uri">https://docs.vllm.ai/en/stable/design/cuda_graphs/</a><a href="#fnref14" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn1"><p><a class="uri" href="https://huggingface.co/Qwen/Qwen3-32B">https://huggingface.co/Qwen/Qwen3-32B</a><a class="footnote-back" href="#fnref1" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p><a class="uri" href="https://huggingface.co/Qwen/Qwen3-1.7B">https://huggingface.co/Qwen/Qwen3-1.7B</a><a class="footnote-back" href="#fnref2" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p><a class="uri" href="https://huggingface.co/Qwen/Qwen3-4B">https://huggingface.co/Qwen/Qwen3-4B</a><a class="footnote-back" href="#fnref3" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p><a class="uri" href="https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3">https://huggingface.co/RedHatAI/Qwen3-32B-speculator.eagle3</a><a class="footnote-back" href="#fnref4" role="doc-backlink">↩︎</a></p></li>
+<li id="fn5"><p><a class="uri" href="https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct">https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct</a><a class="footnote-back" href="#fnref5" role="doc-backlink">↩︎</a></p></li>
+<li id="fn6"><p><a class="uri" href="https://huggingface.co/meta-llama/Llama-3.2-1B">https://huggingface.co/meta-llama/Llama-3.2-1B</a><a class="footnote-back" href="#fnref6" role="doc-backlink">↩︎</a></p></li>
+<li id="fn7"><p><a class="uri" href="https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B">https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B</a><a class="footnote-back" href="#fnref7" role="doc-backlink">↩︎</a></p></li>
+<li id="fn8"><p><a class="uri" href="https://huggingface.co/datasets/philschmid/mt-bench">https://huggingface.co/datasets/philschmid/mt-bench</a><a class="footnote-back" href="#fnref8" role="doc-backlink">↩︎</a></p></li>
+<li id="fn9"><p><a class="uri" href="https://huggingface.co/datasets/likaixin/InstructCoder">https://huggingface.co/datasets/likaixin/InstructCoder</a><a class="footnote-back" href="#fnref9" role="doc-backlink">↩︎</a></p></li>
+<li id="fn10"><p>On InstructCoder with LLaMa 70B the KV cache fills up completely at batch size 64, meaning some requests are put to wait. Increasing the batch size beyond doesn’t increase the parallelism, so I only benchmark up to 64 in this case.<a class="footnote-back" href="#fnref10" role="doc-backlink">↩︎</a></p></li>
+<li id="fn11"><p><a class="uri" href="https://github.com/sgl-project/sglang">https://github.com/sgl-project/sglang</a><a class="footnote-back" href="#fnref11" role="doc-backlink">↩︎</a></p></li>
+<li id="fn12"><p>I had not expected AL variation with batch size. Perhaps batch invariance would solve this.<a class="footnote-back" href="#fnref12" role="doc-backlink">↩︎</a></p></li>
+<li id="fn13"><p><a class="uri" href="https://github.com/vllm-project/speculators">https://github.com/vllm-project/speculators</a><a class="footnote-back" href="#fnref13" role="doc-backlink">↩︎</a></p></li>
+<li id="fn14"><p><a class="uri" href="https://docs.vllm.ai/en/stable/design/cuda_graphs/">https://docs.vllm.ai/en/stable/design/cuda_graphs/</a><a class="footnote-back" href="#fnref14" role="doc-backlink">↩︎</a></p></li>
 </ol>
 </section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2026,
   author = {Ruiz, Tomas},
@@ -870,7 +870,7 @@ Tang, Bangsheng, Carl Chengyan Fu, Fei Kou, Grigory Sizov, Haoci Zhang, Jason Pa
   url = {https://tomasruizt.github.io/posts/06_vllm-spec-decode/},
   langid = {en}
 }
-</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2026" class="csl-entry quarto-appendix-citeas" role="listitem">
+</code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div class="csl-entry quarto-appendix-citeas" id="ref-ruiz2026" role="listitem">
 Ruiz, Tomas. 2026. <span>“Up to 3.55x Faster: Contributing Speculative
 Decoding with Draft Models to vLLM V1.”</span> January 28, 2026. <a href="https://tomasruizt.github.io/posts/06_vllm-spec-decode/">https://tomasruizt.github.io/posts/06_vllm-spec-decode/</a>.
 </div></div></section></div></main> <!-- /main -->
@@ -1294,10 +1294,10 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script>
-<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+<script async="" crossorigin="anonymous" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="lazy" data-mapping="pathname" data-reactions-enabled="1" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-theme="light" src="https://giscus.app/client.js">
 </script>
-<input type="hidden" id="giscus-base-theme" value="light">
-<input type="hidden" id="giscus-alt-theme" value="light">
+<input id="giscus-base-theme" type="hidden" value="light">
+<input id="giscus-alt-theme" type="hidden" value="light">
 </div> <!-- /content -->
 
 

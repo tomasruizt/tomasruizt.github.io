@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.57">
+<meta content="quarto-1.5.57" name="generator">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta content="width=device-width, initial-scale=1.0, user-scalable=yes" name="viewport">
 
-<meta name="author" content="Tomas Ruiz">
-<meta name="dcterms.date" content="2024-12-23">
+<meta content="Tomas Ruiz" name="author">
+<meta content="2024-12-23" name="dcterms.date">
 
 <title>How Does Tiling Speed Up Matrix Multiplications on GPUs? – All Posts</title>
 <style>
@@ -85,16 +85,16 @@ div.csl-indent {
 <script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
 <script src="../../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../../site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="../../">
+<meta content="../../" name="quarto:offset">
 <script src="../../site_libs/quarto-html/quarto.js"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" id="quarto-text-highlighting-styles" rel="stylesheet">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link data-mode="light" href="../../site_libs/bootstrap/bootstrap.min.css" id="quarto-bootstrap" rel="stylesheet">
 <script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -156,13 +156,13 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="../../styles.css">
+<link href="../../styles.css" rel="stylesheet">
 </head>
 
 <body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+  <header class="headroom fixed-top quarto-banner" id="quarto-header">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -170,8 +170,8 @@ window.Quarto = {
     <span class="navbar-title">All Posts</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div class="" id="quarto-search" title="Search"></div>
+          <button aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-bs-target="#navbarCollapse" data-bs-toggle="collapse" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }" role="menu" type="button">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -207,7 +207,7 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+<header class="quarto-title-block default page-columns page-full" id="title-block-header">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">How Does Tiling Speed Up Matrix Multiplications on GPUs?</h1>
@@ -223,7 +223,7 @@ window.Quarto = {
     <div class="quarto-title-meta-heading">Affiliation</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+      <p class="author">Tomas Ruiz <a class="quarto-title-author-email" href="mailto:t.ruiz@lmu.de"><i class="bi bi-envelope"></i></a> </p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
@@ -246,25 +246,25 @@ window.Quarto = {
     </div>
     
   
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+  </header><div class="quarto-container page-columns page-rows-contents page-layout-article page-navbar" id="quarto-content">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
+    <div class="sidebar margin-sidebar" id="quarto-margin-sidebar">
+        <nav class="toc-active" id="TOC" role="doc-toc">
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#matrix-multiplication-recap" id="toc-matrix-multiplication-recap" class="nav-link active" data-scroll-target="#matrix-multiplication-recap">Matrix Multiplication Recap</a></li>
-  <li><a href="#compute-intensity" id="toc-compute-intensity" class="nav-link" data-scroll-target="#compute-intensity">Compute Intensity</a></li>
-  <li><a href="#memory-access-analysis" id="toc-memory-access-analysis" class="nav-link" data-scroll-target="#memory-access-analysis">Memory Access Analysis</a>
+  <li><a class="nav-link active" data-scroll-target="#matrix-multiplication-recap" href="#matrix-multiplication-recap" id="toc-matrix-multiplication-recap">Matrix Multiplication Recap</a></li>
+  <li><a class="nav-link" data-scroll-target="#compute-intensity" href="#compute-intensity" id="toc-compute-intensity">Compute Intensity</a></li>
+  <li><a class="nav-link" data-scroll-target="#memory-access-analysis" href="#memory-access-analysis" id="toc-memory-access-analysis">Memory Access Analysis</a>
   <ul class="collapse">
-  <li><a href="#naive-memory-access" id="toc-naive-memory-access" class="nav-link" data-scroll-target="#naive-memory-access">Naive Memory Access</a></li>
-  <li><a href="#optimal-memory-access" id="toc-optimal-memory-access" class="nav-link" data-scroll-target="#optimal-memory-access">Optimal Memory Access</a></li>
-  <li><a href="#a-middle-ground-tiling" id="toc-a-middle-ground-tiling" class="nav-link" data-scroll-target="#a-middle-ground-tiling">A Middle Ground: Tiling</a></li>
+  <li><a class="nav-link" data-scroll-target="#naive-memory-access" href="#naive-memory-access" id="toc-naive-memory-access">Naive Memory Access</a></li>
+  <li><a class="nav-link" data-scroll-target="#optimal-memory-access" href="#optimal-memory-access" id="toc-optimal-memory-access">Optimal Memory Access</a></li>
+  <li><a class="nav-link" data-scroll-target="#a-middle-ground-tiling" href="#a-middle-ground-tiling" id="toc-a-middle-ground-tiling">A Middle Ground: Tiling</a></li>
   </ul></li>
-  <li><a href="#tiling-on-gpus-cuda" id="toc-tiling-on-gpus-cuda" class="nav-link" data-scroll-target="#tiling-on-gpus-cuda">Tiling on GPUs &amp; CUDA</a></li>
-  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a class="nav-link" data-scroll-target="#tiling-on-gpus-cuda" href="#tiling-on-gpus-cuda" id="toc-tiling-on-gpus-cuda">Tiling on GPUs &amp; CUDA</a></li>
+  <li><a class="nav-link" data-scroll-target="#conclusion" href="#conclusion" id="toc-conclusion">Conclusion</a></li>
+  <li><a class="nav-link" data-scroll-target="#references" href="#references" id="toc-references">References</a></li>
   </ul>
 </nav>
     </div>
@@ -277,12 +277,12 @@ window.Quarto = {
 
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><a href="tiled-matrix-multiplication.webp" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Tiled MatMul according to ChatGPT"><img src="tiled-matrix-multiplication.webp" class="img-fluid figure-img" style="width:100.0%" data-text-align="center" alt="Tiled Matrix Multiplication"></a></p>
+<p><a class="lightbox" data-gallery="quarto-lightbox-gallery-1" href="tiled-matrix-multiplication.webp" title="Tiled MatMul according to ChatGPT"><img alt="Tiled Matrix Multiplication" class="img-fluid figure-img" data-text-align="center" src="tiled-matrix-multiplication.webp" style="width:100.0%"></a></p>
 <figcaption>Tiled MatMul according to ChatGPT</figcaption>
 </figure>
 </div>
 <p><strong>TL;DR:</strong> Tiling is a technique used to reduce the number of memory accesses performed during matrix multiplication. We see how it improves compute intensity and how it speeds up the matrix multiplication operation, not only on CPUs, but also on GPUs. I also provide a simple implementation of tiling in CUDA C.</p>
-<section id="matrix-multiplication-recap" class="level1">
+<section class="level1" id="matrix-multiplication-recap">
 <h1>Matrix Multiplication Recap</h1>
 <p>Matrix multiplication, where <span class="math inline">\(AB = C\)</span>, computes each element of <span class="math inline">\(C\)</span> as:</p>
 <p><span class="math display">\[C_{ij} = \sum_{k=1}^n A_{ik} B_{kj}\]</span></p>
@@ -290,10 +290,10 @@ window.Quarto = {
 <div class="sourceCode" id="cb1"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n):</span>
 <span id="cb1-2"><a href="#cb1-2"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(n):</span>
 <span id="cb1-3"><a href="#cb1-3"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(n):</span>
-<span id="cb1-4"><a href="#cb1-4"></a>            C[i][j] <span class="op">+=</span> A[i][k] <span class="op">*</span> B[k][j]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-4"><a href="#cb1-4"></a>            C[i][j] <span class="op">+=</span> A[i][k] <span class="op">*</span> B[k][j]</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p>The code is correct, but it is inefficient in terms of its memory access pattern. Let’s see why.</p>
 </section>
-<section id="compute-intensity" class="level1">
+<section class="level1" id="compute-intensity">
 <h1>Compute Intensity</h1>
 <p>Besides the count of flops, the performance of a matmul is also determined by the memory access pattern. The matmul has to fetch data from main memory into a fast cache (L1 or L2), compute, and then return the result to main memory. This roundtrip is time-consuming, and the cores can become idle waiting for the data from main memory. If so, the <strong>memory bandwidth</strong> becomes the bottleneck of the algorithm.</p>
 <p>Key Concept: <strong>Compute Intensity</strong>. The compute intensity ratio, defined as flops per memory transfer, indicates whether an algorithm is limited by memory bandwidth or compute power. This concept originates from the Roofline model <span class="citation" data-cites="williams2009roofline">(<a href="#ref-williams2009roofline" role="doc-biblioref">Williams, Waterman, and Patterson 2009</a>)</span>.</p>
@@ -311,16 +311,16 @@ Tip
 </div>
 </div>
 </section>
-<section id="memory-access-analysis" class="level1">
+<section class="level1" id="memory-access-analysis">
 <h1>Memory Access Analysis</h1>
-<section id="naive-memory-access" class="level2">
+<section class="level2" id="naive-memory-access">
 <h2 class="anchored" data-anchor-id="naive-memory-access">Naive Memory Access</h2>
 <p>In the naive approach, computing <span class="math inline">\(C_{ij}\)</span> requires fetching <span class="math inline">\(n\)</span> elements from <span class="math inline">\(A\)</span> (a row) and <span class="math inline">\(n\)</span> elements from <span class="math inline">\(B\)</span> (a column). That makes <span class="math inline">\(2n\)</span> memory accesses. <span class="math inline">\(C_{ij}\)</span> is computed as the dot product of the row and the column, which requires <span class="math inline">\(2n\)</span> flops (1 mult and 1 add, <span class="math inline">\(n\)</span> times). Thus, the compute intensity is: <span class="math display">\[
 \text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2n}{2n} = 1
 \]</span></p>
 <p>Can we do better? In this naive implementation, we are performing redundant memory transfers: For example, to compute <span class="math inline">\(C_{11}\)</span>, and <span class="math inline">\(C_{12}\)</span>, we fetch the first row of <span class="math inline">\(A\)</span> twice from main memory.</p>
 </section>
-<section id="optimal-memory-access" class="level2">
+<section class="level2" id="optimal-memory-access">
 <h2 class="anchored" data-anchor-id="optimal-memory-access">Optimal Memory Access</h2>
 <p>If our cache was (theoretically) large enough, we would transfer all elements of <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> into the cache at once (<span class="math inline">\(2n^2\)</span> transfers) and perform the full matrix multiplication (<span class="math inline">\(2n^3\)</span> flops).</p>
 <p><span class="math display">\[
@@ -340,7 +340,7 @@ Example
 </div>
 </div>
 </section>
-<section id="a-middle-ground-tiling" class="level2">
+<section class="level2" id="a-middle-ground-tiling">
 <h2 class="anchored" data-anchor-id="a-middle-ground-tiling">A Middle Ground: Tiling</h2>
 <p>Since caching entire matrices is impractical, we divide matrices <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> into smaller square blocks of size <span class="math inline">\(r\)</span>, called <strong>tiles</strong>, perform block-wise multiplications, and aggregate the results.</p>
 <p>But how does block-wise matrix multiplication work? Let’s go through an example to gain some intuition. We break the matrices <span class="math inline">\(A\)</span>, <span class="math inline">\(B\)</span>, and <span class="math inline">\(C\)</span> into 4 blocks each (2x2). Each of these blocks has size <span class="math inline">\(n/2\)</span>.</p>
@@ -367,7 +367,7 @@ C_{11} = A_{11}B_{11} + A_{12}B_{21}
 <span id="cb2-2"><a href="#cb2-2"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_blocks):</span>
 <span id="cb2-3"><a href="#cb2-3"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(n_blocks):</span>
 <span id="cb2-4"><a href="#cb2-4"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(n_blocks):</span>
-<span id="cb2-5"><a href="#cb2-5"></a>            C[i][j] <span class="op">+=</span> A[i][k] <span class="op">@</span> B[k][j]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-5"><a href="#cb2-5"></a>            C[i][j] <span class="op">+=</span> A[i][k] <span class="op">@</span> B[k][j]</span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p>Note that the entry <code>C[i][j]</code> is now a block matrix rather than a scalar, and the <code>@</code> operator denotes matrix multiplication, rather than scalar multiplication. Line 5 of the code above is loading blocks of size <span class="math inline">\(r^2\)</span> from <span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span> into the cache, which takes <span class="math inline">\(2r^2\)</span> memory transfers. Then, it multiplies the two blocks, which requires <span class="math inline">\(2r^3\)</span> flops.</p>
 <p><span class="math display">\[
 \text{Compute Intensity} = \frac{\text{flops}}{\text{memory transfers}} = \frac{2r^3}{2r^2} = r
@@ -424,7 +424,7 @@ Example
 </table>
 </section>
 </section>
-<section id="tiling-on-gpus-cuda" class="level1">
+<section class="level1" id="tiling-on-gpus-cuda">
 <h1>Tiling on GPUs &amp; CUDA</h1>
 <p>GPUs have a large number of cores, which can quickly process the data arriving from memory. Therefore, the memory bandwidth is likely to be a bottleneck in matrix multiplication on GPUs. To relieve the pressure on the memory bandwidth, it’s necessary to reduce the number of memory transfers by using the tiling technique.</p>
 <p>How is this actually implemented on a GPU? The code block below shows a simplified tiled matrix multiplication in CUDA C. The key idea is that the cache is explicitly written and read using CUDA <strong>shared memory</strong>. This is the equivalent to a user-managed L1 cache. The keyword <code>__shared__</code> defines an array used as cache. The variables <code>row</code> and <code>col</code> indicate what element of the matrix <span class="math inline">\(C_{ij}\)</span> the function computes. Line 13 is the loop over blocks. Lines 15-16 load the data from main memory into the cache. Lines 22-24 perform the dot product and accumulate the result. Finally, line 31 writes the result back to global memory. The function <code>__syncthreads()</code> is a CUDA synchronization primitive to avoid a race condition between threads.</p>
@@ -459,26 +459,26 @@ Example
 <span id="cb3-29"><a href="#cb3-29"></a>    </span>
 <span id="cb3-30"><a href="#cb3-30"></a>    <span class="co">// Transfer the result back to global memory</span></span>
 <span id="cb3-31"><a href="#cb3-31"></a>    C<span class="op">[</span>row <span class="op">*</span> n <span class="op">+</span> col<span class="op">]</span> <span class="op">=</span> C_ij<span class="op">;</span></span>
-<span id="cb3-32"><a href="#cb3-32"></a><span class="op">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-32"><a href="#cb3-32"></a><span class="op">}</span></span></code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre></div>
 <p>The CUDA code is more complicated than the pseudocode, but it makes the cache usage explicit. To run the code look at <a href="https://github.com/tomasruizt/Code-Along/blob/main/cuda-pmpp/03_matrix_multiplication/main.cu">my example on Github</a>, which has Makefile for compilation and execution. If you want to see a more complete version, you can find it in the book by <span class="citation" data-cites="kirk2016programming">(<a href="#ref-kirk2016programming" role="doc-biblioref">Kirk and Wen-Mei 2016</a>)</span>. They describe other techniques to optimize algorithms on GPUs, like memory coalescing, minimizing control divergence, and thread coarsening.</p>
 </section>
-<section id="conclusion" class="level1">
+<section class="level1" id="conclusion">
 <h1>Conclusion</h1>
 <p>Tiling is a practical optimization technique for improving matrix multiplication performance by minimizing memory transfers and maximizing compute intensity. We saw how the memory access pattern affects the performance of matrix multiplication, and how tiling is implemented concretely in CUDA C.</p>
 <p><strong>Acknowledgement:</strong> The author is funded by the Bavarian Research Institute for Digital Transformation (bidt) and the Ludwig Maximilian University of Munich.</p>
 </section>
-<section id="references" class="level1">
+<section class="level1" id="references">
 
 
 
 
 </section>
 
-<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
-<div id="ref-kirk2016programming" class="csl-entry" role="listitem">
+<div class="default" id="quarto-appendix"><section class="quarto-appendix-contents" id="quarto-bibliography" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div class="references csl-bib-body hanging-indent" data-entry-spacing="0" id="refs" role="list">
+<div class="csl-entry" id="ref-kirk2016programming" role="listitem">
 Kirk, David B, and W Hwu Wen-Mei. 2016. <em>Programming Massively Parallel Processors: A Hands-on Approach</em>. Morgan kaufmann.
 </div>
-<div id="ref-williams2009roofline" class="csl-entry" role="listitem">
+<div class="csl-entry" id="ref-williams2009roofline" role="listitem">
 Williams, Samuel, Andrew Waterman, and David Patterson. 2009. <span>“Roofline: An Insightful Visual Performance Model for Multicore Architectures.”</span> <em>Communications of the ACM</em> 52 (4): 65–76.
 </div>
 </div></section><section class="quarto-appendix-contents" id="quarto-citation"><h2 class="anchored quarto-appendix-heading">Citation</h2><div><div class="quarto-appendix-secondary-label">BibTeX citation:</div><pre class="sourceCode code-with-copy quarto-appendix-bibtex"><code class="sourceCode bibtex">@online{ruiz2024,
@@ -489,7 +489,7 @@ Williams, Samuel, Andrew Waterman, and David Patterson. 2009. <span>“Roofline:
   url = {https://tomasruizt.github.io/posts/03_tiling-for-matrix-mult/},
   langid = {en}
 }
-</code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div id="ref-ruiz2024" class="csl-entry quarto-appendix-citeas" role="listitem">
+</code><button class="code-copy-button" title="Copy to Clipboard"><i class="bi"></i></button></pre><div class="quarto-appendix-secondary-label">For attribution, please cite this work as:</div><div class="csl-entry quarto-appendix-citeas" id="ref-ruiz2024" role="listitem">
 Ruiz, Tomas. 2024. <span>“How Does Tiling Speed Up Matrix
 Multiplications on GPUs?”</span> December 23, 2024. <a href="https://tomasruizt.github.io/posts/03_tiling-for-matrix-mult/">https://tomasruizt.github.io/posts/03_tiling-for-matrix-mult/</a>.
 </div></div></section></div></main> <!-- /main -->
@@ -913,12 +913,12 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script>
-<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+<script async="" crossorigin="anonymous" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="lazy" data-mapping="pathname" data-reactions-enabled="1" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-theme="light" src="https://giscus.app/client.js">
 </script>
-<input type="hidden" id="giscus-base-theme" value="light">
-<input type="hidden" id="giscus-alt-theme" value="light">
+<input id="giscus-base-theme" type="hidden" value="light">
+<input id="giscus-alt-theme" type="hidden" value="light">
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","loop":false,"closeEffect":"zoom","selector":".lightbox","descPosition":"bottom"});
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {

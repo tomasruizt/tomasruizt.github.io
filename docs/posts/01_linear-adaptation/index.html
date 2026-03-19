@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.57">
+<meta content="quarto-1.5.57" name="generator">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta content="width=device-width, initial-scale=1.0, user-scalable=yes" name="viewport">
 
-<meta name="author" content="Tomas Ruiz">
-<meta name="dcterms.date" content="2024-08-02">
+<meta content="Tomas Ruiz" name="author">
+<meta content="2024-08-02" name="dcterms.date">
 
 <title>A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification – All Posts</title>
 <style>
@@ -51,16 +51,16 @@ div.csl-indent {
 <script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
 <script src="../../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../../site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="../../">
+<meta content="../../" name="quarto:offset">
 <script src="../../site_libs/quarto-html/quarto.js"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" id="quarto-text-highlighting-styles" rel="stylesheet">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link data-mode="light" href="../../site_libs/bootstrap/bootstrap.min.css" id="quarto-bootstrap" rel="stylesheet">
 <script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -122,13 +122,13 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="../../styles.css">
+<link href="../../styles.css" rel="stylesheet">
 </head>
 
 <body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+  <header class="headroom fixed-top quarto-banner" id="quarto-header">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -136,8 +136,8 @@ window.Quarto = {
     <span class="navbar-title">All Posts</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div class="" id="quarto-search" title="Search"></div>
+          <button aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-bs-target="#navbarCollapse" data-bs-toggle="collapse" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }" role="menu" type="button">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -173,7 +173,7 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+<header class="quarto-title-block default page-columns page-full" id="title-block-header">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">A Closed-Form Solution to Linearly Fine-Tune LLMs for Binary Classification</h1>
@@ -188,7 +188,7 @@ window.Quarto = {
     <div class="quarto-title-meta-heading">Affiliation</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Tomas Ruiz <a href="mailto:t.ruiz@lmu.de" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+      <p class="author">Tomas Ruiz <a class="quarto-title-author-email" href="mailto:t.ruiz@lmu.de"><i class="bi bi-envelope"></i></a> </p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
@@ -217,23 +217,23 @@ window.Quarto = {
     </div>
     
   
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+  </header><div class="quarto-container page-columns page-rows-contents page-layout-article page-navbar" id="quarto-content">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
+    <div class="sidebar margin-sidebar" id="quarto-margin-sidebar">
+        <nav class="toc-active" id="TOC" role="doc-toc">
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
-  <li><a href="#about-fine-tuning" id="toc-about-fine-tuning" class="nav-link" data-scroll-target="#about-fine-tuning">About Fine-Tuning</a></li>
-  <li><a href="#binary-classification" id="toc-binary-classification" class="nav-link" data-scroll-target="#binary-classification">Binary Classification</a></li>
-  <li><a href="#closed-form-solution" id="toc-closed-form-solution" class="nav-link" data-scroll-target="#closed-form-solution">Closed-Form Solution</a></li>
-  <li><a href="#runtime" id="toc-runtime" class="nav-link" data-scroll-target="#runtime">Runtime</a></li>
-  <li><a href="#inference" id="toc-inference" class="nav-link" data-scroll-target="#inference">Inference</a></li>
-  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next Steps</a>
+  <li><a class="nav-link active" data-scroll-target="#summary" href="#summary" id="toc-summary">Summary</a></li>
+  <li><a class="nav-link" data-scroll-target="#about-fine-tuning" href="#about-fine-tuning" id="toc-about-fine-tuning">About Fine-Tuning</a></li>
+  <li><a class="nav-link" data-scroll-target="#binary-classification" href="#binary-classification" id="toc-binary-classification">Binary Classification</a></li>
+  <li><a class="nav-link" data-scroll-target="#closed-form-solution" href="#closed-form-solution" id="toc-closed-form-solution">Closed-Form Solution</a></li>
+  <li><a class="nav-link" data-scroll-target="#runtime" href="#runtime" id="toc-runtime">Runtime</a></li>
+  <li><a class="nav-link" data-scroll-target="#inference" href="#inference" id="toc-inference">Inference</a></li>
+  <li><a class="nav-link" data-scroll-target="#next-steps" href="#next-steps" id="toc-next-steps">Next Steps</a>
   <ul class="collapse">
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a class="nav-link" data-scroll-target="#references" href="#references" id="toc-references">References</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -245,13 +245,13 @@ window.Quarto = {
 
 
 
-<section id="summary" class="level1">
+<section class="level1" id="summary">
 <h1>Summary</h1>
 <p>In this post I show how to linearly fine-tune a large language model (LLM) using a closed-form solution, based on the Moore-Penrose Inverse. I will focus on the special case of binary classification because the changes in output are easier to interpret. The new linear transformation <span class="math inline">\(W\)</span> is shown in figure 1 (green).</p>
-<div id="fig-llm" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" alt="Learned Linear Transformation" data-text-align="center">
+<div alt="Learned Linear Transformation" class="lightbox quarto-float quarto-figure quarto-figure-center anchored" data-text-align="center" id="fig-llm">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="linear-adaptation/linear-adaptation.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."><img src="linear-adaptation/linear-adaptation.png" class="img-fluid figure-img" style="width:75.0%" data-text-align="center" alt="Learned Linear Transformation"></a>
+<a class="lightbox" data-gallery="quarto-lightbox-gallery-1" href="linear-adaptation/linear-adaptation.png" title="Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function."><img alt="Learned Linear Transformation" class="img-fluid figure-img" data-text-align="center" src="linear-adaptation/linear-adaptation.png" style="width:75.0%"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-llm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: The learned transformation W (green) is applied in parallel to the existing linear layer (blue), preserving the existing knowledge of the model. Both are the summed to make the logits, which are passed to the softmax function.
@@ -259,17 +259,17 @@ Figure&nbsp;1: The learned transformation W (green) is applied in parallel to th
 </figure>
 </div>
 </section>
-<section id="about-fine-tuning" class="level1">
+<section class="level1" id="about-fine-tuning">
 <h1>About Fine-Tuning</h1>
 <p>Large Language Models (LLMs) are great baseline models for <strong>zero-shot</strong> classification, i.e.&nbsp;without any labeled examples. However, one often has a small labeled dataset <span class="math inline">\(D\)</span> and is interested in improving the performance over this baseline. In the <strong>few-shot</strong> setting, some labeled examples are provided in the prompt for the model to learn in context. To improve upon this setting, the next step is to <strong>fine-tune</strong> the model on the labeled dataset.</p>
 <p>There are different ways to fine-tune LLMs. For example: optimizing all network parameters, optimizing only the parameters of the final layer, or freezing all parameters but introduce a new smaller set of tunable parameters <span class="citation" data-cites="hu2021lora">(<a href="#ref-hu2021lora" role="doc-biblioref">Hu et al. 2021</a>)</span>. In this post, I focus on the simple case of fine-tuning the last linear transformation, because I’m interested in interpreting the changes to individual logits and probabilities.</p>
 </section>
-<section id="binary-classification" class="level1">
+<section class="level1" id="binary-classification">
 <h1>Binary Classification</h1>
 <p>I also focus on binary classification specifically. This means that the model must only answer <code>yes/no</code> or <code>0/1</code> to the prompt. This setting is easier to interpret with metrics like precision, recall or the <span class="math inline">\(F1\)</span> score. Furthermore, in the binary case we can interpret how the fine-tuning procedure affected the model by inspecting the answers that flipped between <code>yes/no</code> and vice-versa <span class="citation" data-cites="dutta2024accuracy">(<a href="#ref-dutta2024accuracy" role="doc-biblioref">Dutta et al. 2024</a>)</span>.</p>
-<p>In terms of computation, we will see that the problem structure of binary classification can be leveraged to compute a closed-form solution efficiently. As shown in <a href="#fig-llm" class="quarto-xref">Figure&nbsp;1</a>, I add an additional linear transformation <span class="math inline">\(W\)</span> before the softmax, and solve for it using the Moore-Penrose Inverse. This is mathematically equivalent to training <span class="math inline">\(W\)</span> with gradient descent, but without all the iteration.</p>
+<p>In terms of computation, we will see that the problem structure of binary classification can be leveraged to compute a closed-form solution efficiently. As shown in <a class="quarto-xref" href="#fig-llm">Figure&nbsp;1</a>, I add an additional linear transformation <span class="math inline">\(W\)</span> before the softmax, and solve for it using the Moore-Penrose Inverse. This is mathematically equivalent to training <span class="math inline">\(W\)</span> with gradient descent, but without all the iteration.</p>
 </section>
-<section id="closed-form-solution" class="level1">
+<section class="level1" id="closed-form-solution">
 <h1>Closed-Form Solution</h1>
 <p>In underbraces, I’ve written the dimension of the matrices and vectors. In the original language model, the probability vector <span class="math inline">\(y\)</span> has the same size of the vocabulary <span class="math inline">\(V\)</span>, and is given by:</p>
 <p><span class="math display">\[
@@ -299,16 +299,16 @@ p_a(y | x_{1:t}) &amp;= \text{softmax}(\text{logits}_t + z_t W) \\
 <p><span class="math display">\[W = \arg \min_W || (\log P_a - L_t) - Z_t W ||^2_2 \qquad (1) \]</span></p>
 <p>This is a least squares problem, whose solution is given by the <strong>Moore-Penrose Inverse</strong>.</p>
 <p><span class="math display">\[W = (Z_t^T Z_t)^{-1} Z_t^T (\log P_a - L_t)\]</span></p>
-<p>Or equivalently, by solving the following linear system of equations with <span class="math inline">\(V\)</span> columns (<em>But see note on numerical stability <a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></em>).</p>
+<p>Or equivalently, by solving the following linear system of equations with <span class="math inline">\(V\)</span> columns (<em>But see note on numerical stability <a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a></em>).</p>
 <p><span class="math display">\[W = \text{linsolve}(\underbrace{Z_t^T Z_t}_{(d,d)}, \space \underbrace{Z_t^T (\log P_a - L_t)}_{(d,V)}) \qquad (2) \]</span></p>
 </section>
-<section id="runtime" class="level1">
+<section class="level1" id="runtime">
 <h1>Runtime</h1>
-<p>Each linear system takes <span class="math inline">\(O(d^3)\)</span> to solve, so solving <span class="math inline">\(V\)</span> of these systems is prohibitively expensive (<span class="math inline">\(V=128k, d=4k\)</span> in LLama3 8B). (<em>But see note on repeated linear solves<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></em>). However, we can exploit the structure of the binary classification problem, by only evaluating the logits <span class="math inline">\(L_t\)</span> and probabilities <span class="math inline">\(P_a\)</span> for the <code>yes/no</code> tokens. This reduces the size of the probability matrix <span class="math inline">\(P_a\)</span> by <em>4 to 5 orders of magnitude</em>, from <span class="math inline">\((N,V)\)</span> to <span class="math inline">\((N,2)\)</span>. Similarly, the learned matrix <span class="math inline">\(W\)</span> shrinks from size <span class="math inline">\((d,V)\)</span> to <span class="math inline">\((d,2)\)</span>.</p>
+<p>Each linear system takes <span class="math inline">\(O(d^3)\)</span> to solve, so solving <span class="math inline">\(V\)</span> of these systems is prohibitively expensive (<span class="math inline">\(V=128k, d=4k\)</span> in LLama3 8B). (<em>But see note on repeated linear solves<a class="footnote-ref" href="#fn2" id="fnref2" role="doc-noteref"><sup>2</sup></a></em>). However, we can exploit the structure of the binary classification problem, by only evaluating the logits <span class="math inline">\(L_t\)</span> and probabilities <span class="math inline">\(P_a\)</span> for the <code>yes/no</code> tokens. This reduces the size of the probability matrix <span class="math inline">\(P_a\)</span> by <em>4 to 5 orders of magnitude</em>, from <span class="math inline">\((N,V)\)</span> to <span class="math inline">\((N,2)\)</span>. Similarly, the learned matrix <span class="math inline">\(W\)</span> shrinks from size <span class="math inline">\((d,V)\)</span> to <span class="math inline">\((d,2)\)</span>.</p>
 <p>As a result, we need to solve only 2 linear systems, each with runtime constant in the vocabulary size <span class="math inline">\(V\)</span> and in the number of datapoints in our dataset <span class="math inline">\(N\)</span>, but proportional to <span class="math inline">\(O(d^3)\)</span>. As an added benefit of evaluating only the <code>yes/no</code> logits, the output of the fine-tuned model is compliant by design, as it cannot output any other logits other than for <code>yes/no</code>.</p>
 <p>To solve for <span class="math inline">\(W\)</span> either using eq (1) or eq (2), we plug in our dataset <span class="math inline">\(D\)</span> for <span class="math inline">\(P_a\)</span>, since both matrices have the same size.</p>
 </section>
-<section id="inference" class="level1">
+<section class="level1" id="inference">
 <h1>Inference</h1>
 <p>At inference time, the matrix <span class="math inline">\(W\)</span> stays constant, while the logits change for each input.</p>
 <p><span class="math display">\[
@@ -319,22 +319,22 @@ p_a(y|x_{1:t})
 \end{aligned}
 \]</span></p>
 </section>
-<section id="next-steps" class="level1">
+<section class="level1" id="next-steps">
 <h1>Next Steps</h1>
 <p>In the next post, I will show an implementation of this method in PyTorch, and interpret how linear fine-tuning changes the outputs of the original LLM. I am interested in the flips between <code>yes/no</code> outside of the small fine-tuning dataset <span class="math inline">\(D\)</span>, and particularly on the boundaries of the dataset, and how this pertains to generalization. Stay tuned! :)</p>
-<section id="references" class="level2">
+<section class="level2" id="references">
 <h2 class="anchored" data-anchor-id="references">References</h2>
-<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
-<div id="ref-chowdhery2023palm" class="csl-entry" role="listitem">
+<div class="references csl-bib-body hanging-indent" data-entry-spacing="0" id="refs" role="list">
+<div class="csl-entry" id="ref-chowdhery2023palm" role="listitem">
 Chowdhery, Aakanksha, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, et al. 2023. <span>“Palm: Scaling Language Modeling with Pathways.”</span> <em>Journal of Machine Learning Research</em> 24 (240): 1–113.
 </div>
-<div id="ref-dutta2024accuracy" class="csl-entry" role="listitem">
+<div class="csl-entry" id="ref-dutta2024accuracy" role="listitem">
 Dutta, Abhinav, Sanjeev Krishnan, Nipun Kwatra, and Ramachandran Ramjee. 2024. <span>“Accuracy Is Not All You Need.”</span> <em>arXiv Preprint arXiv:2407.09141</em>.
 </div>
-<div id="ref-hu2021lora" class="csl-entry" role="listitem">
+<div class="csl-entry" id="ref-hu2021lora" role="listitem">
 Hu, Edward J, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. 2021. <span>“Lora: Low-Rank Adaptation of Large Language Models.”</span> <em>arXiv Preprint arXiv:2106.09685</em>.
 </div>
-<div id="ref-watkins2004fundamentals" class="csl-entry" role="listitem">
+<div class="csl-entry" id="ref-watkins2004fundamentals" role="listitem">
 Watkins, David S. 2004. <em>Fundamentals of Matrix Computations</em>. John Wiley &amp; Sons.
 </div>
 </div>
@@ -344,11 +344,11 @@ Watkins, David S. 2004. <em>Fundamentals of Matrix Computations</em>. John Wiley
 </section>
 
 
-<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+<div class="default" id="quarto-appendix"><section class="footnotes footnotes-end-of-document" id="footnotes" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
 
 <ol>
-<li id="fn1"><p>2024-09: The matrix <span class="math inline">\(Z^T Z\)</span> is positive definite, so it is in theory efficiently invertible using the Cholesky decomposition. However, its condition number <span class="math inline">\(\kappa (Z^T Z)\)</span> is squarely proportional to the condition number of <span class="math inline">\(\kappa(Z)\)</span>. This can lead to numerical instability when solving the linear system. In fact, I stumbled upon numerical instability while implementing this in linear system in PyTorch, which lead me to use an <span class="math inline">\(L_2\)</span> regularization term. See <a href="https://tobydriscoll.net/fnc-julia/leastsq/normaleqns.html#conditioning-and-stability">Source</a>.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn2"><p>2024-09: It turns out that solving a linear system with <span class="math inline">\(V\)</span> columns on the right-hand side can be done cheaper than in <span class="math inline">\(V \cdot \frac{2}{3} d^3\)</span> flops. To solve <span class="math inline">\(A X = B\)</span> (with <span class="math inline">\(A \in \mathbb{R}^{d,d}\)</span> and <span class="math inline">\(X, B \in \mathbb{R}^{d,V}\)</span>) the factorization of <span class="math inline">\(A\)</span> requires <span class="math inline">\(\frac{2}{3} d^3\)</span> flops, but it only has to be done once. After that, solving for each of the <span class="math inline">\(V\)</span> columns of <span class="math inline">\(B\)</span> costs <span class="math inline">\(2 d^2\)</span> flops each. So the total flop count is <span class="math inline">\(\frac{2}{3} d^3 + V \cdot 2 d^2\)</span>. This is a significant improvement over the naive approach. See <span class="citation" data-cites="watkins2004fundamentals">(<a href="#ref-watkins2004fundamentals" role="doc-biblioref">Watkins 2004, 77–78</a>)</span>.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn1"><p>2024-09: The matrix <span class="math inline">\(Z^T Z\)</span> is positive definite, so it is in theory efficiently invertible using the Cholesky decomposition. However, its condition number <span class="math inline">\(\kappa (Z^T Z)\)</span> is squarely proportional to the condition number of <span class="math inline">\(\kappa(Z)\)</span>. This can lead to numerical instability when solving the linear system. In fact, I stumbled upon numerical instability while implementing this in linear system in PyTorch, which lead me to use an <span class="math inline">\(L_2\)</span> regularization term. See <a href="https://tobydriscoll.net/fnc-julia/leastsq/normaleqns.html#conditioning-and-stability">Source</a>.<a class="footnote-back" href="#fnref1" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>2024-09: It turns out that solving a linear system with <span class="math inline">\(V\)</span> columns on the right-hand side can be done cheaper than in <span class="math inline">\(V \cdot \frac{2}{3} d^3\)</span> flops. To solve <span class="math inline">\(A X = B\)</span> (with <span class="math inline">\(A \in \mathbb{R}^{d,d}\)</span> and <span class="math inline">\(X, B \in \mathbb{R}^{d,V}\)</span>) the factorization of <span class="math inline">\(A\)</span> requires <span class="math inline">\(\frac{2}{3} d^3\)</span> flops, but it only has to be done once. After that, solving for each of the <span class="math inline">\(V\)</span> columns of <span class="math inline">\(B\)</span> costs <span class="math inline">\(2 d^2\)</span> flops each. So the total flop count is <span class="math inline">\(\frac{2}{3} d^3 + V \cdot 2 d^2\)</span>. This is a significant improvement over the naive approach. See <span class="citation" data-cites="watkins2004fundamentals">(<a href="#ref-watkins2004fundamentals" role="doc-biblioref">Watkins 2004, 77–78</a>)</span>.<a class="footnote-back" href="#fnref2" role="doc-backlink">↩︎</a></p></li>
 </ol>
 </section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -771,12 +771,12 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script>
-<script src="https://giscus.app/client.js" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="bottom" data-theme="light" data-lang="en" crossorigin="anonymous" data-loading="lazy" async="">
+<script async="" crossorigin="anonymous" data-category="Announcements" data-category-id="DIC_kwDOMeb1fM4Cv1gL" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="lazy" data-mapping="pathname" data-reactions-enabled="1" data-repo="tomasruizt/tomasruizt.github.io" data-repo-id="R_kgDOMeb1fA" data-theme="light" src="https://giscus.app/client.js">
 </script>
-<input type="hidden" id="giscus-base-theme" value="light">
-<input type="hidden" id="giscus-alt-theme" value="light">
+<input id="giscus-base-theme" type="hidden" value="light">
+<input id="giscus-alt-theme" type="hidden" value="light">
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","selector":".lightbox","loop":false,"descPosition":"bottom","closeEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
