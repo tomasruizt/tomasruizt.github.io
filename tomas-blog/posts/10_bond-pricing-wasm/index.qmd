@@ -1,0 +1,111 @@
+---
+format:
+  live-html:
+    toc: true
+engine: jupyter
+editor:
+    render-on-save: true
+date: 2026-03-20
+author:
+  - name: Tomas Ruiz
+    affiliations: Ludwig-Maximilians-Universität München
+categories: [Finance, Python]
+title: "Bond Pricing and Interest Rate Sensitivity"
+image: imgs/sensitivity.png
+---
+::: {.callout-note}
+While working at Allianz 2-3 years ago, I made this plot to understand why short-term bonds offer better protection against hikes in interest rates.
+I decided to release it in blog format, because why not?
+:::
+
+Explore how bond prices react to changes in interest rates.
+A bondholder of a \$100 bond receives a fixed payment every year (coupon $C$, e.g. \$3/year) for $T$ years (maturity, e.g. 10 years), plus the face value $FV$ (\$100) back at maturity.
+The price of a bond today is determined by discounting these future cash flows by the interest rate $r$, because money today is worth more than money in the future.
+
+1. **Discounted face value**: $\frac{FV}{(1+r)^T}$.
+2. **Discounted coupon payments**: $C \cdot \frac{1 - (1+r)^{-T}}{r}$.
+
+Notice that in the discounted face value $\frac{FV}{(1+r)^T}$, the exponent $T$ amplifies the effect of any change in $r$ — the longer the maturity, the more the price drops when rates rise.
+
+Use the sliders below to adjust the maturity, coupon rate, and interest rate. We assume annual coupon payments and a face value of \$100.
+
+```{pyodide}
+#| edit: false
+#| output: false
+#| define:
+#|   - bond_price
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+face_value = 100
+
+def bond_price(maturity: int, discount_rate: float, coupon_rate: float) -> float:
+    T = maturity
+    r = discount_rate
+    d_face_value = face_value / (1 + r) ** T
+    d_coupons = face_value * coupon_rate * (1 - (1 + r) ** -T) / r
+    return d_face_value + d_coupons
+
+def plot_bond_prices(maturity: int, coupon_rate_pct: float, discount_rate_pct: float):
+    coupon_rate = coupon_rate_pct / 100
+    discount_rate = discount_rate_pct / 100
+
+    discount_rates = np.linspace(0.001, 0.10, 100)
+    default_maturities = np.array([1, 5, 10, 20, 30])
+    other_maturities = default_maturities[default_maturities != maturity]
+    all_maturities = np.sort(np.append(other_maturities, maturity))
+
+    fig, ax = plt.subplots()
+    ax.set_xlabel("Interest rate [%]")
+    ax.set_ylabel("Bond price")
+    ax.grid(True)
+    for m in all_maturities:
+        p = bond_price(m, discount_rates, coupon_rate)
+        if m == maturity:
+            ax.plot(discount_rates * 100, p, label=f"{m} years (selected)", color="r", linestyle="--")
+        else:
+            i = np.searchsorted(default_maturities, m)
+            ax.plot(discount_rates * 100, p, label=f"{m} years", color=plt.cm.viridis(i / len(default_maturities)))
+    ax.scatter(discount_rate * 100, bond_price(maturity, discount_rate, coupon_rate), color="r", zorder=5)
+    ax.legend()
+    plt.show()
+```
+
+
+```{pyodide}
+#| edit: false
+#| input:
+#|   - maturity
+#|   - coupon_rate_pct
+#|   - discount_rate_pct
+price = bond_price(maturity, discount_rate_pct / 100, coupon_rate_pct / 100)
+print(f"Bond price: ${price:.2f}")
+```
+
+```{ojs}
+//| echo: false
+viewof discount_rate_pct = Inputs.range([0.5, 10.0], {step: 0.25, value: 3.0, label: "Interest rate (%)"});
+viewof maturity = Inputs.range([1, 30], {step: 1, value: 15, label: "Maturity (years)"})
+viewof coupon_rate_pct = Inputs.range([0.5, 10.0], {step: 0.25, value: 3.0, label: "Coupon rate (%)"})
+```
+
+**Sensitivity to Interest Rate Changes:**
+Longer maturities are more sensitive to interest rate changes.
+The plot below shows the bond price as a function of the interest rate for different maturities.
+The red dot marks your selected bond.
+
+```{pyodide}
+#| edit: false
+#| input:
+#|   - maturity
+#|   - coupon_rate_pct
+#|   - discount_rate_pct
+plot_bond_prices(maturity, coupon_rate_pct, discount_rate_pct)
+```
+
+**Key Takeaways:**
+
+- **Higher interest rates** lead to lower bond prices — future cash flows are worth less today.
+- **Longer maturities** amplify the effect of interest rate changes.
+- When the interest rate equals the coupon rate, the bond price equals the face value (\$100), regardless of maturity.
