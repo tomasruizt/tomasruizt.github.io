@@ -1,4 +1,4 @@
-run:
+preview:
 	quarto preview cv.qmd
 
 
