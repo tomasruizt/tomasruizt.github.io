@@ -1,0 +1,241 @@
+---
+title: "CPU-GPU Synchronizations"
+subtitle: "Writing Fast PyTorch Code"
+author: "Tomas Ruiz"
+date: today
+format:
+  revealjs:
+    slide-number: true
+    theme: [default, lmu.scss]
+    logo: images/LMU_Logo_RGB_FlaechigGruen.png
+    incremental: false
+    code-line-numbers: true
+    highlight-style: github
+    footer: "PyCon DE 2026: CPU-GPU Synchronizations"
+---
+
+## What This Talk Is About
+
+How to find and fix **CPU-GPU synchronizations** in PyTorch.
+
+Why? Syncs are a **silent performance killer**. Your code runs, your GPU is warm, but you are leaving speed on the table.
+
+::: {.callout-note}
+By the end of this talk you'll know what they are, how to spot them, and how to get rid of them.
+:::
+
+## Overview
+
+1. **A training loop suffering from a synchronization**
+2. **Deep dive: Dynamic tensor shapes**
+4. **Unit testing that code is free of syncs**
+
+. . .
+
+## A Familiar Training Loop
+
+``` python
+for batch in loader:
+    optimizer.zero_grad()
+    out = model(batch)
+    loss = loss_fn(out, batch.y)
+    loss.backward()
+    optimizer.step()
+    print(f"loss = {loss.item():.4f}")
+```
+
+You wrote this on CPU. You tested it. It worked. You moved it to GPU.
+
+. . .
+
+It got faster. Just not as fast as you hoped. `nvidia-smi` shows your GPU at **40 %** utilization. You check the batch size, the dataloader, `num_workers`… everything looks fine.
+
+. . .
+
+Something is quietly wrong with this loop. We'll come back to it.
+
+## The GPU Is Asynchronous
+
+The CPU **schedules** PyTorch ops. They are queued and the GPU works through them.
+
+![](images/cpu-gpu-timeline.svg){width="95%" fig-align="center"}
+
+. . .
+
+The CPU finishes scheduling long before the GPU finishes executing. That's the healthy state: **CPU runs ahead, GPU stays saturated.**
+
+## What Is a CPU-GPU Sync?
+
+A **synchronization** happens when the CPU blocks waiting for the GPU to send data. E.g. when a CPU decision depends on that data:
+
+```python
+if my_tensor != 0.0:
+    # do something
+else:
+    # do something else
+```
+. . . 
+
+![](images/cpu-gpu-sync-diagram.svg){width="95%" fig-align="center"}
+
+The CPU stops running ahead. The GPU drains its queue and sits idle. The async model breaks.
+
+## Back to the Training Loop
+
+``` {.python code-line-numbers="7"}
+for batch in loader:
+    optimizer.zero_grad()
+    out = model(batch)
+    loss = loss_fn(out, batch.y)
+    loss.backward()
+    optimizer.step()
+    print(f"loss = {loss.item():.4f}")
+```
+
+`loss.item()` forces the CPU to wait for the GPU. **Every iteration.**
+
+## Profiling with NVIDIA Nsight Systems
+
+- TODO: Show nsys command, show gist link, show and explain trace with synchronization.
+
+## The Fix
+
+Don't sync every step. Log less often, or log async.
+
+``` {.python code-line-numbers="8-9"}
+for i, batch in enumerate(loader):
+    optimizer.zero_grad()
+    out = model(batch)
+    loss = loss_fn(out, batch.y)
+    loss.backward()
+    optimizer.step()
+
+    if i % 100 == 0:
+        print(f"loss = {loss.item():.4f}")
+```
+
+- `.item()` only once every 100 steps → CPU can run ahead again
+- Or: ship losses to a background thread / wandb buffer
+
+## Ok, We Stop Writing Slow Code
+
+As the performance tuning docs suggest^[<https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization>]:
+
+* No `cuda_tensor.item()`
+* No `print(cuda_tensor)`
+* No `cuda_tensor.cpu()`
+* No `if cuda_tensor > 1.0:`
+
+# It Goes Deeper...
+
+## Dynamic Shapes: The Hidden Trigger
+
+Are these operations sync-free?
+
+``` {.python code-line-numbers="1-2|4-5|7-9|11-13|"}
+# boolean indexing: how many elements?
+x = t[mask]  # both t, mask are GPU tensors
+
+# k is a GPU tensor: what's its value?
+x = t[:k]
+
+# output size depends on contents of t
+x = torch.nonzero(t)   # indices of nonzero vals
+x = torch.unique(t)    # set of unique vals in t
+
+# t=[t1, t2], counts=[2, 1] -> x=[t1, t1, t2]
+# len(x) is unkown by CPU
+x = t.repeat_interleave(counts)
+```
+
+. . .
+
+They sync: Because PyTorch needs to **allocate the output tensor**, and it needs the **shape** to do that. If the shape depends on GPU data, the CPU must ask the GPU.
+
+## The Mental Model {.center}
+
+**If the output shape depends on GPU data,
+the CPU must ask the GPU → synchronization**
+
+. . .
+
+* **Static shape?** → async
+* **Dynamic shape?** → sync, unless you tell PyTorch the size
+
+## Fixing Dynamic Shapes
+
+Tell PyTorch the output size up front, so it doesn't have to ask the GPU.
+
+``` python
+# ❌ syncs: output_size inferred from `counts` (GPU tensor)
+out = torch.repeat_interleave(x, counts)
+
+# ✅ no sync: output_size is a Python int, known to the CPU
+out = torch.repeat_interleave(x, counts, output_size=total)
+```
+
+. . .
+
+General strategies:
+
+- **Pad to a fixed size** instead of masking variable-length sequences
+- Use APIs with explicit `output_size=` / `num_classes=` parameters
+- Keep shape-defining counters on the **CPU side** when possible
+
+## Testing for Syncs
+
+PyTorch has an experimental debug mode that flags every sync^[<https://docs.pytorch.org/docs/stable/generated/torch.cuda.set_sync_debug_mode.html>]:
+
+``` {.python code-line-numbers="1-3|5-7|9-11"}
+import torch
+
+x = cuda_tensor
+
+torch.cuda.set_sync_debug_mode("warn")    # print a warning
+x.item()
+# → UserWarning: called a synchronizing CUDA operation
+
+torch.cuda.set_sync_debug_mode("error")   # raise instead
+x.item()
+# → RuntimeError: called a synchronizing CUDA operation
+```
+
+## Testing with Pytest
+
+Use it in **unit tests** to verify that your code is sync-free!
+
+``` {.python code-line-numbers="1-5|1-5,7-8,10,14"}
+@fail_on_gpu_sync
+def test_training_step_has_no_sync():
+    inputs = load_inputs()
+    out = my_pytorch_fn(inputs)
+    assert ...
+
+# Decorator raises RuntimeError if my_pytorch_fn() has any CPU-GPU sync
+def fail_on_gpu_sync(fn):
+    def wrapper(*args, **kwargs):
+        torch.cuda.set_sync_debug_mode("error")
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            torch.cuda.set_sync_debug_mode("default")
+    return wrapper
+```
+
+The function under test (`my_pytorch_fn`) stays **untouched**. The decorator toggles debug mode only in unit tests.
+
+## Takeaways
+
+1. **Async is the default**: CPU runs ahead, GPU stays busy.
+2. **A sync is any op that blocks the CPU for a GPU value.**
+3. **Obvious triggers:** `.item()`, `print()`, `.cpu()`, `if-else` branching...
+4. **Hidden triggers:** dynamic output shapes (`mask`, `nonzero`, `repeat_interleave` w/o `output_size`).
+5. **Fix:** sync less often, pad to fixed shapes, pass explicit sizes.
+6. **Test it:** `set_sync_debug_mode("error")` in your unit tests.
+
+# Thank You! 
+
+Questions?
+
+Blog Post: <https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization>
+
