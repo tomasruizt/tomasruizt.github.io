@@ -1,7 +1,10 @@
 ---
 title: "CPU-GPU Synchronizations"
 subtitle: "Writing Fast PyTorch Code"
-author: "Tomas Ruiz"
+author:
+  - name: Tomas Ruiz
+    affiliations:
+      - name: LMU Munich
 date: today
 format:
   revealjs:
@@ -12,6 +15,8 @@ format:
     code-line-numbers: true
     highlight-style: github
     footer: "PyCon DE 2026: CPU-GPU Synchronizations"
+    embed_resources: true
+    pdf-separate-fragments: true
 ---
 
 ## What This Talk Is About
@@ -53,7 +58,7 @@ Something is quietly wrong with this loop. We'll come back to it.
 
 ## The GPU Is Asynchronous
 
-The CPU **schedules** PyTorch ops. They are queued and the GPU works through them.
+The CPU is the boss of the GPU. CPU **schedules** PyTorch ops, which are queued and executed by the GPU.
 
 ![](images/cpu-gpu-timeline.svg){width="95%" fig-align="center"}
 
