@@ -1,5 +1,5 @@
 ---
-title: "CPU-GPU Synchronizations"
+title: "PyTorch and CPU-GPU Synchronizations"
 subtitle: "Writing Fast PyTorch Code"
 author:
   - name: Tomas Ruiz
@@ -19,11 +19,12 @@ format:
     pdf-separate-fragments: true
 ---
 
-## What This Talk Is About
+## This Talk
 
-* How to find and fix **CPU-GPU synchronizations** in PyTorch.
-* Why? Syncs are a **silent performance killer**. Your code runs, your GPU is warm, but you are leaving speed on the table.
-* By the end of this talk you'll know what they are, how to spot them, and how to get rid of them.
+* For everyone writing PyTorch code on GPU: this talk is for you.
+* Understand what **CPU-GPU synchronizations** are in PyTorch.
+* Learn how to spot syncs and how to fix them.
+* Why? Syncs are a **silent performance killer**. Your code is still correct, but you are leaving speed on the table.
 
 ## Overview
 
@@ -256,3 +257,16 @@ Questions?
 
 Blog Post: <https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization>
 
+## Appendix
+Intentionally synchronizing. Common use case to measure execution time:
+
+```python
+start_event = torch.cuda.Event(enable_timing=True)
+end_event = torch.cuda.Event(enable_timing=True)
+
+start_event.record()
+fn()
+end_event.record()
+
+torch.cuda.synchronize()  # wait for fn() to finish
+```
