@@ -251,14 +251,13 @@ The function under test (`my_pytorch_fn`) stays **untouched**. The decorator tog
 5. **Fix:** pass explicit sizes, pad to fixed shapes, sync less often.
 6. **Test it:** `set_sync_debug_mode("error")` in your unit tests.
 
-# Thank You! 
-
-Questions?
+# Thank You!
 
 Blog Post: <https://tomasruizt.github.io/posts/08_cpu_gpu_synchronization>
 
-## Appendix
-Intentionally synchronizing. Common use case to measure execution time:
+## Appendix - Intentional Sync
+
+Common use case to measure execution time:
 
 ```python
 start_event = torch.cuda.Event(enable_timing=True)
@@ -270,3 +269,9 @@ end_event.record()
 
 torch.cuda.synchronize()  # wait for fn() to finish
 ```
+
+## Appendix - Triton Kernels
+
+* Triton is a programming language (Python library) to author GPU kernels^[<https://triton-lang.org/main/getting-started/tutorials/>].
+* Model input data preparation can require 10 different PyTorch ops (`torch.zeros()`, `torch.arange()`, `torch.gather() / scatter()`, etc.). We ays the **op launch overhead price** 10 times 🐌. You can replace all this with a single Triton kernel.
+* PyTorch might not have the static shape API you need to avoid syncrhonization (see passing `torch.repeat_interleave(..., output_size=20)`). In this case, you can write your own Triton kernel.
