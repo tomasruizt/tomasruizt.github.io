@@ -23,14 +23,14 @@ format:
 
 * For everyone writing PyTorch code on GPU: this talk is for you.
 * Understand what **CPU-GPU synchronizations** are in PyTorch.
-* Learn how to spot syncs and how to fix them.
 * Why? Syncs are a **silent performance killer**. Your code is still correct, but you are leaving speed on the table.
+* Learn how to spot syncs and how to fix them.
 
 ## Overview
 
-1. **A training loop suffering from a synchronization**
-2. **NVIDIA Nsight Systems Profiler**
-3. **Deep dive: Dynamic tensor shapes**
+1. **Basic training loop showing the problem**
+2. **Real Profiling: NVIDIA Nsight Systems**
+3. **Deep dive into subtle syncs**
 4. **Unit testing that code is sync-free**
 
 . . .
@@ -59,7 +59,9 @@ Something is quietly wrong with this loop. We'll come back to it.
 
 ## The GPU Is Asynchronous
 
-The CPU is the boss of the GPU. CPU **schedules** PyTorch ops, which are queued and executed by the GPU.
+**Principle:** The CPU is the boss of the GPU. 
+
+CPU **schedules** PyTorch ops, which are queued and executed by the GPU.
 
 ![](images/cpu-gpu-timeline.svg){width="95%" fig-align="center"}
 
@@ -122,14 +124,14 @@ A simpler PyTorch example:
 n = 5
 for _ in range(n):
     out = slow_operation(X)    # e.g. matrix multiplication
-    out = fast_operation(out)  # e.g mean()
+    out = quick_operation(out)  # e.g mean()
     if do_print:
         print(out)  # CPU-GPU sync
 ```
 
 Profiling Command:
 ``` shell
-nsys profile -o profile.nsys-rep python cpu_gpu_sync_example.py --do-print
+nsys profile python cpu_gpu_sync_example.py --do-print
 ```
 
 Full code: <https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90>
@@ -141,7 +143,7 @@ Full code: <https://gist.github.com/tomasruizt/4281c61bfaead3e61211d052d3971c90>
 
 ## Ok, We Stop Writing Slow Code
 
-As the performance tuning docs suggest^[<https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization>]:
+The PyTorch performance tuning docs^[<https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization>] suggest:
 
 * No `cuda_tensor.item()`
 * No `print(cuda_tensor)`
@@ -161,7 +163,7 @@ x = t[mask]  # boolean indexing selects subset
 # k is an integer on the GPU.
 x = t[:k]  # CPU doesn't know len(x)
 
-# output size depends on contents of t
+# size of x depends on contents of t
 x = torch.nonzero(t)   # indices of nonzero vals
 x = torch.unique(t)    # set of unique vals in t
 ```
@@ -174,8 +176,6 @@ They sync because PyTorch needs to **allocate the output tensor x**, and it need
 
 **If the output shape depends on GPU data,
 the CPU must ask the GPU → synchronization**
-
-. . .
 
 * **Static shape?** → async (healthy)
 * **Dynamic shape?** → synchronization
@@ -197,7 +197,7 @@ x = torch.repeat_interleave(cuda_tensor, counts, output_size=total)
 General strategies:
 
 - Use APIs with explicit `output_size=` / `num_classes=` parameters
-- Keep shape-defining counters on the **CPU side** when possible
+- Keep shape-defitions like `total` on the **CPU side** when possible
 - **Pad to a fixed size** instead of masking variable-length sequences
 
 # Unit Testing
@@ -222,12 +222,12 @@ cuda_tensor.item()
 
 Use it in **unit tests** to verify that your code is sync-free!
 
-``` {.python code-line-numbers="1-5|1-5,7-8,10,14"}
+``` {.python code-line-numbers="1-5|1-5,7-8,10,12,14"}
 @fail_on_gpu_sync
 def test_training_step_has_no_sync():
     inputs = load_inputs()
     out = my_pytorch_fn(inputs)
-    assert ...
+    assert ...  # correctness check
 
 # Decorator raises RuntimeError if my_pytorch_fn() has any CPU-GPU sync
 def fail_on_gpu_sync(fn):
