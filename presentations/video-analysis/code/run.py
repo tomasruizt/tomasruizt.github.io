@@ -27,20 +27,23 @@ if not cloud_file.exists():
 # Assemble LLM request
 client = genai.Client(vertexai=True, project=GOOGLE_PROJECT, location="global")
 
+prompt_content = Content(role="user", parts=[Part.from_text(text=prompt)])
 video_content = Part.from_uri(
     file_uri=f"gs://{GOOGLE_BUCKET}/{VIDEO_FILE}",
     mime_type="video/mp4",
 )
-text_content = Content(role="user", parts=[Part.from_text(text=prompt)])
 
-# Execute request
+# Call the LLM
+answer = client.models.generate_content_stream(
+    model=MODEL,
+    contents=[video_content, prompt_content],
+)
+
+# Show prompt and answer
 print("=== PROMPT ===")
 print(prompt)
 
 print("=== ANSWER ===")
-for chunk in client.models.generate_content_stream(
-    model=MODEL,
-    contents=[video_content, text_content],
-):
+for chunk in answer:
     print(chunk.text, end="", flush=True)
 print()
