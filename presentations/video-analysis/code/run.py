@@ -19,15 +19,15 @@ GOOGLE_BUCKET = "css-temp-bucket-for-vertex"
 prompt = Path(PROMPT_FILE).read_text()
 
 # Upload video to the cloud (skip if already there)
-sclient = storage.Client(project=GOOGLE_PROJECT)
-blob = sclient.bucket(GOOGLE_BUCKET).blob(VIDEO_FILE)
-if not blob.exists():
-    blob.upload_from_filename(VIDEO_FILE)
+client = storage.Client(project=GOOGLE_PROJECT)
+cloud_file = client.bucket(GOOGLE_BUCKET).blob(VIDEO_FILE)
+if not cloud_file.exists():
+    cloud_file.upload_from_filename(VIDEO_FILE)
 
-# Assemble request
+# Assemble LLM request
 client = genai.Client(vertexai=True, project=GOOGLE_PROJECT, location="global")
 
-video_part = Part.from_uri(
+video_content = Part.from_uri(
     file_uri=f"gs://{GOOGLE_BUCKET}/{VIDEO_FILE}",
     mime_type="video/mp4",
 )
@@ -40,7 +40,7 @@ print(prompt)
 print("=== ANSWER ===")
 for chunk in client.models.generate_content_stream(
     model=MODEL,
-    contents=[video_part, text_content],
+    contents=[video_content, text_content],
 ):
     print(chunk.text, end="", flush=True)
 print()
