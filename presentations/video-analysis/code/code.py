@@ -14,13 +14,13 @@ PROMPT_FILE = "prompt.txt"
 VIDEO_FILE = "sample-intolerance-video.mp4"
 MODEL = "gemini-3.5-flash"
 GOOGLE_PROJECT = "css-lehrbereich-schwemmer"
-GOOGLE_BUCKET = "css-temp-bucket-for-vertex"
+GOOGLE_FOLDER = "css-temp-bucket-for-vertex"
 
 prompt = Path(PROMPT_FILE).read_text()
 
 # Upload video to the cloud (skip if already there)
 client = storage.Client(project=GOOGLE_PROJECT)
-cloud_file = client.bucket(GOOGLE_BUCKET).blob(VIDEO_FILE)
+cloud_file = client.bucket(GOOGLE_FOLDER).blob(VIDEO_FILE)
 if not cloud_file.exists():
     cloud_file.upload_from_filename(VIDEO_FILE)
 
@@ -29,7 +29,7 @@ client = genai.Client(vertexai=True, project=GOOGLE_PROJECT, location="global")
 
 prompt_content = Content(role="user", parts=[Part.from_text(text=prompt)])
 video_content = Part.from_uri(
-    file_uri=f"gs://{GOOGLE_BUCKET}/{VIDEO_FILE}",
+    file_uri=f"gs://{GOOGLE_FOLDER}/{VIDEO_FILE}",
     mime_type="video/mp4",
 )
 
