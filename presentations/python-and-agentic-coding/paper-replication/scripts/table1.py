@@ -72,11 +72,14 @@ out = pd.DataFrame(table, index=index)
 
 pd.set_option("display.max_colwidth", None)
 pd.set_option("display.width", None)
-print("TABLE 1 — DESCRIPTIVE STATISTICS")
-print("(mean; standard deviation in parentheses; quartiles by settler mortality)\n")
-print(out.to_string())
+report = "\n".join([
+    "TABLE 1 — DESCRIPTIVE STATISTICS",
+    "(mean; standard deviation in parentheses; quartiles by settler mortality)",
+    "",
+    out.to_string(),
+]) + "\n"
+print(report)
 
-# Also save a CSV for reuse.
-outpath = ROOT / "figures" / "table1.csv"
-out.to_csv(outpath)
-print(f"\nsaved {outpath}")
+outpath = ROOT / "tables" / "table1.txt"
+outpath.write_text(report)
+print(f"saved {outpath}")

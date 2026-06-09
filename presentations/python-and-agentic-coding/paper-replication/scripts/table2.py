@@ -76,12 +76,16 @@ samples = {label: ("base" if b else "world") for label, _, _, b in SPECS}
 
 pd.set_option("display.max_colwidth", None)
 pd.set_option("display.width", None)
-print("TABLE 2 — OLS REGRESSIONS")
-print("(coefficient; standard error in parentheses)")
-print("outcome:", "  ".join(f"{k}={v}" for k, v in outcomes.items()))
-print("sample: ", "  ".join(f"{k}={v}" for k, v in samples.items()), "\n")
-print(out.to_string())
+report = "\n".join([
+    "TABLE 2 — OLS REGRESSIONS",
+    "(coefficient; standard error in parentheses)",
+    "outcome: " + "  ".join(f"{k}={v}" for k, v in outcomes.items()),
+    "sample:  " + "  ".join(f"{k}={v}" for k, v in samples.items()),
+    "",
+    out.to_string(),
+]) + "\n"
+print(report)
 
-outpath = ROOT / "figures" / "table2.csv"
-out.to_csv(outpath)
-print(f"\nsaved {outpath}")
+outpath = ROOT / "tables" / "table2.txt"
+outpath.write_text(report)
+print(f"saved {outpath}")
