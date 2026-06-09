@@ -1,0 +1,286 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{img/}}
+\captionsetup{font=small}
+
+\title{\textbf{A Two-Language Replication of}\\
+Acemoglu, Johnson, and Robinson (2001),\\
+\emph{``The Colonial Origins of Comparative Development''}}
+\author{Replication report}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent We replicate the core empirical results of Acemoglu, Johnson, and
+Robinson (2001, \emph{AER}) --- the three scatter relationships (Figures 1--3)
+and the descriptive, OLS, and instrumental-variables tables (Tables 1, 2, and
+4). The replication is carried out \emph{twice}, independently, in Python and in
+R, reading a single shared copy of the authors' data. Both implementations
+recover the paper's headline two-stage least-squares (2SLS) estimate of the
+effect of institutions on income, $0.94$ (s.e.\ $0.16$), and agree with each
+other to the last reported digit. The one substantive cross-language difference
+we encountered --- the standard error of the 2SLS coefficient --- turned out to
+be a degrees-of-freedom convention, which we reconcile so that both languages
+match the printed paper exactly.
+\end{abstract}
+
+\section{The paper in one paragraph}
+
+AJR ask whether \emph{institutions} cause long-run prosperity. The empirical
+problem is reverse causality and omitted variables: rich countries can afford
+good institutions, so a raw correlation between institutional quality and income
+is not evidence of a causal effect. AJR's identification strategy uses
+\emph{settler mortality} as an instrument for institutions. Where European
+settlers faced high mortality (tropical disease environments) they set up
+``extractive'' states rather than settling; where mortality was low they
+reproduced European-style institutions protecting property rights. Settler
+mortality plausibly affects income today \emph{only} through its historical
+effect on institutions, making it a valid instrument. The causal chain is:
+\[
+\text{settler mortality} \;\longrightarrow\; \text{early institutions}
+\;\longrightarrow\; \text{current institutions} \;\longrightarrow\;
+\text{income today}.
+\]
+The three key variables are \texttt{logpgp95} (log GDP per capita, PPP, 1995),
+\texttt{avexpr} (average protection against expropriation risk, 1985--95, the
+institutions proxy), and \texttt{logem4} (log settler mortality, the
+instrument). The main analysis runs on a ``base sample'' of 64 former colonies.
+
+\section{What we replicated}
+
+\begin{itemize}
+  \item \textbf{Figure 1} --- reduced form: income vs.\ settler mortality.
+  \item \textbf{Figure 2} --- OLS: income vs.\ expropriation risk.
+  \item \textbf{Figure 3} --- first stage: expropriation risk vs.\ settler mortality.
+  \item \textbf{Table 1} --- descriptive statistics by sample and mortality quartile.
+  \item \textbf{Table 2} --- OLS regressions of income on institutions.
+  \item \textbf{Table 4} --- 2SLS regressions (the headline result), with first
+        stage and OLS panels.
+\end{itemize}
+
+\section{Figures}
+
+The three figures reproduce the paper's bivariate relationships on the base
+sample ($n=64$), plotting country codes as markers with an OLS fit line. The
+fitted slopes match the corresponding regression coefficients in the tables: the
+Figure~2 slope ($0.522$) is the Table~2 column~(2) OLS coefficient, and the
+Figure~3 slope ($-0.607$) is the Table~4 first-stage coefficient.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figure1.png}
+  \caption{Reduced-form relationship between income and settler mortality
+  (slope $-0.573$, s.e.\ $0.076$, $R^2=0.477$). High-mortality colonies are
+  poorer today.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figure2.png}
+  \caption{OLS relationship between expropriation risk and income
+  (slope $0.522$, s.e.\ $0.061$, $R^2=0.540$). Better property-rights
+  protection is associated with higher income.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figure3.png}
+  \caption{First-stage relationship between settler mortality and expropriation
+  risk (slope $-0.607$, s.e.\ $0.127$, $R^2=0.270$). The instrument is strongly
+  correlated with the endogenous regressor.}
+\end{figure}
+
+\section{Tables}
+
+All tables report the reproduced values; standard errors are in parentheses.
+Each matches the printed paper up to rounding. The notes below each table flag
+the few known data-driven discrepancies.
+
+\begin{table}[H]
+  \centering
+  \caption{Descriptive statistics (mean; standard deviation in parentheses).
+  Columns (1)--(4) split the base sample by quartiles of settler mortality.}
+  \footnotesize
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{lcccccc}
+    \toprule
+    & Whole world & Base sample & (1) & (2) & (3) & (4) \\
+    \midrule
+    Log GDP per capita (PPP) 1995              & 8.30 (1.11) & 8.06 (1.04) & 8.89 (1.29) & 8.41 (0.64) & 7.78 (0.80) & 7.20 (0.63) \\
+    Log output per worker 1988                 & -1.73 (1.08) & -1.93 (0.98) & -1.03 (0.86) & -1.46 (0.42) & -2.20 (0.80) & -3.03 (0.48) \\
+    Avg.\ expropriation risk 1985--95          & 7.07 (1.80) & 6.52 (1.47) & 7.90 (1.55) & 6.47 (0.95) & 5.97 (1.32) & 5.89 (1.30) \\
+    Constraint on executive 1990               & 3.64 (2.34) & 3.97 (2.26) & 5.33 (2.10) & 5.12 (1.80) & 3.31 (2.18) & 2.27 (1.58) \\
+    Constraint on executive 1900               & 1.86 (1.82) & 2.25 (2.11) & 3.67 (2.99) & 3.28 (2.11) & 1.12 (0.50) & 1.00 (0.00) \\
+    Constraint at independence                 & 3.59 (2.41) & 3.40 (2.39) & 5.17 (2.76) & 2.44 (1.92) & 3.12 (2.28) & 3.43 (2.14) \\
+    Democracy 1900                             & 1.15 (2.58) & 1.64 (3.00) & 3.92 (4.58) & 2.76 (2.91) & 0.19 (0.40) & 0.00 (0.00) \\
+    European settlements 1900                  & 0.30 (0.42) & 0.16 (0.26) & 0.32 (0.44) & 0.26 (0.18) & 0.08 (0.12) & 0.01 (0.02) \\
+    Log settler mortality                      & n.a.\ & 4.66 (1.26) & 3.01 (0.59) & 4.28 (0.05) & 4.92 (0.40) & 6.35 (0.75) \\
+    \midrule
+    Number of observations                     & 163 & 64 & 14 & 18 & 17 & 15 \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{OLS regressions. Dependent variable is log GDP per capita 1995, except
+  columns (7)--(8) which use log output per worker 1988. ``base'' = 64-country
+  base sample; ``world'' = whole-world sample.}
+  \footnotesize
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{lcccccccc}
+    \toprule
+    & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) \\
+    & world & base & world & world & base & base & world & base \\
+    \midrule
+    Avg.\ expropriation risk & 0.53 (0.04) & 0.52 (0.06) & 0.46 (0.06) & 0.39 (0.05) & 0.47 (0.06) & 0.40 (0.06) & 0.45 (0.04) & 0.46 (0.06) \\
+    Latitude                 &             &             & 0.87 (0.49) & 0.33 (0.45) & 1.58 (0.71) & 0.88 (0.63) &             &             \\
+    Asia dummy               &             &             &             & -0.15 (0.15) &            & -0.58 (0.23) &            &             \\
+    Africa dummy             &             &             &             & -0.92 (0.17) &            & -0.88 (0.17) &            &             \\
+    ``Other'' dummy          &             &             &             & 0.30 (0.37) &             & 0.11 (0.38) &             &             \\
+    \midrule
+    $R^2$                    & 0.61 & 0.54 & 0.62 & 0.72 & 0.57 & 0.71 & 0.55 & 0.49 \\
+    Observations             & 111 & 64 & 111 & 111 & 64 & 64 & 108 & 61 \\
+    \bottomrule
+  \end{tabular}}
+  \caption*{\footnotesize Note: the whole-world $N=111$, not the printed $110$;
+  AJR's replication code notes one observation was mistakenly dropped from the
+  printed table, so $111$ is the corrected figure (matching standard
+  reproductions).}
+\end{table}
+
+\setcounter{table}{3}% this is AJR's Table 4 (we replicate AJR Tables 1, 2, 4)
+\begin{table}[H]
+  \centering
+  \caption{IV regressions of log GDP per capita --- the headline result. Average
+  expropriation risk is instrumented by log settler mortality. Column (9) uses
+  log output per worker. America is the omitted continent dummy.}
+  \footnotesize
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{lccccccccc}
+    \toprule
+    & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) \\
+    & base & base & \makecell{no Neo-\\Europes} & \makecell{no Neo-\\Europes} & \makecell{no\\Africa} & \makecell{no\\Africa} & \makecell{+\,cont.\\dummies} & \makecell{+\,cont.\\dummies} & \makecell{output/\\worker} \\
+    \midrule
+    \multicolumn{10}{l}{\emph{Panel A: Two-Stage Least Squares}} \\
+    Avg.\ expropriation risk & 0.94 (0.16) & 1.00 (0.22) & 1.28 (0.36) & 1.21 (0.35) & 0.58 (0.10) & 0.58 (0.12) & 0.98 (0.30) & 1.11 (0.46) & 0.98 (0.17) \\
+    Latitude                 &             & -0.65 (1.34) &            & 0.94 (1.46) &            & 0.04 (0.84) &            & -1.18 (1.76) &            \\
+    Asia dummy               &             &             &             &             &            &             & -0.92 (0.40) & -1.05 (0.52) &           \\
+    Africa dummy             &             &             &             &             &            &             & -0.46 (0.36) & -0.44 (0.42) &           \\
+    ``Other'' dummy          &             &             &             &             &            &             & -0.94 (0.85) & -0.99 (1.00) &           \\
+    \midrule
+    \multicolumn{10}{l}{\emph{Panel B: First Stage (dependent variable: expropriation risk)}} \\
+    Log settler mortality    & -0.61 (0.13) & -0.51 (0.14) & -0.39 (0.13) & -0.39 (0.14) & -1.21 (0.22) & -1.14 (0.24) & -0.43 (0.17) & -0.34 (0.18) & -0.63 (0.13) \\
+    $R^2$                    & 0.27 & 0.30 & 0.13 & 0.13 & 0.47 & 0.47 & 0.30 & 0.33 & 0.29 \\
+    \midrule
+    \multicolumn{10}{l}{\emph{Panel C: Ordinary Least Squares}} \\
+    Avg.\ expropriation risk & 0.52 (0.06) & 0.47 (0.06) & 0.49 (0.08) & 0.47 (0.07) & 0.48 (0.07) & 0.47 (0.07) & 0.42 (0.06) & 0.40 (0.06) & 0.46 (0.06) \\
+    \midrule
+    Observations             & 64 & 64 & 60 & 60 & 37 & 37 & 64 & 64 & 61 \\
+    \bottomrule
+  \end{tabular}}
+  \caption*{\footnotesize Note: the public \texttt{maketable4.dta} does not ship
+  the ``Other'' continent dummy used in columns (7)--(8); we merge it in from
+  \texttt{maketable2.dta} on the country code. Panel A standard errors use the
+  small-sample ($n-k$) correction, matching the printed paper.}
+\end{table}
+
+\section{Reading the results}
+
+The headline comparison is OLS vs.\ IV. In Table~2 the OLS coefficient on
+expropriation risk is about $0.52$ (base sample); in Table~4 Panel~A the 2SLS
+coefficient is $0.94$. The instrumented estimate is \emph{larger}, not smaller.
+AJR read this as evidence that OLS is, if anything, attenuated by measurement
+error in the institutions proxy, and that the cross-country correlation is not
+merely reverse causation. Panel~B confirms a strong first stage --- log settler
+mortality enters with a coefficient of $-0.61$ (s.e.\ $0.13$) in the base
+sample --- so the instrument is not weak. The result is robust across samples:
+dropping the ``Neo-Europes'' (columns 3--4) or all of Africa (columns 5--6), or
+adding continent dummies (columns 7--8), leaves a large, significant effect.
+
+\section{The two-language replication}
+
+We implemented the entire pipeline twice, independently, against one shared copy
+of the data (\texttt{data/maketable\{1,2,4\}.dta}).
+
+\begin{table}[H]
+  \centering
+  \caption*{\textbf{Tools used in each implementation.}}
+  \small
+  \begin{tabular}{lll}
+    \toprule
+    Step & Python & R \\
+    \midrule
+    Read Stata \texttt{.dta} & \texttt{pandas.read\_stata} & \texttt{foreign::read.dta} \\
+    Figures                  & \texttt{matplotlib}        & base graphics \\
+    OLS (Tables 1--2)        & \texttt{statsmodels}       & \texttt{stats::lm} \\
+    2SLS (Table 4)           & \texttt{linearmodels.IV2SLS} & \texttt{ivreg::ivreg} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent The two stacks were chosen to be idiomatic rather than identical. On
+the R side, figures and the OLS tables need only base R plus the bundled
+\texttt{foreign} package --- no installation --- while Table~4 adds the
+lightweight \texttt{ivreg} package.
+
+\paragraph{Agreement.} Every point estimate agrees between Python and R to the
+two decimal places reported, and both match the paper. The figures' slopes,
+$R^2$, and sample sizes are identical across languages.
+
+\paragraph{The one wrinkle: 2SLS standard errors.} Our first R and Python
+versions disagreed on a single quantity --- the standard error of the headline
+2SLS coefficient: R reported $0.16$, Python $0.15$. This was not a bug but a
+\emph{degrees-of-freedom convention}. R's \texttt{ivreg} divides the residual
+variance by $n-k$ (the textbook small-sample correction AJR used), whereas
+\texttt{linearmodels} with \texttt{cov\_type="unadjusted"} divides by $n$.
+Setting \texttt{debiased=True} in the Python fit applies the $n-k$ correction, after
+which both languages report $0.94\ (0.16)$ --- matching the printed paper
+exactly. This is a useful illustration of why a second, independent
+implementation is valuable: it surfaced a silent modeling assumption that a
+single-language replication would never have questioned.
+
+\section{Data notes and minor discrepancies}
+
+\begin{itemize}
+  \item \textbf{Whole-world $N=111$, not $110$.} AJR's own replication code notes
+        one observation was mistakenly dropped from the printed Table~2; $111$
+        is the corrected sample, and matches standard reproductions.
+  \item \textbf{The ``Other'' continent dummy} is absent from the public
+        \texttt{maketable4.dta}, so we merge it from \texttt{maketable2.dta} on
+        the country code for Table~4 columns (7)--(8).
+  \item \textbf{Mortality-quartile boundaries (Table 1).} Five countries are
+        stored at the float value of $78.1$; the paper assigns them to quartile
+        (2), so the (2)/(3) cut is placed at $78.15$ to reproduce the
+        $14/18/17/15$ split.
+\end{itemize}
+
+\section{Reproducibility}
+
+From the \texttt{paper-replication/} directory:
+\begin{quote}
+\texttt{make python}\quad --- run all Python scripts ($\rightarrow$ \texttt{python/figures}, \texttt{python/tables})\\
+\texttt{make R}\qquad\;\, --- run all R scripts ($\rightarrow$ \texttt{R/figures}, \texttt{R/tables})\\
+\texttt{make all}\qquad --- both
+\end{quote}
+Each language writes its figures as \texttt{.png} and its tables as plain-text
+files; the values in this report are taken directly from those outputs.
+
+\bigskip
+\noindent\emph{Reference:} Acemoglu, D., Johnson, S., \& Robinson, J.~A. (2001).
+The Colonial Origins of Comparative Development: An Empirical Investigation.
+\emph{American Economic Review}, 91(5), 1369--1401.
+
+\end{document}
