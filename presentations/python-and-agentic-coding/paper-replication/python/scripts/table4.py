@@ -28,9 +28,10 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from linearmodels.iv import IV2SLS
 
-ROOT = Path(__file__).parent.parent  # paper-replication/
-df = pd.read_stata(ROOT / "data" / "maketable4.dta")
-other = pd.read_stata(ROOT / "data" / "maketable2.dta")[["shortnam", "other"]]
+ROOT = Path(__file__).parent.parent  # paper-replication/python/
+DATA = ROOT.parent / "data"          # shared data lives at the repl root
+df = pd.read_stata(DATA / "maketable4.dta")
+other = pd.read_stata(DATA / "maketable2.dta")[["shortnam", "other"]]
 df = df.merge(other, on="shortnam", how="left")
 
 # (label, outcome, sample filter, extra exogenous controls)

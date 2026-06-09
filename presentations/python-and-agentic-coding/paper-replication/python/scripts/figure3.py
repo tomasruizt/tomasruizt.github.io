@@ -13,10 +13,11 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
-ROOT = Path(__file__).parent.parent  # paper-replication/
+ROOT = Path(__file__).parent.parent  # paper-replication/python/
+DATA = ROOT.parent / "data"          # shared data lives at the repl root
 
 # Figure 3 uses the base sample (the 64 countries in the main analysis).
-df = pd.read_stata(ROOT / "data" / "maketable1.dta")
+df = pd.read_stata(DATA / "maketable1.dta")
 df = df[df["baseco"] == 1].dropna(subset=["avexpr", "logem4"])
 
 # First-stage OLS fit: expropriation risk ~ log settler mortality.

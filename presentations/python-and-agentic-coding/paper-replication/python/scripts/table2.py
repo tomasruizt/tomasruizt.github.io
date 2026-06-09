@@ -23,8 +23,9 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.formula.api as smf
 
-ROOT = Path(__file__).parent.parent  # paper-replication/
-df = pd.read_stata(ROOT / "data" / "maketable2.dta")
+ROOT = Path(__file__).parent.parent  # paper-replication/python/
+DATA = ROOT.parent / "data"          # shared data lives at the repl root
+df = pd.read_stata(DATA / "maketable2.dta")
 
 # (label, outcome, regressors, base_sample_only)
 SPECS = [

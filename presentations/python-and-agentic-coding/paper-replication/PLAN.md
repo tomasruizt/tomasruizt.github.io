@@ -35,7 +35,6 @@ on `shortnam`.
 2. Load + filter to base sample.
 3. Build the 3 figures.
 4. Run OLS (Table 2) and 2SLS (Table 4); compare coefficients to paper.
-5. (Stretch) Albouy critique: show sensitivity to mortality data choices.
 
 ## Stack
 `pandas`, `numpy`, `matplotlib`, `statsmodels`, `linearmodels`

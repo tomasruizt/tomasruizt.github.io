@@ -9,9 +9,10 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).parent.parent  # paper-replication/
+ROOT = Path(__file__).parent.parent  # paper-replication/python/
+DATA = ROOT.parent / "data"          # shared data lives at the repl root
 
-df = pd.read_stata(ROOT / "data" / "maketable1.dta")
+df = pd.read_stata(DATA / "maketable1.dta")
 # euro1900 is stored 0-100; the paper reports it as a 0-1 fraction.
 df["euro1900"] = df["euro1900"] / 100
 
