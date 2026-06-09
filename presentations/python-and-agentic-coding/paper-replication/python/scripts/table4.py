@@ -21,6 +21,10 @@ Nine columns, three panels:
 Data note: the public maketable4.dta does not ship the `other` continent dummy
 that columns (7)-(9) need, so we merge it in from maketable2.dta on `shortnam`
 (same dataset, same coding the existing table2.py already relies on).
+
+SE note: Panel A uses debiased (n-k) standard errors so they match the printed
+paper and the R/ivreg replication exactly (col 1: 0.94 (0.16)). Without the
+correction linearmodels divides by n and reports 0.94 (0.15).
 """
 from pathlib import Path
 
@@ -55,9 +59,11 @@ def fit_column(outcome, mask, controls):
     data = df.loc[mask, cols].dropna()
     exog = " + ".join(["1"] + controls)
     # Panel A: 2SLS, avexpr instrumented by logem4.
+    # debiased=True applies the small-sample (n-k) df correction, matching the
+    # printed paper's SEs and R's ivreg() default (e.g. col 1: 0.16, not 0.15).
     iv = IV2SLS.from_formula(
         f"{outcome} ~ {exog} + [avexpr ~ logem4]", data
-    ).fit(cov_type="unadjusted")
+    ).fit(cov_type="unadjusted", debiased=True)
     # Panel B: first stage.
     first = smf.ols(f"avexpr ~ {exog} + logem4", data).fit()
     # Panel C: OLS of the outcome on avexpr (+ controls).
