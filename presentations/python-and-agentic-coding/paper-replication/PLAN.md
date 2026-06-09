@@ -14,21 +14,19 @@ Settler mortality is the **instrument** for institutions (expropriation risk).
 - `logem4` — log settler mortality (instrument)
 
 ## What we replicate
-| # | Target | Method | Tool | Status |
-|---|--------|--------|------|--------|
-| 1 | **Figure 1** — log GDP vs. settler mortality (reduced form) | scatter + fit | matplotlib | ✅ `figure1.py` |
-| 2 | **Figure 2** — log GDP vs. expropriation risk (OLS) | scatter + fit | matplotlib | ✅ `figure2.py` |
-| 3 | **Figure 3** — expropriation risk vs. settler mortality (first stage) | scatter + fit | matplotlib | ✅ `figure3.py` |
-| 4 | **Table 1** — summary statistics | descriptive | pandas | ✅ `table1.py` |
-| 5 | **Table 2** — OLS: `logpgp95 ~ avexpr` | OLS | statsmodels | ✅ `table2.py` |
-| 6 | **Table 4** — 2SLS: `logpgp95 ~ avexpr`, instrument `logem4` (9 cols, 3 panels) | IV / 2SLS | linearmodels.IV2SLS | ✅ `table4.py` |
+| # | Target | Method | Tool |
+|---|--------|--------|------|
+| 1 | **Figure 1** — log GDP vs. settler mortality (reduced form) | scatter + fit | matplotlib |
+| 2 | **Figure 2** — log GDP vs. expropriation risk (OLS) | scatter + fit | matplotlib |
+| 3 | **Figure 3** — expropriation risk vs. settler mortality (first stage) | scatter + fit | matplotlib |
+| 4 | **Table 1** — summary statistics | descriptive | pandas |
+| 5 | **Table 2** — OLS: `logpgp95 ~ avexpr` | OLS | statsmodels |
+| 6 | **Table 4** — 2SLS: `logpgp95 ~ avexpr`, instrument `logem4` (9 cols, 3 panels) | IV / 2SLS | linearmodels.IV2SLS |
 
-**Headline number to match:** 2SLS coefficient on `avexpr` ≈ 0.94. → **reproduced: 0.94 (0.15)** [paper: 0.94 (0.16)].
+**Headline number to match:** 2SLS coefficient on `avexpr` ≈ 0.94 [paper: 0.94 (0.16)].
 
-All 9 Table 4 columns and all three panels (2SLS / first stage / OLS) match the
-published values to rounding. The public `maketable4.dta` lacks the `other`
-continent dummy needed for cols (7)–(8), so it is merged in from `maketable2.dta`
-on `shortnam`.
+Note: the public `maketable4.dta` lacks the `other` continent dummy needed for
+cols (7)–(8); it can be merged in from `maketable2.dta` on `shortnam`.
 
 ## Steps
 1. Get data — AJR replication dataset (`maketable*.dta`, mirrored online).
