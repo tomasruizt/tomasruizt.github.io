@@ -2,7 +2,7 @@
 
 **Goal:** Reproduce the paper's core plots and regressions in Python, approximately.
 
-**Paper:** `../pdfs/acemoglu-2001-colonial-origins.pdf` (AER 91(5), pp. 1369–1401)
+**Paper:** `acemoglu-2001-colonial-origins.pdf` (AER 91(5), pp. 1369–1401)
 
 ## Core idea
 Institutions cause prosperity. Settler mortality → settlement strategy → institutions → income today.
