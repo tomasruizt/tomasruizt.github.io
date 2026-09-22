@@ -2,7 +2,7 @@
 
 [Open the tabbed HTML report](RESULTS.html).
 
-Each table's Logs row links to Server logs and Bench logs, metric JSON exports, and configurations by concurrency. Bench also documents the source fields and formulas. Share the HTML, benchmark-logs.html, and model directories together.
+Each table's Logs link opens server and benchmark logs, metric exports, and configurations for every repetition.
 
 - **Releases:** vLLM 0.30.0 (`ced6857afa0ea7b2e3f0846a62e1394e90f15607`); SGLang 0.5.20. Latest published releases checked on 2026-09-22.
 - **PR2:** head `a8db1fe32ac19c2296bc0e9faedf9550ee56dd2d` merged with vLLM 0.30.0 as `63dc18cf5a93f69be959b2d2f3c26109ac693766`. Only PR2's four files differ; compiled kernels come from the release wheel.
@@ -34,7 +34,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 880.27 | 1,870.76 | 976.46 | 2,523.63 | 2,148.68 |
 | 16 | 1,695.01 | 2,599.91 | 1,869.05 | 3,240.05 | 3,181.93 |
 | 32 | 3,080.62 | 3,207.61 | 3,326.50 | 4,632.60 | 3,986.62 |
-| Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#27B-vllm_baseline) | [Logs](benchmark-logs.html#27B-vllm_dflash) | [Logs](benchmark-logs.html#27B-sglang_baseline) | [Logs](benchmark-logs.html#27B-sglang_dflash) | [Logs](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B ITL p99 (ms)
 
@@ -46,7 +46,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 9.68 | 87.78 | 11.60 | 50.96 | 72.83 |
 | 16 | 10.26 | 90.16 | 12.36 | 89.95 | 74.99 |
 | 32 | 11.94 | 118.15 | 14.46 | 77.09 | 97.66 |
-| Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#27B-vllm_baseline) | [Logs](benchmark-logs.html#27B-vllm_dflash) | [Logs](benchmark-logs.html#27B-sglang_baseline) | [Logs](benchmark-logs.html#27B-sglang_dflash) | [Logs](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B TTFT p99 (ms)
 
@@ -58,7 +58,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 165.41 | 228.33 | 76.49 | 105.84 | 198.23 |
 | 16 | 117.40 | 254.47 | 90.14 | 124.66 | 211.56 |
 | 32 | 211.14 | 339.66 | 146.90 | 447.87 | 275.07 |
-| Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#27B-vllm_baseline) | [Logs](benchmark-logs.html#27B-vllm_dflash) | [Logs](benchmark-logs.html#27B-sglang_baseline) | [Logs](benchmark-logs.html#27B-sglang_dflash) | [Logs](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B TPOT p90 (ms)
 
@@ -70,7 +70,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 8.79 | 4.80 | 7.98 | 3.60 | 4.17 |
 | 16 | 9.13 | 6.98 | 8.28 | 5.92 | 5.78 |
 | 32 | 9.95 | 11.49 | 8.80 | 7.95 | 9.19 |
-| Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#27B-vllm_baseline) | [Logs](benchmark-logs.html#27B-vllm_dflash) | [Logs](benchmark-logs.html#27B-sglang_baseline) | [Logs](benchmark-logs.html#27B-sglang_dflash) | [Logs](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B Acceptance length (including bonus)
 
@@ -82,7 +82,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | — | 7.45 | — | 7.63 | 7.48 |
 | 16 | — | 7.66 | — | 7.73 | 7.62 |
 | 32 | — | 7.70 | — | 7.64 | 7.70 |
-| Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#27B-vllm_baseline) | [Logs](benchmark-logs.html#27B-vllm_dflash) | [Logs](benchmark-logs.html#27B-sglang_baseline) | [Logs](benchmark-logs.html#27B-sglang_dflash) | [Logs](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B Memory & capacity
 
@@ -91,7 +91,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | Reported cache tokens | 2,134,931.00 | 1,139,046.67 | 2,140,480.00 | 1,071,151.00 | 1,134,165.00 |
 | 128K seq equivalents (est.) | 16.29 | 8.69 | 16.33 | 8.17 | 8.65 |
 | Configured request limit | 32.00 | 32.00 | 32.00 | 32.00 | 32.00 |
-| Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#27B-vllm_baseline) | [Logs](benchmark-logs.html#27B-vllm_dflash) | [Logs](benchmark-logs.html#27B-sglang_baseline) | [Logs](benchmark-logs.html#27B-sglang_dflash) | [Logs](benchmark-logs.html#27B-pr2_dflash) |
 
 128K = 131,072 tokens. Sequence equivalents = reported cache tokens / 131,072, not measured concurrency. These allocations come from servers configured for 32,768-token contexts and 32 request slots; reconfiguring for 128K may change capacity. No long-context measurements were run.
 
@@ -105,7 +105,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 2,715.41 | 2,845.69 | 2,942.68 | 4,291.27 | 3,665.64 |
 | 16 | 5,036.88 | 4,256.38 | 5,584.93 | 5,765.82 | 5,351.84 |
 | 32 | 8,860.49 | 5,675.74 | 9,638.42 | 9,442.54 | 6,651.20 |
-| Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#4B-vllm_baseline) | [Logs](benchmark-logs.html#4B-vllm_dflash) | [Logs](benchmark-logs.html#4B-sglang_baseline) | [Logs](benchmark-logs.html#4B-sglang_dflash) | [Logs](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B ITL p99 (ms)
 
@@ -117,7 +117,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 3.82 | 48.01 | 4.02 | 30.66 | 39.49 |
 | 16 | 5.01 | 50.93 | 5.11 | 47.27 | 40.36 |
 | 32 | 5.58 | 58.33 | 7.81 | 33.10 | 52.26 |
-| Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#4B-vllm_baseline) | [Logs](benchmark-logs.html#4B-vllm_dflash) | [Logs](benchmark-logs.html#4B-sglang_baseline) | [Logs](benchmark-logs.html#4B-sglang_dflash) | [Logs](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B TTFT p99 (ms)
 
@@ -129,7 +129,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 79.86 | 131.84 | 49.96 | 70.96 | 110.22 |
 | 16 | 92.33 | 144.38 | 49.93 | 73.71 | 122.79 |
 | 32 | 142.11 | 187.99 | 134.55 | 208.43 | 171.13 |
-| Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#4B-vllm_baseline) | [Logs](benchmark-logs.html#4B-vllm_dflash) | [Logs](benchmark-logs.html#4B-sglang_baseline) | [Logs](benchmark-logs.html#4B-sglang_dflash) | [Logs](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B TPOT p90 (ms)
 
@@ -141,7 +141,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 2.71 | 3.42 | 2.56 | 2.33 | 2.70 |
 | 16 | 2.88 | 4.88 | 2.71 | 3.65 | 3.84 |
 | 32 | 3.20 | 7.29 | 2.96 | 4.36 | 6.37 |
-| Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#4B-vllm_baseline) | [Logs](benchmark-logs.html#4B-vllm_dflash) | [Logs](benchmark-logs.html#4B-sglang_baseline) | [Logs](benchmark-logs.html#4B-sglang_dflash) | [Logs](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B Acceptance length (including bonus)
 
@@ -153,7 +153,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | — | 5.50 | — | 5.22 | 5.52 |
 | 16 | — | 5.62 | — | 5.59 | 5.57 |
 | 32 | — | 5.60 | — | 5.54 | 5.64 |
-| Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#4B-vllm_baseline) | [Logs](benchmark-logs.html#4B-vllm_dflash) | [Logs](benchmark-logs.html#4B-sglang_baseline) | [Logs](benchmark-logs.html#4B-sglang_dflash) | [Logs](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B Memory & capacity
 
@@ -162,7 +162,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | Reported cache tokens | 5,036,229.67 | 2,856,496.00 | 5,128,384.00 | 2,674,702.00 | 2,856,496.00 |
 | 128K seq equivalents (est.) | 38.42 | 21.79 | 39.13 | 20.41 | 21.79 |
 | Configured request limit | 32.00 | 32.00 | 32.00 | 32.00 | 32.00 |
-| Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#4B-vllm_baseline) | [Logs](benchmark-logs.html#4B-vllm_dflash) | [Logs](benchmark-logs.html#4B-sglang_baseline) | [Logs](benchmark-logs.html#4B-sglang_dflash) | [Logs](benchmark-logs.html#4B-pr2_dflash) |
 
 128K = 131,072 tokens. Sequence equivalents = reported cache tokens / 131,072, not measured concurrency. These allocations come from servers configured for 32,768-token contexts and 32 request slots; reconfiguring for 128K may change capacity. No long-context measurements were run.
 
@@ -176,7 +176,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 1,371.03 | 2,398.98 | 1,623.04 | 2,823.40 | 2,685.02 |
 | 16 | 2,312.08 | 3,448.68 | 2,728.21 | 3,924.49 | 3,805.00 |
 | 32 | 3,933.29 | 3,125.55 | 4,127.09 | 6,673.55 | 3,448.48 |
-| Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#35B-A3B-vllm_baseline) | [Logs](benchmark-logs.html#35B-A3B-vllm_dflash) | [Logs](benchmark-logs.html#35B-A3B-sglang_baseline) | [Logs](benchmark-logs.html#35B-A3B-sglang_dflash) | [Logs](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B ITL p99 (ms)
 
@@ -188,7 +188,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 6.38 | 58.32 | 9.29 | 40.26 | 52.65 |
 | 16 | 7.71 | 63.92 | 9.71 | 70.85 | 62.08 |
 | 32 | 9.69 | 120.23 | 12.37 | 45.20 | 116.30 |
-| Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#35B-A3B-vllm_baseline) | [Logs](benchmark-logs.html#35B-A3B-vllm_dflash) | [Logs](benchmark-logs.html#35B-A3B-sglang_baseline) | [Logs](benchmark-logs.html#35B-A3B-sglang_dflash) | [Logs](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B TTFT p99 (ms)
 
@@ -200,7 +200,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 887.15 | 162.78 | 65.41 | 79.78 | 144.89 |
 | 16 | 172.82 | 409.66 | 61.99 | 95.94 | 196.54 |
 | 32 | 215.12 | 334.46 | 89.53 | 293.53 | 332.30 |
-| Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#35B-A3B-vllm_baseline) | [Logs](benchmark-logs.html#35B-A3B-vllm_dflash) | [Logs](benchmark-logs.html#35B-A3B-sglang_baseline) | [Logs](benchmark-logs.html#35B-A3B-sglang_dflash) | [Logs](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B TPOT p90 (ms)
 
@@ -212,7 +212,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | 5.38 | 3.95 | 4.76 | 3.40 | 3.50 |
 | 16 | 6.49 | 5.61 | 5.71 | 5.12 | 5.04 |
 | 32 | 7.67 | 12.59 | 7.32 | 5.64 | 11.76 |
-| Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#35B-A3B-vllm_baseline) | [Logs](benchmark-logs.html#35B-A3B-vllm_dflash) | [Logs](benchmark-logs.html#35B-A3B-sglang_baseline) | [Logs](benchmark-logs.html#35B-A3B-sglang_dflash) | [Logs](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B Acceptance length (including bonus)
 
@@ -224,7 +224,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | 8 | — | 6.50 | — | 6.48 | 6.49 |
 | 16 | — | 6.51 | — | 6.64 | 6.64 |
 | 32 | — | 6.56 | — | 6.60 | 6.56 |
-| Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#35B-A3B-vllm_baseline) | [Logs](benchmark-logs.html#35B-A3B-vllm_dflash) | [Logs](benchmark-logs.html#35B-A3B-sglang_baseline) | [Logs](benchmark-logs.html#35B-A3B-sglang_dflash) | [Logs](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B Memory & capacity
 
@@ -233,7 +233,7 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 | Reported cache tokens | 6,368,085.33 | 1,967,364.33 | 6,697,728.00 | 2,648,553.00 | 1,967,364.33 |
 | 128K seq equivalents (est.) | 48.59 | 15.01 | 51.10 | 20.21 | 15.01 |
 | Configured request limit | 32.00 | 32.00 | 32.00 | 32.00 | 32.00 |
-| Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
+| Logs | [Logs](benchmark-logs.html#35B-A3B-vllm_baseline) | [Logs](benchmark-logs.html#35B-A3B-vllm_dflash) | [Logs](benchmark-logs.html#35B-A3B-sglang_baseline) | [Logs](benchmark-logs.html#35B-A3B-sglang_dflash) | [Logs](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 128K = 131,072 tokens. Sequence equivalents = reported cache tokens / 131,072, not measured concurrency. These allocations come from servers configured for 32,768-token contexts and 32 request slots; reconfiguring for 128K may change capacity. No long-context measurements were run.
 
