@@ -1,4 +1,7 @@
-To publish, run the command `make render`. This will overwrite the `docs/` directory with the rendered content. The `docs/` directory is what is served by GitHub Pages. 
+To publish, run the command `make render-for-publish`. This will overwrite the `docs/` directory with the rendered content. The `docs/` directory is what is served by GitHub Pages.
+
+Standalone reports live in `reports/` and are copied into `docs/reports/` during publishing.
+The [B200 DFlash benchmark report](https://tomasruizt.github.io/reports/b200-dflash/) includes both draft lengths, all three models, and linked logs.
 
 # Installation
 

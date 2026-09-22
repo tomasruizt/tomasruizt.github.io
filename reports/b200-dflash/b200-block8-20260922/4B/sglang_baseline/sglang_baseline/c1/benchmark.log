@@ -1,0 +1,306 @@
+10:37:56.034 INFO     Starting AIPerf System (_single_run.py:64)
+10:37:56.038 INFO     [OK] Tokenizer /home/tomasruizt/.cache/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a detected (tokenizer_display.py:297)
+10:37:56.038 INFO     1 tokenizer validated | 0.0s (tokenizer_display.py:306)
+10:37:56.038 INFO     Prefetching 1 tokenizer into HF cache... (tokenizer_validator.py:129)
+10:37:59.785 INFO       Cached /home/tomasruizt/.cache/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a (3.74s) (tokenizer_validator.py:146)
+10:37:59.831 INFO     1 tokenizer cached • 3.8s (tokenizer_validator.py:166)
+10:38:00.137 INFO     Server Metrics: Discovered 1 endpoints: ['http://127.0.0.1:8507/metrics'] (manager.py:97)
+10:38:00.160 INFO     GPU telemetry export enabled: /home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_baseline/sglang_baseline/c1/aiperf/gpu_telemetry_export.jsonl (jsonl_writer.py:56)
+10:38:00.164 INFO     Telemetry streaming is disabled (set --otel-url and/or --mlflow-tracking-uri to enable) (otel_metrics_results_processor.py:127)
+10:38:00.165 INFO     Record metrics export enabled: /home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_baseline/sglang_baseline/c1/aiperf/profile_export.jsonl (record_export_jsonl_writer.py:62)
+10:38:00.228 INFO     Registered Worker Manager (id: 'worker_manager') (system_controller.py:411)
+10:38:00.251 INFO     Registered Gpu Telemetry Manager (id: 'gpu_telemetry_manager') (system_controller.py:411)
+10:38:00.252 INFO     Registered Dataset Manager (id: 'dataset_manager') (system_controller.py:411)
+10:38:00.264 INFO     Registered Server Metrics Manager (id: 'server_metrics_manager') (system_controller.py:411)
+10:38:00.270 INFO     Registered Records Manager (id: 'records_manager') (system_controller.py:411)
+10:38:00.328 INFO     Registered Timing Manager (id: 'timing_manager') (system_controller.py:411)
+10:38:00.367 INFO     Registered Record Processor (id: 'record_processor_0cb118d2') (system_controller.py:411)
+10:38:00.452 INFO     Registered Worker (id: 'worker_9ba74921') (system_controller.py:411)
+10:38:00.623 INFO     AIPerf System is CONFIGURING (system_controller.py:292)
+10:38:00.623 INFO     Configuring all services to start profiling (system_controller.py:305)
+10:38:00.624 INFO     Configuring tokenizers for inference result parser (resolve_alias: True) (inference_result_parser.py:86)
+10:38:00.624 INFO     Waiting for dataset to be configured before configuring timing (manager.py:124)
+10:38:00.625 INFO     Configuring tokenizer(s) for dataset manager (dataset_manager.py:240)
+10:38:00.634 INFO     Server Metrics: Capturing baseline metrics... (manager.py:191)
+10:38:00.648 WARNING  Dropping non-finite (NaN/Inf) sample(s) from metric 'sglang:fwd_occupancy': 1 in this scrape; affected data will be missing from server_metrics_export. Further occurrences for this metric name will not be logged. (data_collector.py:374)
+10:38:00.651 INFO     Server metrics enabled - 1/1 endpoint(s) reachable. (system_controller.py:559)
+10:38:00.651 INFO     Waiting for result domains: profile, server_metrics, telemetry (system_controller.py:824)
+10:38:00.670 INFO     GPU Telemetry: Capturing baseline metrics from http://localhost:9400/metrics (manager.py:282)
+10:38:00.700 WARNING  GPU Telemetry: http://localhost:9401/metrics is not reachable (manager.py:253)
+10:38:00.701 INFO     DCGM telemetry enabled - 1/1 endpoint(s) reachable (system_controller.py:533)
+10:38:04.581 INFO     Initialized tokenizers: {'qwen': {'class': 'Qwen2Tokenizer', 'name_or_path': '/home/tomasruizt/.cache/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'}} in 3.96 seconds (inference_result_parser.py:109)
+10:38:04.630 INFO     Tokenizer(s) configured in 4.01 seconds (dataset_manager.py:244)
+10:38:04.631 INFO     Configuring dataset for dataset_manager (dataset_manager.py:250)
+10:38:04.965 INFO     Loading HuggingFace dataset 'openai/gsm8k' (split=test) (base_hf_dataset.py:48)
+10:38:05.129 INFO     HTTP Request: HEAD https://huggingface.co/datasets/openai/gsm8k/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect" (_client.py:1025)
+10:38:05.134 INFO     HTTP Request: HEAD https://huggingface.co/api/resolve-cache/datasets/openai/gsm8k/740312add88f781978c0658806c59bc2815b9866/README.md?%2Fdatasets%2Fopenai%2Fgsm8k%2Fresolve%2Fmain%2FREADME.md=&etag=%22ad25b2c451d0fcd2793678b2baa917c962acf281%22 "HTTP/1.1 200 OK" (_client.py:1025)
+10:38:05.174 INFO     HTTP Request: HEAD https://huggingface.co/datasets/openai/gsm8k/resolve/740312add88f781978c0658806c59bc2815b9866/gsm8k.py "HTTP/1.1 404 Not Found" (_client.py:1025)
+10:38:05.236 INFO     HTTP Request: HEAD https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/openai/gsm8k/openai/gsm8k.py "HTTP/1.1 404 Not Found" (_client.py:1025)
+10:38:05.284 INFO     HTTP Request: GET https://huggingface.co/api/datasets/openai/gsm8k/revision/740312add88f781978c0658806c59bc2815b9866 "HTTP/1.1 200 OK" (_client.py:1025)
+10:38:05.322 INFO     HTTP Request: HEAD https://huggingface.co/datasets/openai/gsm8k/resolve/740312add88f781978c0658806c59bc2815b9866/.huggingface.yaml "HTTP/1.1 404 Not Found" (_client.py:1025)
+10:38:05.378 INFO     HTTP Request: GET https://datasets-server.huggingface.co/info?dataset=openai/gsm8k "HTTP/1.1 200 OK" (_client.py:1025)
+10:38:05.421 INFO     HTTP Request: GET https://huggingface.co/api/datasets/openai/gsm8k/tree/740312add88f781978c0658806c59bc2815b9866/main?recursive=true&expand=false "HTTP/1.1 200 OK" (_client.py:1025)
+10:38:05.461 INFO     HTTP Request: GET https://huggingface.co/api/datasets/openai/gsm8k/tree/740312add88f781978c0658806c59bc2815b9866?recursive=false&expand=false "HTTP/1.1 200 OK" (_client.py:1025)
+10:38:05.499 INFO     HTTP Request: HEAD https://huggingface.co/datasets/openai/gsm8k/resolve/740312add88f781978c0658806c59bc2815b9866/dataset_infos.json "HTTP/1.1 404 Not Found" (_client.py:1025)
+10:38:05.550 INFO     Memory-mapped backing store initialized (streaming to /tmp/aiperf_mmap_487be2f47854/dataset.dat) (memory_map_utils.py:160)
+10:38:05.608 INFO     Data file finalized: 1319 conversations, 1.36 MB (memory_map_utils.py:288)
+10:38:05.609 INFO     Index file created: /tmp/aiperf_mmap_487be2f47854/index.dat (memory_map_utils.py:295)
+10:38:05.609 INFO     Backing store finalized: client_type=DatasetClientStoreType.MEMORY_MAP format=MemoryMapFormat.CONVERSATION data_file_path=PosixPath('/tmp/aiperf_mmap_487be2f47854/dataset.dat') index_file_path=PosixPath('/tmp/aiperf_mmap_487be2f47854/index.dat') conversation_count=1319 total_size_bytes=1431128 compressed=False compressed_data_file_path=None compressed_index_file_path=None compressed_size_bytes=0 (dataset_manager.py:969)
+10:38:05.620 INFO     sampling strategy: sequential, unique conversations: 1319, unique turn count: 1319 (dataset_manager.py:987)
+10:38:05.645 INFO     Generating inputs.json file at /home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_baseline/sglang_baseline/c1/aiperf/inputs.json (dataset_manager.py:489)
+10:38:05.657 INFO     Initialized 2 phase(s): ['Warmup', 'Profiling'] (phase_orchestrator.py:228)
+10:38:05.658 INFO     inputs.json file generated in 0.01 seconds (dataset_manager.py:508)
+10:38:05.964 INFO     Dataset client initialized and freed 1319 conversations from memory (dataset_manager.py:327)
+10:38:05.964 INFO     Dataset configured in 1.33 seconds (dataset_manager.py:263)
+10:38:05.965 INFO     All services configured in 5.34 seconds (system_controller.py:316)
+10:38:05.965 INFO     AIPerf System is CONFIGURED (system_controller.py:294)
+10:38:05.967 INFO     Server Metrics: Started 1 collector(s) successfully (manager.py:281)
+10:38:05.968 INFO     All services started profiling successfully (system_controller.py:338)
+10:38:05.968 INFO     AIPerf System is PROFILING (system_controller.py:296)
+10:38:05.968 INFO     Creating interval generator: pattern=concurrency_burst, rate=None, smoothness=None (request_rate.py:114)
+10:38:05.968 NOTICE   Phase warmup (warmup) started | phase_index=0 | target: 10 requests (runner.py:559)
+10:38:05.970 INFO     Credit phase start: warmup (records_manager.py:943)
+10:38:11.548 NOTICE   Phase warmup (warmup) sending complete | sent=10, completed=9, in_flight=1 | sessions: sent=10, completed=9 (runner.py:997)
+10:38:12.164 NOTICE   Phase warmup (warmup) complete | completed=10, cancelled=0, errors=0 | sessions: completed=10, cancelled=0 | elapsed=6.20s (runner.py:1120)
+10:38:12.165 INFO     Creating interval generator: pattern=concurrency_burst, rate=None, smoothness=None (request_rate.py:114)
+10:38:12.165 INFO     Server Metrics: Warmup complete, capturing final warmup metrics... (manager.py:304)
+10:38:12.165 NOTICE   Phase profiling (profiling) started | phase_index=1 | profiling_index=0 | target: 100 requests (runner.py:559)
+10:38:12.167 INFO     Credit phase start: profiling (records_manager.py:943)
+10:39:13.310 NOTICE   Phase profiling (profiling) sending complete | sent=100, completed=99, in_flight=1 | sessions: sent=100, completed=99 (runner.py:997)
+10:39:13.310 INFO     Sent 100 requests. Waiting for all to complete... (records_manager.py:959)
+10:39:13.930 NOTICE   Phase profiling (profiling) complete | completed=100, cancelled=0, errors=0 | sessions: completed=100, cancelled=0 | elapsed=61.76s (runner.py:1120)
+10:39:13.930 NOTICE   All credits completed (phase_orchestrator.py:245)
+10:39:13.931 INFO     Received credits complete from 'timing_manager' (system_controller.py:446)
+10:39:13.932 INFO     Received CREDIT_PHASE_COMPLETE message, Phase complete: PhaseRecordsStats(phase=CreditPhase.PROFILING, phase_index=1, profiling_index=0, phase_name='profiling', phase_kind='profiling', start_ns=1790073492165851145, sent_end_ns=1790073553309878007, requests_end_ns=1790073553930195995, baseline_start_ns=1790073492165837975, baseline_end_ns=1790073553930212539, total_expected_requests=100, expected_duration_sec=None, expected_num_sessions=None, expected_grace_period_sec=None, final_requests_sent=None, final_requests_completed=100, final_requests_cancelled=0, final_request_errors=0, final_sent_sessions=None, final_completed_sessions=None, final_cancelled_sessions=None, timeout_triggered=False, grace_period_timeout_triggered=False, was_cancelled=False, records_end_ns=None, success_records=99, error_records=0) (records_manager.py:985)
+10:39:13.932 NOTICE   All requests have completed, please wait for the results to be processed (currently 99 of 100 records processed)... (records_manager.py:996)
+10:39:13.932 INFO     All credits complete, please wait for the results to be processed... (records_manager.py:1022)
+10:39:13.935 INFO     Processed 100 valid requests and 0 errors (100 total). (records_manager.py:858)
+10:39:13.936 INFO     Received all records, processing now... (records_manager.py:864)
+10:39:13.937 INFO     GPU Telemetry: Profiling complete, capturing final metrics... (manager.py:422)
+10:39:13.937 INFO     Server Metrics: Profiling complete, capturing final metrics... (manager.py:355)
+10:39:13.938 INFO     Waiting 2.0s for server metrics flush period... (records_manager.py:918)
+10:39:15.931 INFO     Processing records results... (records_manager.py:1908)
+10:39:16.333 INFO     Waiting for result domains: server_metrics, telemetry (system_controller.py:824)
+10:39:16.334 INFO     Waiting for result domains: server_metrics (system_controller.py:824)
+10:39:16.458 INFO     _finalize_and_process_results completed (records_manager.py:925)
+10:39:16.460 INFO     All results received, initiating shutdown (system_controller.py:819)
+10:39:17.064 INFO     Exporting all records (exporter_manager.py:69)
+10:39:17.119 INFO     Exporting console data (exporter_manager.py:326)
+
+
+                                     NVIDIA AIPerf | LLM Metrics: Effective                                      
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃                                    Metric ┃    avg ┃    min ┃       max ┃      p99 ┃    p90 ┃    p50 ┃    std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│          Effective Concurrency (requests) │   1.00 │   0.00 │      1.00 │     1.00 │   1.00 │   1.00 │   0.07 │
+│  Effective Decode Throughput (tokens/sec) │ 412.86 │   0.00 │ 85,675.61 │   556.25 │ 483.52 │ 427.76 │ 289.32 │
+│ Effective Prefill Throughput (tokens/sec) │  96.54 │   0.00 │  5,224.02 │ 2,910.86 │   0.00 │   0.00 │ 509.65 │
+│   Effective Decode Concurrency (requests) │   0.96 │   0.00 │      1.00 │     1.00 │   1.00 │   1.00 │   0.20 │
+│  Effective Prefill Concurrency (requests) │   0.04 │   0.00 │      1.00 │     1.00 │   0.00 │   0.00 │   0.19 │
+│   Effective Total Throughput (tokens/sec) │ 509.40 │   0.00 │  5,224.02 │ 2,910.86 │ 432.13 │ 431.75 │ 433.32 │
+│      Effective Decode Throughput Per User │ 412.86 │   0.00 │ 85,675.61 │   556.25 │ 483.52 │ 427.76 │ 289.32 │
+│                         (tokens/sec/user) │        │        │           │          │        │        │        │
+│     Effective Prefill Throughput Per User │  96.54 │   0.00 │  5,224.02 │ 2,910.86 │   0.00 │   0.00 │ 509.65 │
+│                         (tokens/sec/user) │        │        │           │          │        │        │        │
+│                 Tokens In Flight (tokens) │ 182.11 │   0.00 │    383.00 │   336.00 │ 289.00 │ 182.00 │  79.95 │
+│         Effective Latency (CO-aware) (ms) │ 616.23 │ 613.61 │    626.64 │   625.69 │ 618.54 │ 615.63 │   2.40 │
+└───────────────────────────────────────────┴────────┴────────┴───────────┴──────────┴────────┴────────┴────────┘
+                                         NVIDIA AIPerf | LLM Metrics: Active                                          
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
+┃                                 Metric ┃      avg ┃      min ┃       max ┃      p99 ┃      p90 ┃      p50 ┃    std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
+│  Active Decode Throughput (tokens/sec) │   431.61 │     0.00 │ 85,675.61 │   557.83 │   484.60 │   430.08 │ 281.81 │
+│ Active Prefill Throughput (tokens/sec) │ 2,473.45 │ 1,039.52 │  5,224.02 │ 5,224.02 │ 3,718.35 │ 2,240.62 │ 880.58 │
+│      Active Decode Throughput Per User │   431.61 │     0.00 │ 85,675.61 │   557.83 │   484.60 │   430.08 │ 281.81 │
+│                      (tokens/sec/user) │          │          │           │          │          │          │        │
+│     Active Prefill Throughput Per User │ 2,473.45 │ 1,039.52 │  5,224.02 │ 5,224.02 │ 3,718.35 │ 2,240.62 │ 880.58 │
+│                      (tokens/sec/user) │          │          │           │          │          │          │        │
+│   Active Total Throughput (tokens/sec) │   511.66 │   427.32 │  5,224.02 │ 2,910.86 │   432.13 │   431.75 │ 432.95 │
+└────────────────────────────────────────┴──────────┴──────────┴───────────┴──────────┴──────────┴──────────┴────────┘
+                                          NVIDIA AIPerf | LLM Metrics                                          
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┓
+┃                                        Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃   std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━┩
+│                      Time to First Token (ms) │  24.11 │  21.95 │  33.78 │  33.59 │  25.18 │  23.61 │  2.21 │
+│                     Time to Second Token (ms) │   1.47 │   0.00 │   1.89 │   1.84 │   1.72 │   1.51 │  0.28 │
+│               Time to First Output Token (ms) │  24.11 │  21.95 │  33.78 │  33.59 │  25.18 │  23.61 │  2.21 │
+│                          Request Latency (ms) │ 614.92 │ 612.63 │ 625.16 │ 624.32 │ 617.19 │ 614.25 │  2.37 │
+│                          Decode Duration (ms) │ 590.81 │ 584.54 │ 596.75 │ 596.55 │ 591.58 │ 590.63 │  1.32 │
+│                      Inter Token Latency (ms) │   2.32 │   2.29 │   2.34 │   2.34 │   2.32 │   2.32 │  0.01 │
+│              Output Token Throughput Per User │ 431.61 │ 427.32 │ 436.24 │ 433.46 │ 432.05 │ 431.74 │  0.96 │
+│                             (tokens/sec/user) │        │        │        │        │        │        │       │
+│ E2E Output Token Throughput (tokens/sec/user) │ 416.32 │ 409.50 │ 417.87 │ 417.85 │ 417.39 │ 416.77 │  1.59 │
+│               Output Sequence Length (tokens) │ 256.00 │ 256.00 │ 256.00 │ 256.00 │ 256.00 │ 256.00 │  0.00 │
+│                Input Sequence Length (tokens) │  59.63 │  24.00 │ 127.00 │ 123.04 │  88.50 │  54.50 │ 21.34 │
+│          Output Token Throughput (tokens/sec) │ 414.48 │    N/A │    N/A │    N/A │    N/A │    N/A │   N/A │
+│           Input Token Throughput (tokens/sec) │  96.54 │    N/A │    N/A │    N/A │    N/A │    N/A │   N/A │
+│             Request Throughput (requests/sec) │   1.62 │    N/A │    N/A │    N/A │    N/A │    N/A │   N/A │
+│                      Request Count (requests) │ 100.00 │    N/A │    N/A │    N/A │    N/A │    N/A │   N/A │
+└───────────────────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┘
+
+
+╭──────────────────────────────────────────── GPU Telemetry Platform ─────────────────────────────────────────────╮
+│  Platform: nvidia                                                                                               │
+│  Metric semantics are platform-specific; cross-platform comparisons require workload and collector validation.  │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+            GPU Power Efficiency (NVIDIA)             
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃                                Metric ┃        avg ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│            Energy Delay Product (J*s) │   1,298.68 │
+│ Performance per Watt (requests/sec/W) │       0.00 │
+│     Output Tokens per Second per Watt │       0.12 │
+│                        (tokens/sec/W) │            │
+│                 Average GPU Power (W) │   3,419.34 │
+│                  Total GPU Energy (J) │ 211,193.36 │
+│                   Total GPU Power (W) │   3,242.05 │
+│     Energy per Total Token (mJ/token) │   6,691.17 │
+│    Energy per Output Token (mJ/token) │   8,249.74 │
+│   Energy per Request (joules/request) │   2,111.93 │
+│    Output Tokens per Joule (tokens/J) │       0.12 │
+│         Energy per User (joules/user) │ 211,193.36 │
+└───────────────────────────────────────┴────────────┘
+
+
+                                 AIPerf | GPU Telemetry Summary                                  
+                                 1/1 telemetry sources reachable                                 
+                                       • localhost:9400 ✔                                        
+                                                                                                 
+                              localhost:9400 | GPU 0 | NVIDIA B200                               
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃    std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 531.54 │ 265.20 │ 857.79 │ 857.79 │ 857.79 │ 265.20 │ 302.10 │
+│ NVIDIA Energy Consumption (MJ) │   0.04 │    N/A │    N/A │    N/A │    N/A │    N/A │    N/A │
+│     NVIDIA GPU Utilization (%) │  45.00 │   0.00 │ 100.00 │ 100.00 │ 100.00 │   0.00 │  51.04 │
+│  NVIDIA Memory Utilization (%) │  26.40 │   0.00 │  60.00 │  60.00 │  60.00 │   0.00 │  29.95 │
+│    NVIDIA GPU Memory Used (GB) │ 179.23 │ 179.22 │ 179.25 │ 179.25 │ 179.25 │ 179.22 │   0.01 │
+│    NVIDIA GPU Temperature (°C) │  57.30 │  54.00 │  62.00 │  62.00 │  62.00 │  54.00 │   3.76 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+
+                              localhost:9400 | GPU 1 | NVIDIA B200                               
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃    std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 322.61 │ 194.82 │ 946.63 │ 946.63 │ 946.63 │ 194.82 │ 269.90 │
+│ NVIDIA Energy Consumption (MJ) │   0.01 │    N/A │    N/A │    N/A │    N/A │    N/A │    N/A │
+│     NVIDIA GPU Utilization (%) │  15.00 │   0.00 │ 100.00 │ 100.00 │ 100.00 │   0.00 │  36.63 │
+│  NVIDIA Memory Utilization (%) │   6.75 │   0.00 │  45.00 │  45.00 │  45.00 │   0.00 │  16.49 │
+│    NVIDIA GPU Memory Used (GB) │  29.61 │   0.00 │ 179.55 │ 179.55 │ 179.55 │   0.00 │  64.75 │
+│    NVIDIA GPU Temperature (°C) │  38.40 │  35.00 │  54.00 │  54.00 │  54.00 │  36.00 │   6.74 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+
+                             localhost:9400 | GPU 2 | NVIDIA B200                              
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃  std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 700.46 │ 683.55 │ 703.96 │ 703.96 │ 703.96 │ 703.15 │ 7.29 │
+│ NVIDIA Energy Consumption (MJ) │   0.04 │    N/A │    N/A │    N/A │    N/A │    N/A │  N/A │
+│     NVIDIA GPU Utilization (%) │ 100.00 │ 100.00 │ 100.00 │ 100.00 │ 100.00 │ 100.00 │ 0.00 │
+│  NVIDIA Memory Utilization (%) │  52.45 │  52.00 │  53.00 │  53.00 │  53.00 │  52.00 │ 0.51 │
+│    NVIDIA GPU Memory Used (GB) │ 176.97 │ 176.97 │ 176.97 │ 176.97 │ 176.97 │ 176.97 │ 0.00 │
+│    NVIDIA GPU Temperature (°C) │  54.55 │  54.00 │  55.00 │  55.00 │  55.00 │  55.00 │ 0.51 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴──────┘
+
+                              localhost:9400 | GPU 3 | NVIDIA B200                               
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃    std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 462.82 │ 245.50 │ 557.63 │ 557.63 │ 557.63 │ 557.63 │ 145.99 │
+│ NVIDIA Energy Consumption (MJ) │   0.03 │    N/A │    N/A │    N/A │    N/A │    N/A │    N/A │
+│     NVIDIA GPU Utilization (%) │  35.70 │   0.00 │  54.00 │  54.00 │  54.00 │  54.00 │  24.48 │
+│  NVIDIA Memory Utilization (%) │  17.00 │   0.00 │  29.00 │  29.00 │  29.00 │  29.00 │  14.35 │
+│    NVIDIA GPU Memory Used (GB) │ 175.56 │ 175.03 │ 175.65 │ 175.65 │ 175.65 │ 175.65 │   0.23 │
+│    NVIDIA GPU Temperature (°C) │  39.10 │  37.00 │  40.00 │  40.00 │  40.00 │  40.00 │   1.41 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+
+                              localhost:9400 | GPU 4 | NVIDIA B200                              
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃   std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 240.30 │ 189.15 │ 424.22 │ 424.22 │ 424.22 │ 189.15 │ 82.81 │
+│ NVIDIA Energy Consumption (MJ) │   0.02 │    N/A │    N/A │    N/A │    N/A │    N/A │   N/A │
+│     NVIDIA GPU Utilization (%) │  14.85 │   0.00 │  45.00 │  45.00 │  45.00 │   0.00 │ 17.83 │
+│  NVIDIA Memory Utilization (%) │   3.00 │   0.00 │  12.00 │  12.00 │  12.00 │   0.00 │  4.28 │
+│    NVIDIA GPU Memory Used (GB) │  79.75 │   0.00 │ 177.41 │ 177.41 │ 177.41 │   0.00 │ 90.45 │
+│    NVIDIA GPU Temperature (°C) │  40.10 │  38.00 │  46.00 │  46.00 │  46.00 │  38.00 │  2.88 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │  0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │  0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┘
+
+                              localhost:9400 | GPU 5 | NVIDIA B200                               
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃    std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 484.23 │ 239.83 │ 548.24 │ 548.24 │ 548.24 │ 543.58 │ 125.39 │
+│ NVIDIA Energy Consumption (MJ) │   0.03 │    N/A │    N/A │    N/A │    N/A │    N/A │    N/A │
+│     NVIDIA GPU Utilization (%) │  75.75 │   0.00 │ 100.00 │ 100.00 │ 100.00 │ 100.00 │  39.53 │
+│  NVIDIA Memory Utilization (%) │  25.45 │   0.00 │  34.00 │  34.00 │  34.00 │  34.00 │  13.39 │
+│    NVIDIA GPU Memory Used (GB) │ 178.87 │ 178.20 │ 179.04 │ 179.04 │ 179.04 │ 179.04 │   0.34 │
+│    NVIDIA GPU Temperature (°C) │  38.00 │  32.00 │  41.00 │  41.00 │  41.00 │  38.00 │   2.92 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+
+                             localhost:9400 | GPU 6 | NVIDIA B200                              
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃  std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 253.47 │ 253.36 │ 253.54 │ 253.54 │ 253.54 │ 253.54 │ 0.08 │
+│ NVIDIA Energy Consumption (MJ) │   0.02 │    N/A │    N/A │    N/A │    N/A │    N/A │  N/A │
+│     NVIDIA GPU Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│  NVIDIA Memory Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│    NVIDIA GPU Memory Used (GB) │ 184.34 │ 184.34 │ 184.34 │ 184.34 │ 184.34 │ 184.34 │ 0.00 │
+│    NVIDIA GPU Temperature (°C) │  41.00 │  41.00 │  41.00 │  41.00 │  41.00 │  41.00 │ 0.00 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴──────┘
+
+                             localhost:9400 | GPU 7 | NVIDIA B200                              
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━┓
+┃                         Metric ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p50 ┃  std ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━┩
+│     NVIDIA GPU Power Usage (W) │ 246.63 │ 246.45 │ 247.23 │ 247.23 │ 247.23 │ 246.45 │ 0.28 │
+│ NVIDIA Energy Consumption (MJ) │   0.03 │    N/A │    N/A │    N/A │    N/A │    N/A │  N/A │
+│     NVIDIA GPU Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│  NVIDIA Memory Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│    NVIDIA GPU Memory Used (GB) │ 174.91 │ 174.89 │ 174.97 │ 174.97 │ 174.97 │ 174.89 │ 0.03 │
+│    NVIDIA GPU Temperature (°C) │  36.15 │  36.00 │  37.00 │  37.00 │  37.00 │  36.00 │ 0.37 │
+│ NVIDIA Decoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+│ NVIDIA Encoder Utilization (%) │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │   0.00 │ 0.00 │
+└────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴──────┘
+
+CLI Command: aiperf profile --model 'qwen' --tokenizer 
+'/home/tomasruizt/.cache/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00dd
+f55e13ccb7b8cd0a' --url 'http://127.0.0.1:8507' --request-count 100 --warmup-request-count 10 
+--public-dataset 'spec_al_gsm8k' --extra-inputs 'max_completion_tokens:256' --concurrency 1 
+--endpoint-type 'chat' --streaming --output-artifact-dir 
+'/home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_ba
+seline/sglang_baseline/c1/aiperf'
+Benchmark Duration: 61.76 sec
+CSV Export: 
+/home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_bas
+eline/sglang_baseline/c1/aiperf/profile_export_aiperf.csv
+JSON Export: 
+/home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_bas
+eline/sglang_baseline/c1/aiperf/profile_export_aiperf.json
+Server Metrics CSV Export: 
+/home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_bas
+eline/sglang_baseline/c1/aiperf/server_metrics_export.csv
+Server Metrics JSON Export: 
+/home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_bas
+eline/sglang_baseline/c1/aiperf/server_metrics_export.json
+Log File: 
+/home/tomasruizt/code/vllm-scripts/experiments/dflash-gdn/results/b200-block8-20260922/4B/sglang_bas
+eline/sglang_baseline/c1/aiperf/logs/aiperf.log
+
