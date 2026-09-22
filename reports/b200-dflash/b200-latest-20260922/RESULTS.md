@@ -19,7 +19,8 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 - **Workload:** GSM8K, up to 256 output tokens, EOS and model sampling defaults enabled. Dense-model checkpoints match the pinned H100 experiments; all target/draft revisions are recorded per run.
 - **Requests/warmups:** 100/10 at c=1, otherwise 20c/2c. Each variant reuses one server across ascending concurrency levels.
 - **Execution:** variants run concurrently on separate reserved GPUs on a shared host, using up to seven benchmark GPUs.
-- **Scope:** single runs without uncertainty estimates; reported separately from the historical H100 tables.
+- **Scope:** n=3 independently restarted runs per configuration; tables show means. Latencies average per-run percentiles: TPOT p90, ITL and TTFT p99, not pooled percentiles. Plot coordinates average each run's throughput and 1,000 / TPOT p90 separately; error bars show ±1 sample SD.
+- **Concurrency caveat:** C=1 measures GSM8K prompt indices 10–109, whereas C=2 measures 4–43 (zero-based), because request and warmup counts differ. These curves retain the measured workloads; n=3 does not correct the prompt-mix confound. Small request counts limit p99 reliability.
 
 [SGLang verification findings](SGLANG_VERIFICATION.md).
 
@@ -27,69 +28,69 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 121.53 | 493.19 | 132.93 | 597.00 | 519.38 |
-| 2 | 229.59 | 808.17 | 262.14 | 1,073.78 | 893.94 |
-| 4 | 453.49 | 1,263.00 | 509.73 | 1,724.21 | 1,457.00 |
-| 8 | 883.45 | 1,850.74 | 977.52 | 2,530.46 | 2,191.41 |
-| 16 | 1,698.77 | 2,556.29 | 1,872.77 | 3,300.47 | 3,162.82 |
-| 32 | 3,085.51 | 3,203.37 | 3,331.81 | 4,667.50 | 3,952.41 |
+| 1 | 120.00 | 463.29 | 132.90 | 589.90 | 513.04 |
+| 2 | 227.68 | 769.27 | 261.40 | 1,071.07 | 856.87 |
+| 4 | 450.12 | 1,274.29 | 508.82 | 1,691.91 | 1,391.58 |
+| 8 | 880.27 | 1,870.76 | 976.46 | 2,523.63 | 2,148.68 |
+| 16 | 1,695.01 | 2,599.91 | 1,869.05 | 3,240.05 | 3,181.93 |
+| 32 | 3,080.62 | 3,207.61 | 3,326.50 | 4,632.60 | 3,986.62 |
 | Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B ITL p99 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 8.66 | 16.06 | 10.98 | 14.41 | 13.48 |
-| 2 | 9.29 | 80.09 | 10.80 | 40.40 | 60.22 |
-| 4 | 9.18 | 81.27 | 11.11 | 43.53 | 62.84 |
-| 8 | 9.40 | 90.71 | 10.90 | 49.04 | 68.95 |
-| 16 | 9.95 | 89.97 | 11.59 | 87.74 | 69.30 |
-| 32 | 12.08 | 116.43 | 12.85 | 71.70 | 97.47 |
+| 1 | 9.44 | 20.47 | 11.00 | 15.08 | 13.97 |
+| 2 | 9.86 | 83.84 | 10.97 | 39.71 | 69.83 |
+| 4 | 9.57 | 81.57 | 11.65 | 46.56 | 70.24 |
+| 8 | 9.68 | 87.78 | 11.60 | 50.96 | 72.83 |
+| 16 | 10.26 | 90.16 | 12.36 | 89.95 | 74.99 |
+| 32 | 11.94 | 118.15 | 14.46 | 77.09 | 97.66 |
 | Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B TTFT p99 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 39.14 | 75.78 | 41.75 | 48.70 | 66.93 |
-| 2 | 131.51 | 147.84 | 69.12 | 77.44 | 122.48 |
-| 4 | 85.75 | 175.71 | 67.97 | 87.18 | 167.77 |
-| 8 | 91.37 | 204.67 | 71.53 | 97.77 | 187.97 |
-| 16 | 106.63 | 267.24 | 86.91 | 112.46 | 192.46 |
-| 32 | 230.33 | 349.20 | 134.20 | 436.00 | 284.64 |
+| 1 | 136.04 | 88.52 | 39.79 | 51.00 | 76.72 |
+| 2 | 127.41 | 152.35 | 71.83 | 82.35 | 134.78 |
+| 4 | 94.66 | 178.94 | 76.48 | 103.06 | 171.49 |
+| 8 | 165.41 | 228.33 | 76.49 | 105.84 | 198.23 |
+| 16 | 117.40 | 254.47 | 90.14 | 124.66 | 211.56 |
+| 32 | 211.14 | 339.66 | 146.90 | 447.87 | 275.07 |
 | Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
 
-## 27B TPOT p99 (ms)
+## 27B TPOT p90 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 8.12 | 2.86 | 7.42 | 2.56 | 2.63 |
-| 2 | 8.48 | 2.97 | 7.46 | 2.17 | 2.50 |
-| 4 | 8.58 | 3.97 | 7.64 | 3.18 | 3.41 |
-| 8 | 8.79 | 6.26 | 7.98 | 4.70 | 5.22 |
-| 16 | 9.14 | 9.85 | 8.35 | 7.65 | 7.88 |
-| 32 | 9.97 | 15.12 | 9.00 | 10.59 | 12.37 |
+| 1 | 8.17 | 2.41 | 7.41 | 1.92 | 2.09 |
+| 2 | 8.49 | 2.59 | 7.46 | 2.01 | 2.39 |
+| 4 | 8.61 | 3.21 | 7.64 | 2.55 | 3.03 |
+| 8 | 8.79 | 4.80 | 7.98 | 3.60 | 4.17 |
+| 16 | 9.13 | 6.98 | 8.28 | 5.92 | 5.78 |
+| 32 | 9.95 | 11.49 | 8.80 | 7.95 | 9.19 |
 | Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B Acceptance length (including bonus)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | — | 7.61 | — | 7.49 | 7.59 |
-| 2 | — | 7.79 | — | 7.82 | 7.77 |
-| 4 | — | 7.56 | — | 7.55 | 7.63 |
-| 8 | — | 7.46 | — | 7.51 | 7.44 |
-| 16 | — | 7.62 | — | 7.77 | 7.64 |
-| 32 | — | 7.70 | — | 7.59 | 7.72 |
+| 1 | — | 7.61 | — | 7.46 | 7.59 |
+| 2 | — | 7.78 | — | 7.72 | 7.76 |
+| 4 | — | 7.66 | — | 7.57 | 7.60 |
+| 8 | — | 7.45 | — | 7.63 | 7.48 |
+| 16 | — | 7.66 | — | 7.73 | 7.62 |
+| 32 | — | 7.70 | — | 7.64 | 7.70 |
 | Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
 
 ## 27B Memory & capacity
 
 | Metric | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Reported cache tokens | 2,134,931 | 1,126,472 | 2,140,480 | 1,071,151 | 1,126,456 |
-| 128K seq equivalents (est.) | 16.29 | 8.59 | 16.33 | 8.17 | 8.59 |
-| Configured request limit | 32 | 32 | 32 | 32 | 32 |
+| Reported cache tokens | 2,134,931.00 | 1,139,046.67 | 2,140,480.00 | 1,071,151.00 | 1,134,165.00 |
+| 128K seq equivalents (est.) | 16.29 | 8.69 | 16.33 | 8.17 | 8.65 |
+| Configured request limit | 32.00 | 32.00 | 32.00 | 32.00 | 32.00 |
 | Logs | [Server](27B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#27B-vllm_baseline) | [Server](27B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-vllm_dflash) | [Server](27B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#27B-sglang_baseline) | [Server](27B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#27B-sglang_dflash) | [Server](27B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#27B-pr2_dflash) |
 
 128K = 131,072 tokens. Sequence equivalents = reported cache tokens / 131,072, not measured concurrency. These allocations come from servers configured for 32,768-token contexts and 32 request slots; reconfiguring for 128K may change capacity. No long-context measurements were run.
@@ -98,69 +99,69 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 389.98 | 607.61 | 414.68 | 1,094.58 | 902.85 |
-| 2 | 716.91 | 1,048.02 | 809.91 | 1,811.13 | 1,484.93 |
-| 4 | 1,428.20 | 1,744.15 | 1,573.46 | 3,106.55 | 2,375.40 |
-| 8 | 2,744.44 | 2,664.71 | 2,978.73 | 4,269.92 | 3,623.70 |
-| 16 | 5,148.07 | 4,098.17 | 5,625.26 | 5,808.05 | 5,238.02 |
-| 32 | 9,120.77 | 5,554.17 | 9,658.22 | 9,546.29 | 6,676.68 |
+| 1 | 387.81 | 643.37 | 406.50 | 1,095.36 | 844.91 |
+| 2 | 716.93 | 1,092.84 | 790.32 | 1,819.28 | 1,472.87 |
+| 4 | 1,415.99 | 1,835.17 | 1,538.62 | 3,097.50 | 2,383.93 |
+| 8 | 2,715.41 | 2,845.69 | 2,942.68 | 4,291.27 | 3,665.64 |
+| 16 | 5,036.88 | 4,256.38 | 5,584.93 | 5,765.82 | 5,351.84 |
+| 32 | 8,860.49 | 5,675.74 | 9,638.42 | 9,442.54 | 6,651.20 |
 | Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B ITL p99 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 3.12 | 10.31 | 2.97 | 7.80 | 6.68 |
-| 2 | 3.28 | 48.30 | 3.26 | 22.80 | 36.78 |
-| 4 | 3.34 | 48.56 | 3.37 | 23.74 | 38.38 |
-| 8 | 3.93 | 49.95 | 3.97 | 28.77 | 41.29 |
-| 16 | 4.12 | 49.74 | 5.17 | 50.69 | 41.94 |
-| 32 | 4.89 | 60.12 | 7.72 | 30.37 | 50.49 |
+| 1 | 3.41 | 9.70 | 3.22 | 8.24 | 7.87 |
+| 2 | 3.40 | 45.98 | 3.36 | 22.69 | 36.65 |
+| 4 | 3.62 | 46.68 | 3.54 | 23.77 | 37.98 |
+| 8 | 3.82 | 48.01 | 4.02 | 30.66 | 39.49 |
+| 16 | 5.01 | 50.93 | 5.11 | 47.27 | 40.36 |
+| 32 | 5.58 | 58.33 | 7.81 | 33.10 | 52.26 |
 | Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B TTFT p99 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 29.02 | 62.82 | 28.80 | 30.42 | 40.75 |
-| 2 | 57.82 | 103.84 | 55.35 | 56.58 | 83.54 |
-| 4 | 59.71 | 108.88 | 51.08 | 57.68 | 139.44 |
-| 8 | 74.68 | 128.96 | 47.95 | 62.68 | 118.88 |
-| 16 | 81.19 | 144.70 | 43.84 | 82.61 | 124.86 |
-| 32 | 116.26 | 189.89 | 208.65 | 205.80 | 169.75 |
+| 1 | 37.29 | 52.94 | 33.46 | 33.04 | 44.53 |
+| 2 | 60.88 | 96.51 | 52.05 | 56.47 | 73.93 |
+| 4 | 60.08 | 105.88 | 51.55 | 61.08 | 108.79 |
+| 8 | 79.86 | 131.84 | 49.96 | 70.96 | 110.22 |
+| 16 | 92.33 | 144.38 | 49.93 | 73.71 | 122.79 |
+| 32 | 142.11 | 187.99 | 134.55 | 208.43 | 171.13 |
 | Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
 
-## 4B TPOT p99 (ms)
+## 4B TPOT p90 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 2.48 | 2.38 | 2.37 | 1.41 | 1.59 |
-| 2 | 2.62 | 2.79 | 2.34 | 1.68 | 1.88 |
-| 4 | 2.62 | 3.75 | 2.41 | 2.02 | 2.26 |
-| 8 | 2.74 | 5.32 | 2.54 | 3.10 | 3.29 |
-| 16 | 2.87 | 6.71 | 2.69 | 4.69 | 5.03 |
-| 32 | 3.18 | 9.71 | 3.00 | 5.61 | 8.28 |
+| 1 | 2.47 | 1.95 | 2.36 | 1.12 | 1.43 |
+| 2 | 2.59 | 2.14 | 2.38 | 1.36 | 1.56 |
+| 4 | 2.63 | 2.74 | 2.45 | 1.51 | 1.96 |
+| 8 | 2.71 | 3.42 | 2.56 | 2.33 | 2.70 |
+| 16 | 2.88 | 4.88 | 2.71 | 3.65 | 3.84 |
+| 32 | 3.20 | 7.29 | 2.96 | 4.36 | 6.37 |
 | Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B Acceptance length (including bonus)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | — | 5.52 | — | 5.67 | 5.80 |
-| 2 | — | 5.66 | — | 5.22 | 5.67 |
-| 4 | — | 5.48 | — | 5.30 | 5.55 |
-| 8 | — | 5.34 | — | 5.09 | 5.47 |
-| 16 | — | 5.63 | — | 5.58 | 5.57 |
-| 32 | — | 5.61 | — | 5.53 | 5.61 |
+| 1 | — | 5.63 | — | 5.60 | 5.75 |
+| 2 | — | 5.64 | — | 5.29 | 5.57 |
+| 4 | — | 5.55 | — | 5.30 | 5.49 |
+| 8 | — | 5.50 | — | 5.22 | 5.52 |
+| 16 | — | 5.62 | — | 5.59 | 5.57 |
+| 32 | — | 5.60 | — | 5.54 | 5.64 |
 | Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
 
 ## 4B Memory & capacity
 
 | Metric | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Reported cache tokens | 5,035,701 | 2,844,760 | 5,128,384 | 2,674,702 | 2,844,760 |
-| 128K seq equivalents (est.) | 38.42 | 21.70 | 39.13 | 20.41 | 21.70 |
-| Configured request limit | 32 | 32 | 32 | 32 | 32 |
+| Reported cache tokens | 5,036,229.67 | 2,856,496.00 | 5,128,384.00 | 2,674,702.00 | 2,856,496.00 |
+| 128K seq equivalents (est.) | 38.42 | 21.79 | 39.13 | 20.41 | 21.79 |
+| Configured request limit | 32.00 | 32.00 | 32.00 | 32.00 | 32.00 |
 | Logs | [Server](4B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#4B-vllm_baseline) | [Server](4B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-vllm_dflash) | [Server](4B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#4B-sglang_baseline) | [Server](4B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#4B-sglang_dflash) | [Server](4B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#4B-pr2_dflash) |
 
 128K = 131,072 tokens. Sequence equivalents = reported cache tokens / 131,072, not measured concurrency. These allocations come from servers configured for 32,768-token contexts and 32 request slots; reconfiguring for 128K may change capacity. No long-context measurements were run.
@@ -169,74 +170,74 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 242.96 | 596.67 | 300.17 | 802.38 | 708.54 |
-| 2 | 431.50 | 1,011.58 | 547.39 | 1,279.90 | 1,128.58 |
-| 4 | 807.94 | 1,584.66 | 998.55 | 1,913.46 | 1,829.56 |
-| 8 | 1,306.67 | 2,399.39 | 1,616.83 | 2,804.22 | 2,764.44 |
-| 16 | 2,313.31 | 3,477.69 | 2,725.81 | 4,081.41 | 4,216.30 |
-| 32 | 3,932.94 | 3,185.81 | 4,121.79 | 6,710.99 | 3,700.51 |
+| 1 | 240.47 | 602.46 | 305.11 | 791.12 | 703.50 |
+| 2 | 428.87 | 1,035.72 | 552.21 | 1,120.56 | 1,152.14 |
+| 4 | 806.22 | 1,569.57 | 1,010.17 | 1,921.25 | 1,797.60 |
+| 8 | 1,371.03 | 2,398.98 | 1,623.04 | 2,823.40 | 2,685.02 |
+| 16 | 2,312.08 | 3,448.68 | 2,728.21 | 3,924.49 | 3,805.00 |
+| 32 | 3,933.29 | 3,125.55 | 4,127.09 | 6,673.55 | 3,448.48 |
 | Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B ITL p99 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 4.69 | 14.27 | 4.81 | 10.64 | 9.77 |
-| 2 | 5.11 | 55.21 | 6.64 | 29.27 | 45.28 |
-| 4 | 5.55 | 57.71 | 7.02 | 32.68 | 44.26 |
-| 8 | 6.24 | 57.73 | 8.56 | 38.55 | 46.24 |
-| 16 | 7.96 | 58.89 | 9.84 | 66.75 | 49.32 |
-| 32 | 9.82 | 109.98 | 12.02 | 42.84 | 108.66 |
+| 1 | 5.07 | 12.79 | 5.57 | 12.01 | 10.35 |
+| 2 | 5.30 | 54.83 | 8.08 | 31.55 | 44.31 |
+| 4 | 5.70 | 58.92 | 8.08 | 34.50 | 46.08 |
+| 8 | 6.38 | 58.32 | 9.29 | 40.26 | 52.65 |
+| 16 | 7.71 | 63.92 | 9.71 | 70.85 | 62.08 |
+| 32 | 9.69 | 120.23 | 12.37 | 45.20 | 116.30 |
 | Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B TTFT p99 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 46.44 | 55.21 | 32.78 | 37.30 | 50.56 |
-| 2 | 76.85 | 107.78 | 58.46 | 67.59 | 102.29 |
-| 4 | 88.05 | 232.47 | 55.82 | 64.81 | 97.59 |
-| 8 | 2,347.93 | 163.70 | 60.82 | 70.99 | 128.97 |
-| 16 | 147.68 | 846.20 | 59.29 | 89.88 | 169.98 |
-| 32 | 206.58 | 317.79 | 86.85 | 285.11 | 297.96 |
+| 1 | 50.54 | 55.01 | 44.32 | 47.66 | 58.94 |
+| 2 | 79.59 | 104.06 | 70.48 | 1,239.56 | 102.10 |
+| 4 | 76.35 | 162.99 | 62.75 | 71.93 | 102.28 |
+| 8 | 887.15 | 162.78 | 65.41 | 79.78 | 144.89 |
+| 16 | 172.82 | 409.66 | 61.99 | 95.94 | 196.54 |
+| 32 | 215.12 | 334.46 | 89.53 | 293.53 | 332.30 |
 | Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
-## 35B-A3B TPOT p99 (ms)
+## 35B-A3B TPOT p90 (ms)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 4.00 | 2.36 | 3.23 | 1.82 | 1.97 |
-| 2 | 4.41 | 2.48 | 3.48 | 1.94 | 2.31 |
-| 4 | 4.75 | 3.81 | 3.85 | 3.02 | 2.88 |
-| 8 | 5.38 | 4.85 | 4.80 | 4.70 | 3.96 |
-| 16 | 6.50 | 6.53 | 5.72 | 6.37 | 6.09 |
-| 32 | 7.82 | 17.24 | 7.40 | 6.96 | 14.30 |
+| 1 | 4.02 | 1.93 | 3.17 | 1.48 | 1.59 |
+| 2 | 4.44 | 2.16 | 3.42 | 1.78 | 1.89 |
+| 4 | 4.75 | 2.82 | 3.78 | 2.38 | 2.46 |
+| 8 | 5.38 | 3.95 | 4.76 | 3.40 | 3.50 |
+| 16 | 6.49 | 5.61 | 5.71 | 5.12 | 5.04 |
+| 32 | 7.67 | 12.59 | 7.32 | 5.64 | 11.76 |
 | Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B Acceptance length (including bonus)
 
 | c | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | — | 6.45 | — | 6.45 | 6.45 |
-| 2 | — | 6.57 | — | 6.80 | 6.57 |
-| 4 | — | 6.64 | — | 6.34 | 6.72 |
-| 8 | — | 6.48 | — | 6.27 | 6.52 |
-| 16 | — | 6.60 | — | 6.67 | 6.59 |
-| 32 | — | 6.55 | — | 6.59 | 6.55 |
+| 1 | — | 6.45 | — | 6.49 | 6.47 |
+| 2 | — | 6.68 | — | 6.80 | 6.74 |
+| 4 | — | 6.62 | — | 6.44 | 6.65 |
+| 8 | — | 6.50 | — | 6.48 | 6.49 |
+| 16 | — | 6.51 | — | 6.64 | 6.64 |
+| 32 | — | 6.56 | — | 6.60 | 6.56 |
 | Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 ## 35B-A3B Memory & capacity
 
 | Metric | vLLM | vLLM DFlash | SGLang | SGLang DFlash | vLLM + DFlash PR 52297 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Reported cache tokens | 6,344,192 | 1,959,911 | 6,697,728 | 2,648,553 | 1,959,911 |
-| 128K seq equivalents (est.) | 48.40 | 14.95 | 51.10 | 20.21 | 14.95 |
-| Configured request limit | 32 | 32 | 32 | 32 | 32 |
+| Reported cache tokens | 6,368,085.33 | 1,967,364.33 | 6,697,728.00 | 2,648,553.00 | 1,967,364.33 |
+| 128K seq equivalents (est.) | 48.59 | 15.01 | 51.10 | 20.21 | 15.01 |
+| Configured request limit | 32.00 | 32.00 | 32.00 | 32.00 | 32.00 |
 | Logs | [Server](35B-A3B/vllm_baseline/vllm_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_baseline) | [Server](35B-A3B/vllm_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-vllm_dflash) | [Server](35B-A3B/sglang_baseline/sglang_baseline/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_baseline) | [Server](35B-A3B/sglang_dflash/sglang_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-sglang_dflash) | [Server](35B-A3B/pr2_dflash/vllm_dflash/server.log) · [Bench](benchmark-logs.html#35B-A3B-pr2_dflash) |
 
 128K = 131,072 tokens. Sequence equivalents = reported cache tokens / 131,072, not measured concurrency. These allocations come from servers configured for 32,768-token contexts and 32 request slots; reconfiguring for 128K may change capacity. No long-context measurements were run.
 
-- **Completed:** 90/90 benchmark points. A dash indicates an unavailable or inapplicable metric.
+- **Completed:** 270/270 benchmark points. A dash indicates an unavailable or inapplicable metric.
 - **Artifacts:** per-run commands, versions, GPU identifiers, metrics and logs are in the model/variant directories.
 - **Environment:** see `environment.json` for dependency versions and source revisions.
 
@@ -244,16 +245,16 @@ Each table's Logs row links to Server logs and Bench logs, metric JSON exports, 
 
 ![27B throughput versus interactivity](plots/27b-throughput-interactivity.svg)
 
-Interactivity = 1,000 / TPOT p99 (ms). Dashed curves show the baselines.
+Coordinates: mean throughput and mean per-run 1,000 / TPOT p90 (ms); error bars: ±1 sample SD, n=3. Dashed curves show the baselines.
 
 ## 4B throughput vs interactivity
 
 ![4B throughput versus interactivity](plots/4b-throughput-interactivity.svg)
 
-Interactivity = 1,000 / TPOT p99 (ms). Dashed curves show the baselines.
+Coordinates: mean throughput and mean per-run 1,000 / TPOT p90 (ms); error bars: ±1 sample SD, n=3. Dashed curves show the baselines.
 
 ## 35B-A3B throughput vs interactivity
 
 ![35B-A3B throughput versus interactivity](plots/35b-a3b-throughput-interactivity.svg)
 
-Interactivity = 1,000 / TPOT p99 (ms). Dashed curves show the baselines.
+Coordinates: mean throughput and mean per-run 1,000 / TPOT p90 (ms); error bars: ±1 sample SD, n=3. Dashed curves show the baselines.
