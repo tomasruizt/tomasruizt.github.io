@@ -1,7 +1,8 @@
 # B200 DFlash benchmark report
 
 - Extract the entire ZIP and open [index.html](index.html). Keep the directory structure intact so Server and Bench links work.
-- Includes both K settings, all three models, server/benchmark logs, per-point summaries and configurations, plots, environment versions, and validation.
+- Includes both K settings, all three models, server/benchmark logs, original AIPerf metric and server-metric JSON exports, per-point summaries and configurations, plots, environment versions, and validation.
+- Follow Bench for each concurrency's source files and the metric field/formula mapping. Aggregates are included; independently recomputing percentiles requires the excluded per-request traces.
 - Model selection stays constant when switching K; no JavaScript or internet connection is required to view the report.
 - Excludes raw profiler traces and per-request datasets; this is a report bundle, not the full experiment archive.
 
