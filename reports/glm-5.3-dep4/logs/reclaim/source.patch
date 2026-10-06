@@ -1,0 +1,277 @@
+diff --git a/tests/v1/spec_decode/test_adaptive_verification.py b/tests/v1/spec_decode/test_adaptive_verification.py
+index 73c478a10..74e37294b 100644
+--- a/tests/v1/spec_decode/test_adaptive_verification.py
++++ b/tests/v1/spec_decode/test_adaptive_verification.py
+@@ -6,6 +6,7 @@ from types import SimpleNamespace
+ 
+ import numpy as np
+ import pytest
++import torch
+ 
+ from vllm.config.compilation import CUDAGraphMode
+ from vllm.v1.attention.backend import AttentionCGSupport, AttentionMetadataBuilder
+@@ -184,6 +185,64 @@ def test_budget_stops_where_marginal_drafts_stop_paying_for_themselves():
+     assert num_non_draft_tokens == {"low": 1, "high": 1}
+ 
+ 
++@pytest.mark.parametrize(
++    "graph_tokens,max_logits,expected_tokens",
++    [(4, 100, 4), (10, 100, 6), (10, 3, 3), (10, 1, 2)],
++)
++def test_graph_padding_expansion_respects_drafts_and_sampler_capacity(
++    graph_tokens, max_logits, expected_tokens
++):
++    manager = make_manager(
++        np.array([[0.1, 0.1], [0.9, 0.9]], dtype=np.float32),
++        np.array([1.0, 1.0, 1.0, 1.0, 100.0, 100.0, 100.0]),
++    )
++    manager._max_total_logits = max_logits
++    scheduled = {"low": 3, "high": 3}
++    drafts = {"low": [1, 2], "high": [3, 4]}
++    original_tokens = manager.get_num_tokens(scheduled, drafts)
++
++    expanded_tokens = manager.expand_budget_to_fit(graph_tokens)
++    assert original_tokens <= expanded_tokens == expected_tokens <= graph_tokens
++    compacted, _ = manager.compact_batch(
++        np.array([2, 2], dtype=np.int32),
++        np.array([3, 3], dtype=np.int32),
++        np.array([0, 3, 6], dtype=np.int32),
++    )
++    assert compacted.sum() == expanded_tokens
++
++
++def test_expanded_budget_verifies_highest_confidence_remaining_drafts(monkeypatch):
++    manager = make_manager(
++        np.array([[0.1, 0.1], [0.9, 0.9]], dtype=np.float32),
++        np.array([1.0, 1.0, 1.0, 1.0, 100.0, 100.0, 100.0]),
++    )
++    manager.get_num_tokens({"low": 3, "high": 3}, {"low": [1, 2], "high": [3, 4]})
++    assert manager.expand_budget_to_fit(4) == 4
++    manager._confidence_probs = torch.tensor([[0.1, 0.1], [0.9, 0.9]])
++    manager._batch_draft_capacity = torch.empty(2, dtype=torch.int32)
++    manager._num_non_draft_tokens = torch.empty(2, dtype=torch.int32)
++    manager._cu_num_logits = torch.empty(3, dtype=torch.int32)
++    manager.query_start_loc = torch.empty(4, dtype=torch.int32)
++    monkeypatch.setattr(
++        adaptive_module,
++        "async_tensor_h2d",
++        lambda array, out: out.copy_(torch.from_numpy(array)),
++    )
++    monkeypatch.setattr(
++        adaptive_module,
++        "_assign_draft_token_budget_compiled",
++        adaptive_module._assign_draft_token_budget,
++    )
++
++    logits, query_starts, draft_budget = manager.reallocate_drafts(
++        ["low", "high"], torch.tensor([0, 1])
++    )
++    assert draft_budget == 2
++    assert logits.tolist() == [0, 1, 4]
++    assert query_starts.tolist() == [0, 1, 4, 4]
++    assert manager._batch_draft_capacity.tolist() == [0, 2]
++
++
+ def test_profiled_batches_seed_cost_curves_via_consumer(monkeypatch):
+     manager = AdaptiveVerificationManager.__new__(AdaptiveVerificationManager)
+     manager.req_states = SimpleNamespace(max_num_batched_tokens=4096, max_num_reqs=64)
+diff --git a/tests/v1/worker/test_gpu_model_runner_v2.py b/tests/v1/worker/test_gpu_model_runner_v2.py
+index 2e0c7271c..f5b9c0985 100644
+--- a/tests/v1/worker/test_gpu_model_runner_v2.py
++++ b/tests/v1/worker/test_gpu_model_runner_v2.py
+@@ -5,10 +5,12 @@ import contextlib
+ from types import SimpleNamespace
+ from unittest.mock import Mock
+ 
++import numpy as np
+ import pytest
+ import torch
+ 
+ import vllm.v1.worker.gpu.model_runner as model_runner_module
++from vllm.config.compilation import CUDAGraphMode
+ from vllm.model_executor.warmup.jit_warmup import JitWarmupRegistry
+ from vllm.v1.kv_cache_interface import (
+     CircularBufferSpec,
+@@ -19,7 +21,94 @@ from vllm.v1.kv_cache_interface import (
+     UniformTypeKVCacheSpecs,
+ )
+ from vllm.v1.worker.gpu.block_table import BlockTables
+-from vllm.v1.worker.gpu.model_runner import ExecuteModelState, GPUModelRunner
++from vllm.v1.worker.gpu.cudagraph_utils import BatchExecutionDescriptor
++from vllm.v1.worker.gpu.model_runner import (
++    BatchReqState,
++    ExecuteModelState,
++    GPUModelRunner,
++)
++from vllm.v1.worker.gpu.spec_decode.adaptive_verification import (
++    AdaptiveVerificationManager,
++)
++
++
++@pytest.mark.parametrize(
++    "mode,dp_size,num_ubatches,query_bound,expected_tokens",
++    [
++        (CUDAGraphMode.FULL, 4, 1, 3, 4),
++        (CUDAGraphMode.NONE, 4, 1, 3, 3),
++        (CUDAGraphMode.FULL, 1, 1, 3, 3),
++        (CUDAGraphMode.FULL, 4, 2, 3, 3),
++        (CUDAGraphMode.FULL, 4, 1, None, 3),
++    ],
++)
++def test_reclaim_dp_graph_padding_after_sync_before_input_preparation(
++    monkeypatch, mode, dp_size, num_ubatches, query_bound, expected_tokens
++):
++    """Sync sees AV's original count; preparation sees any expanded budget."""
++    runner = GPUModelRunner.__new__(GPUModelRunner)
++    for name in (
++        "update_pp_decode_requests",
++        "finish_requests",
++        "free_states",
++        "add_requests",
++        "update_requests",
++    ):
++        setattr(runner, name, Mock())
++    runner.block_tables = Mock()
++    runner.aux_output_connector = runner.pcp_manager = runner.lora_config = None
++    runner.ubatch_runner = None
++    runner.is_encoder_decoder = False
++    runner.parallel_config = SimpleNamespace(
++        data_parallel_size=dp_size, data_parallel_rank=0
++    )
++    runner.observability_config = SimpleNamespace(cudagraph_metrics=False)
++    runner.decode_query_len = 3
++    runner.cudagraph_manager = Mock()
++    manager = AdaptiveVerificationManager.__new__(AdaptiveVerificationManager)
++    manager._batch_budget = ({"a": 2, "b": 2}, {"a": 1, "b": 1}, 1)
++    manager._max_total_logits, manager.num_bonus_tokens = 100, 1
++    runner.adaptive_verification = manager
++    state = BatchReqState(
++        req_ids=["a", "b"],
++        num_scheduled_tokens=np.array([3, 3]),
++        num_tokens=3,
++        num_draft_tokens_np=np.array([2, 2]),
++        idx_mapping_np=np.array([0, 1]),
++        prefill_len_np=np.array([16, 16]),
++        num_computed_prefill_tokens_np=np.array([16, 16]),
++        is_prefilling_np=np.array([False, False]),
++        max_seq_len_np=None,
++        has_prefill=False,
++        prefill_runs_as_decode_np=None,
++        decode_graph_eligible=True,
++    )
++    runner.gather_batch_req_state = Mock(return_value=(state, None))
++    scheduler_output = SimpleNamespace(
++        num_scheduled_tokens={"a": 3, "b": 3},
++        total_num_scheduled_tokens=6,
++        scheduled_spec_decode_tokens={"a": [1, 2], "b": [3, 4]},
++    )
++    descriptor = BatchExecutionDescriptor(
++        mode, 4, 4, max_query_len=query_bound, num_ubatches=num_ubatches
++    )
++    dispatch = Mock(return_value=(descriptor, object() if dp_size > 1 else None))
++    monkeypatch.setattr(model_runner_module, "dispatch_cg_and_sync_dp", dispatch)
++
++    class InputsPrepared(Exception):
++        pass
++
++    def prepare_inputs(_scheduler, batch_state, batch_desc, _num_loras):
++        assert batch_desc is descriptor
++        assert state.num_tokens == 3
++        assert batch_state.num_tokens == expected_tokens
++        assert manager._batch_budget[2] == expected_tokens - 2
++        raise InputsPrepared
++
++    runner.prepare_inputs = prepare_inputs
++    with pytest.raises(InputsPrepared):
++        runner.execute_model(scheduler_output)
++    assert dispatch.call_args.args[2] == 3
+ 
+ 
+ def test_non_last_pp_rank_uses_global_batch_for_sample_feedback():
+diff --git a/vllm/v1/worker/gpu/model_runner.py b/vllm/v1/worker/gpu/model_runner.py
+index b40fb4eac..71943e19a 100644
+--- a/vllm/v1/worker/gpu/model_runner.py
++++ b/vllm/v1/worker/gpu/model_runner.py
+@@ -1782,9 +1782,24 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+         if not dummy_run:
+             # Common case.
+             # Prepare all the inputs and copy to the input buffers.
++            assert batch_req_state is not None
++            if (
++                self.adaptive_verification is not None
++                and scheduler_output.scheduled_spec_decode_tokens
++                and dp_sync is not None
++                and batch_desc.cg_mode == CUDAGraphMode.FULL
++                and batch_desc.num_ubatches == 1
++                and batch_desc.max_query_len is not None
++                and num_toks < batch_desc.num_tokens
++            ):
++                # The graph shape is already agreed across DP ranks. Reclaim
++                # padding without changing that shape or its query-length bound.
++                num_toks = self.adaptive_verification.expand_budget_to_fit(
++                    batch_desc.num_tokens
++                )
++                batch_req_state = batch_req_state._replace(num_tokens=num_toks)
+             if self.observability_config.cudagraph_metrics:
+                 cudagraph_stats = make_cudagraph_stats(batch_desc, num_toks)
+-            assert batch_req_state is not None
+             input_batch = self.prepare_inputs(
+                 scheduler_output, batch_req_state, batch_desc, num_active_loras
+             )
+diff --git a/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py b/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py
+index 5f91af59e..936adfe0a 100644
+--- a/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py
++++ b/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py
+@@ -349,6 +349,44 @@ class AdaptiveVerificationManager:
+         )
+         return sum(num_non_draft_tokens_per_req.values()) + draft_budget
+ 
++    def expand_budget_to_fit(self, num_tokens: int) -> int:
++        """Use synchronized graph padding for additional scheduled drafts."""
++        assert self._batch_budget is not None
++        num_drafts_per_req, num_non_draft_tokens_per_req, old_draft_budget = (
++            self._batch_budget
++        )
++        num_non_draft_tokens = sum(num_non_draft_tokens_per_req.values())
++        assert num_tokens >= num_non_draft_tokens + old_draft_budget
++        max_draft_budget = int_clamp(
++            x=self._max_total_logits - len(num_drafts_per_req) * self.num_bonus_tokens,
++            low=0,
++            high=sum(num_drafts_per_req.values()),
++        )
++        assert max_draft_budget >= old_draft_budget
++        new_draft_budget = int_clamp(
++            x=num_tokens - num_non_draft_tokens,
++            low=old_draft_budget,
++            high=max_draft_budget,
++        )
++        if new_draft_budget > old_draft_budget and not getattr(
++            self, "_logged_budget_expansion", False
++        ):
++            logger.info(
++                "AV reclaimed DP graph padding: draft budget %d -> %d, "
++                "non-draft tokens %d, graph capacity %d",
++                old_draft_budget,
++                new_draft_budget,
++                num_non_draft_tokens,
++                num_tokens,
++            )
++            self._logged_budget_expansion = True
++        self._batch_budget = (
++            num_drafts_per_req,
++            num_non_draft_tokens_per_req,
++            new_draft_budget,
++        )
++        return num_non_draft_tokens + new_draft_budget
++
+     def compact_batch(
+         self,
+         num_draft_tokens_per_req: np.ndarray,
+@@ -507,3 +545,7 @@ def maybe_create_adaptive_verification_manager(
+         num_bonus_tokens,
+         max_total_logits=max_total_logits,
+     )
++
++
++def int_clamp(x: int, low: int, high: int) -> int:
++    return min(max(x, low), high)

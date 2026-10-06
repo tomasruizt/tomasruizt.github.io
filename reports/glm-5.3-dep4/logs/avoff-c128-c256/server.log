@@ -1,1016 +1,0 @@
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [serve.py:127] Defaulting api_server_count to data_parallel_size (4).
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:347] 
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:347]        █     █     █▄   ▄█
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.30.1rc1.dev563+g58b329845
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:347]   █▄█▀ █     █     █     █  model   RedHatAI/GLM-5.3-NVFP4
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:347] 
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [api_utils.py:286] non-default args: {'model_tag': 'RedHatAI/GLM-5.3-NVFP4', 'api_server_count': 4, 'chat_template_content_format': 'string', 'host': '127.0.0.1', 'port': 8023, 'disable_uvicorn_access_log': True, 'model': 'RedHatAI/GLM-5.3-NVFP4', 'trust_remote_code': True, 'revision': 'c8917e4258572c405575855ff53effe58c17a38e', 'max_model_len': 16384, 'served_model_name': ['glm-5.3'], 'attention_backend': 'FLASHINFER_MLA_SPARSE', 'reasoning_parser': 'glm45', 'data_parallel_size': 4, 'enable_expert_parallel': True, 'block_size': 64, 'gpu_memory_utilization': 0.85, 'kv_cache_dtype': 'fp8_e4m3', 'max_num_batched_tokens': 16384, 'max_num_seqs': 128, 'speculative_config': {'method': 'dspark', 'model': 'RedHatAI/GLM-5.3-speculator.dspark', 'revision': 'b374b95663447ea0e935151be4f3d6666e36e6d7', 'num_speculative_tokens': 8, 'attention_backend': 'FLASH_ATTN', 'draft_sample_method': 'probabilistic', 'enable_adaptive_verification': False}, 'compilation_config': {'mode': None, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': [], 'ir_enable_torch_wrap': None, 'splitting_ops': None, 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': None, 'compile_ranges_endpoints': None, 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': None, 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': None, 'pass_config': {}, 'max_cudagraph_capture_size': 1152, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': None, 'static_all_moe_layers': []}}
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [model.py:709] Resolved architecture: GlmMoeDsaForCausalLM
-(MainProcess pid=1663430) INFO 10-02 15:54:30 [model.py:2120] Using max model len 16384
-(MainProcess pid=1663430) INFO 10-02 15:54:31 [cache.py:349] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor
-(MainProcess pid=1663430) INFO 10-02 15:54:31 [model.py:709] Resolved architecture: Qwen3DSparkModel
-(MainProcess pid=1663430) INFO 10-02 15:54:32 [model.py:2120] Using max model len 1048576
-(MainProcess pid=1663430) INFO 10-02 15:54:32 [speculative.py:1663] Overriding draft model max model len from 1048576 to 16384
-(MainProcess pid=1663430) INFO 10-02 15:54:32 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=16384.
-(MainProcess pid=1663430) INFO 10-02 15:54:32 [vllm.py:1637] Disabling NCCL for DP synchronization when using async scheduling.
-(MainProcess pid=1663430) INFO 10-02 15:54:32 [vllm.py:843] Auto-enabling VLLM_USE_BREAKABLE_CUDAGRAPH=1. Set VLLM_USE_BREAKABLE_CUDAGRAPH=0 to opt out.
-(MainProcess pid=1663430) INFO 10-02 15:54:32 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(MainProcess pid=1663430) INFO 10-02 15:54:33 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(MainProcess pid=1663430) INFO 10-02 15:54:39 [utils.py:1198] Started DP Coordinator process (PID: 1664432)
-(MainProcess pid=1663430) INFO 10-02 15:54:39 [utils.py:254] Started 4 API server processes
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:48 [model.py:709] Resolved architecture: GlmMoeDsaForCausalLM
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:48 [model.py:2120] Using max model len 16384
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:48 [model.py:709] Resolved architecture: GlmMoeDsaForCausalLM
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:48 [model.py:2120] Using max model len 16384
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:48 [model.py:709] Resolved architecture: GlmMoeDsaForCausalLM
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:48 [model.py:2120] Using max model len 16384
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:49 [model.py:709] Resolved architecture: GlmMoeDsaForCausalLM
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:49 [model.py:2120] Using max model len 16384
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:49 [cache.py:349] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:49 [cache.py:349] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:49 [cache.py:349] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:50 [model.py:709] Resolved architecture: Qwen3DSparkModel
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:50 [model.py:709] Resolved architecture: Qwen3DSparkModel
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:50 [model.py:709] Resolved architecture: Qwen3DSparkModel
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [cache.py:349] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [model.py:709] Resolved architecture: Qwen3DSparkModel
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:50 [model.py:2120] Using max model len 1048576
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:50 [speculative.py:1663] Overriding draft model max model len from 1048576 to 16384
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:50 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=16384.
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:50 [vllm.py:1637] Disabling NCCL for DP synchronization when using async scheduling.
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:50 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:50 [model.py:2120] Using max model len 1048576
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:50 [speculative.py:1663] Overriding draft model max model len from 1048576 to 16384
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:50 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=16384.
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:50 [vllm.py:1637] Disabling NCCL for DP synchronization when using async scheduling.
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:50 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:50 [model.py:2120] Using max model len 1048576
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:50 [speculative.py:1663] Overriding draft model max model len from 1048576 to 16384
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:50 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=16384.
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:50 [vllm.py:1637] Disabling NCCL for DP synchronization when using async scheduling.
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:50 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [model.py:2120] Using max model len 1048576
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [speculative.py:1663] Overriding draft model max model len from 1048576 to 16384
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=16384.
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [vllm.py:1637] Disabling NCCL for DP synchronization when using async scheduling.
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:50 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(ApiServer_3 pid=1665879) INFO 10-02 15:54:52 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(ApiServer_0 pid=1665876) INFO 10-02 15:54:52 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(ApiServer_1 pid=1665877) INFO 10-02 15:54:52 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(ApiServer_2 pid=1665878) INFO 10-02 15:54:52 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:54:54 [multiproc_executor.py:153] DP group leader: node_rank=0, node_rank_within_dp=0, master_addr=127.0.0.1, mq_connect_ip=172.31.44.248 (local), world_size=1, local_world_size=1
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:54:54 [multiproc_executor.py:153] DP group leader: node_rank=0, node_rank_within_dp=0, master_addr=127.0.0.1, mq_connect_ip=172.31.44.248 (local), world_size=1, local_world_size=1
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:54:54 [core.py:129] Initializing a V1 LLM engine (v0.30.1rc1.dev563+g58b329845) with config: model='RedHatAI/GLM-5.3-NVFP4', speculative_config=SpeculativeConfig(method='dspark', model='RedHatAI/GLM-5.3-speculator.dspark', num_spec_tokens=8), tokenizer='RedHatAI/GLM-5.3-NVFP4', skip_tokenizer_init=False, tokenizer_mode=auto, revision=c8917e4258572c405575855ff53effe58c17a38e, tokenizer_revision=c8917e4258572c405575855ff53effe58c17a38e, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=16384, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=4, decode_context_parallel_size=1, dcp_comm_backend=a2a, disable_custom_all_reduce=False, quantization=compressed-tensors, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=fp8_e4m3, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='glm45', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=glm-5.3, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.NONE: 0>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['all'], 'ir_enable_torch_wrap': False, 'splitting_ops': [], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512, 528, 544, 560, 576, 592, 608, 624, 640, 656, 672, 688, 704, 720, 736, 752, 768, 784, 800, 816, 832, 848, 864, 880, 896, 912, 928, 944, 960, 976, 992, 1008, 1024, 1040, 1056, 1072, 1088, 1104, 1120, 1136, 1152], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': True, 'fuse_act_quant': True, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 1152, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:54:54 [multiproc_executor.py:153] DP group leader: node_rank=0, node_rank_within_dp=0, master_addr=127.0.0.1, mq_connect_ip=172.31.44.248 (local), world_size=1, local_world_size=1
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:54:55 [multiproc_executor.py:153] DP group leader: node_rank=0, node_rank_within_dp=0, master_addr=127.0.0.1, mq_connect_ip=172.31.44.248 (local), world_size=1, local_world_size=1
-(Worker pid=1670698) INFO 10-02 15:55:06 [parallel_state.py:1825] world_size=4 rank=0 local_rank=0 distributed_init_method=tcp://127.0.0.1:32809 backend=nccl
-(Worker pid=1670648) INFO 10-02 15:55:07 [parallel_state.py:1825] world_size=4 rank=1 local_rank=1 distributed_init_method=tcp://127.0.0.1:32809 backend=nccl
-(Worker pid=1670748) INFO 10-02 15:55:07 [parallel_state.py:1825] world_size=4 rank=2 local_rank=2 distributed_init_method=tcp://127.0.0.1:32809 backend=nccl
-(Worker pid=1670647) INFO 10-02 15:55:07 [parallel_state.py:1825] world_size=4 rank=3 local_rank=3 distributed_init_method=tcp://127.0.0.1:32809 backend=nccl
-(Worker pid=1670698) INFO 10-02 15:55:08 [pynccl.py:148] vLLM is using nccl==2.29.7
-(Worker pid=1670698) INFO 10-02 15:55:33 [cuda_communicator.py:334] Using ['PYNCCL'] all-reduce backends (in dispatch order) for group 'dp:0' out of potential backends: ['FLASHINFER_PCIE_IPC', 'FLASHINFER', 'NCCL_SYMM_MEM', 'QUICK_REDUCE', 'AITER_CUSTOM', 'CUSTOM', 'SYMM_MEM', 'PYNCCL'].
-(Worker pid=1670698) INFO 10-02 15:55:34 [cuda_communicator.py:334] Using ['PYNCCL'] all-reduce backends (in dispatch order) for group 'ep:0' out of potential backends: ['FLASHINFER_PCIE_IPC', 'FLASHINFER', 'NCCL_SYMM_MEM', 'QUICK_REDUCE', 'AITER_CUSTOM', 'CUSTOM', 'SYMM_MEM', 'PYNCCL'].
-(Worker pid=1670698) INFO 10-02 15:55:34 [cuda_communicator.py:261] Using AgRsAll2AllManager all2all manager.
-(Worker pid=1670698) INFO 10-02 15:55:34 [parallel_state.py:2269] rank 0 in world size 4 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank 0, EPLB rank N/A
-(Worker pid=1670698) INFO 10-02 15:55:34 [gpu_worker.py:500] Using V2 Model Runner
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:55:35 [cuda.py:466] Using AttentionBackendEnum.FLASHINFER_MLA_SPARSE backend.
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:55:35 [cuda.py:466] Using AttentionBackendEnum.FLASHINFER_MLA_SPARSE backend.
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:55:35 [cuda.py:466] Using AttentionBackendEnum.FLASHINFER_MLA_SPARSE backend.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [model_runner.py:375] Loading model from scratch...
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [cuda.py:466] Using AttentionBackendEnum.FLASHINFER_MLA_SPARSE backend.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [mla_attention.py:540] Using standard fp8 KV cache format. To use DeepSeek's fp8_ds_mla KV cache format, please set `--attention-backend FLASHMLA_SPARSE`
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [selector.py:207] Using TRTLLM_RAGGED MLA prefill backend.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [deep_gemm.py:197] deep_gemm not found in site-packages, trying vendored vllm.third_party.deep_gemm
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [deep_gemm.py:224] DeepGEMM PDL enabled on vllm.third_party.deep_gemm.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:35 [deep_gemm.py:136] DeepGEMM E8M0 enabled on current platform.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:36 [expert_map_manager.py:250] [EP Rank 0/4] Expert parallelism is enabled. Expert placement strategy: linear. Local/global number of experts: 64/256. Experts local to global index map: 0->0, 1->1, 2->2, 3->3, 4->4, 5->5, 6->6, 7->7, 8->8, 9->9, 10->10, 11->11, 12->12, 13->13, 14->14, 15->15, 16->16, 17->17, 18->18, 19->19, 20->20, 21->21, 22->22, 23->23, 24->24, 25->25, 26->26, 27->27, 28->28, 29->29, 30->30, 31->31, 32->32, 33->33, 34->34, 35->35, 36->36, 37->37, 38->38, 39->39, 40->40, 41->41, 42->42, 43->43, 44->44, 45->45, 46->46, 47->47, 48->48, 49->49, 50->50, 51->51, 52->52, 53->53, 54->54, 55->55, 56->56, 57->57, 58->58, 59->59, 60->60, 61->61, 62->62, 63->63.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:36 [nvfp4.py:302] Using 'FLASHINFER_TRTLLM' NvFp4 MoE backend out of potential backends: ['FLASHINFER_TRTLLM', 'FLASHINFER_CUTEDSL', 'FLASHINFER_CUTEDSL_BATCHED', 'FLASHINFER_CUTLASS', 'VLLM_CUTLASS', 'MARLIN', 'HUMMING', 'EMULATION'].
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:36 [base_loader.py:81] Initializing model took 0.955172 seconds
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:37 [weight_utils.py:1063] Filesystem type for checkpoints: XFS. Checkpoint size: 432.90 GiB. Available RAM: 3836.43 GiB.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:55:37 [weight_utils.py:1086] Auto-prefetch is disabled because the filesystem (XFS) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
-Loading safetensors checkpoint shards:   0% Completed | 0/23 [00:00<?, ?it/s]
-Loading safetensors checkpoint shards:   4% Completed | 1/23 [00:02<00:52,  2.37s/it]
-Loading safetensors checkpoint shards:   9% Completed | 2/23 [00:03<00:40,  1.93s/it]
-Loading safetensors checkpoint shards:  13% Completed | 3/23 [00:06<00:39,  1.97s/it]
-Loading safetensors checkpoint shards:  17% Completed | 4/23 [00:07<00:34,  1.82s/it]
-Loading safetensors checkpoint shards:  22% Completed | 5/23 [00:09<00:32,  1.83s/it]
-Loading safetensors checkpoint shards:  26% Completed | 6/23 [00:11<00:30,  1.82s/it]
-Loading safetensors checkpoint shards:  30% Completed | 7/23 [00:12<00:28,  1.78s/it]
-Loading safetensors checkpoint shards:  35% Completed | 8/23 [00:14<00:27,  1.84s/it]
-Loading safetensors checkpoint shards:  39% Completed | 9/23 [00:16<00:24,  1.75s/it]
-Loading safetensors checkpoint shards:  43% Completed | 10/23 [00:18<00:23,  1.78s/it]
-Loading safetensors checkpoint shards:  48% Completed | 11/23 [00:20<00:21,  1.77s/it]
-Loading safetensors checkpoint shards:  52% Completed | 12/23 [00:21<00:19,  1.75s/it]
-Loading safetensors checkpoint shards:  57% Completed | 13/23 [00:23<00:17,  1.77s/it]
-Loading safetensors checkpoint shards:  61% Completed | 14/23 [00:25<00:15,  1.69s/it]
-Loading safetensors checkpoint shards:  65% Completed | 15/23 [00:26<00:13,  1.72s/it]
-Loading safetensors checkpoint shards:  70% Completed | 16/23 [00:28<00:12,  1.77s/it]
-Loading safetensors checkpoint shards:  74% Completed | 17/23 [00:30<00:10,  1.78s/it]
-Loading safetensors checkpoint shards:  78% Completed | 18/23 [00:32<00:09,  1.84s/it]
-Loading safetensors checkpoint shards:  83% Completed | 19/23 [00:34<00:06,  1.75s/it]
-Loading safetensors checkpoint shards:  87% Completed | 20/23 [00:36<00:05,  1.83s/it]
-Loading safetensors checkpoint shards:  91% Completed | 21/23 [00:37<00:03,  1.75s/it]
-Loading safetensors checkpoint shards:  96% Completed | 22/23 [00:37<00:01,  1.32s/it]
-Loading safetensors checkpoint shards: 100% Completed | 23/23 [00:37<00:00,  1.65s/it]
-
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:15 [default_loader.py:484] Loading weights took 37.99 seconds
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:56:16 [eagle3_utils.py:27] Using Eagle3 auxiliary layers from config: (2, 20, 39, 58, 75)
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:56:16 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:56:16 [cuda.py:466] Using AttentionBackendEnum.FLASH_ATTN backend.
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:56:16 [eagle3_utils.py:27] Using Eagle3 auxiliary layers from config: (2, 20, 39, 58, 75)
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:56:16 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:56:16 [cuda.py:466] Using AttentionBackendEnum.FLASH_ATTN backend.
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:56:16 [eagle3_utils.py:27] Using Eagle3 auxiliary layers from config: (2, 20, 39, 58, 75)
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:56:16 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:56:16 [cuda.py:466] Using AttentionBackendEnum.FLASH_ATTN backend.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:16 [nvfp4.py:612] Using MoEPrepareAndFinalizeNaiveDPEPModular
-(Worker_DP1_EP1 pid=1670648) WARNING 10-02 15:56:16 [utils.py:325] Attempted to load weight confidence_head.proj.bias with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP1_EP1 pid=1670648) WARNING 10-02 15:56:16 [utils.py:325] Attempted to load weight confidence_head.proj.weight with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP3_EP3 pid=1670647) WARNING 10-02 15:56:16 [utils.py:325] Attempted to load weight confidence_head.proj.bias with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP3_EP3 pid=1670647) WARNING 10-02 15:56:16 [utils.py:325] Attempted to load weight confidence_head.proj.weight with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP2_EP2 pid=1670748) WARNING 10-02 15:56:16 [utils.py:325] Attempted to load weight confidence_head.proj.bias with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP2_EP2 pid=1670748) WARNING 10-02 15:56:16 [utils.py:325] Attempted to load weight confidence_head.proj.weight with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [eagle3_utils.py:27] Using Eagle3 auxiliary layers from config: (2, 20, 39, 58, 75)
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [cuda.py:466] Using AttentionBackendEnum.FLASH_ATTN backend.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [flash_attn.py:1171] Using FlashAttention version 4
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [base_loader.py:81] Initializing model took 0.020951 seconds
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:56:17 [model_runner.py:407] Model loading took 133.27 GiB memory and 42.225268 seconds
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:56:17 [torch_utils.py:286] Reducing Torch threads from 48 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:56:17 [utils.py:343] Using LBNHC KV cache layout.
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:56:17 [model_runner.py:407] Model loading took 133.27 GiB memory and 42.587231 seconds
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:56:17 [model_runner.py:407] Model loading took 133.27 GiB memory and 42.634754 seconds
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:56:17 [torch_utils.py:286] Reducing Torch threads from 48 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:56:17 [utils.py:343] Using LBNHC KV cache layout.
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:56:17 [torch_utils.py:286] Reducing Torch threads from 48 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:56:17 [utils.py:343] Using LBNHC KV cache layout.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:17 [weight_utils.py:1063] Filesystem type for checkpoints: XFS. Checkpoint size: 2.33 GiB. Available RAM: 3836.02 GiB.
-Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
-Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00, 1279.14it/s]
-
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 15:56:17 [utils.py:325] Attempted to load weight confidence_head.proj.bias with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 15:56:17 [utils.py:325] Attempted to load weight confidence_head.proj.weight with dtype torch.bfloat16 into parameter with dtype torch.float32
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:18 [default_loader.py:484] Loading weights took 0.43 seconds
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:18 [model_runner.py:407] Model loading took 133.27 GiB memory and 43.320685 seconds
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:18 [topk_topp_sampler.py:124] Using FlashInfer for top-p & top-k sampling.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:18 [torch_utils.py:286] Reducing Torch threads from 48 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:56:18 [torch_utils.py:286] Reducing Torch threads from 48 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:56:18 [utils.py:343] Using LBNHC KV cache layout.
-[2026-10-02 15:56:24.784] [info] TRT-LLM fused MoE cooperative launch SM allocation: 140 SMs used for MoE, 8 SMs reserved for overlapping kernels (total SMs: 148)
-[2026-10-02 15:56:24.842] [info] TRT-LLM fused MoE cooperative launch SM allocation: 140 SMs used for MoE, 8 SMs reserved for overlapping kernels (total SMs: 148)
-[2026-10-02 15:56:24.889] [info] TRT-LLM fused MoE cooperative launch SM allocation: 140 SMs used for MoE, 8 SMs reserved for overlapping kernels (total SMs: 148)
-[2026-10-02 15:56:24.940] [info] TRT-LLM fused MoE cooperative launch SM allocation: 140 SMs used for MoE, 8 SMs reserved for overlapping kernels (total SMs: 148)
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:25 [dp_utils.py:49] Using CPU all reduce to synchronize DP padding between ranks.
-(Worker_DP2_EP2 pid=1670748) WARNING 10-02 15:56:26 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(Worker_DP3_EP3 pid=1670647) WARNING 10-02 15:56:26 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 15:56:26 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:26 [indexer.py:927] DSA indexer decode path: use_flattening=False supports_varlen=True (next_n=9, use_fp4_cache=False)
-(Worker_DP1_EP1 pid=1670648) WARNING 10-02 15:56:26 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:56:26 [breakable_cudagraph.py:294] Breakable CUDA graph enabled
-Capturing CUDA graphs (PIECEWISE):   0%|          | 0/91 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   1%|          | 1/91 [00:00<00:46,  1.92it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 2/91 [00:00<00:37,  2.36it/s]Capturing CUDA graphs (PIECEWISE):   3%|▎         | 3/91 [00:01<00:34,  2.56it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 4/91 [00:01<00:32,  2.69it/s]Capturing CUDA graphs (PIECEWISE):   5%|▌         | 5/91 [00:01<00:31,  2.77it/s]Capturing CUDA graphs (PIECEWISE):   7%|▋         | 6/91 [00:02<00:30,  2.77it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 7/91 [00:02<00:29,  2.81it/s]Capturing CUDA graphs (PIECEWISE):   9%|▉         | 8/91 [00:02<00:29,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  10%|▉         | 9/91 [00:03<00:28,  2.83it/s]Capturing CUDA graphs (PIECEWISE):  11%|█         | 10/91 [00:03<00:28,  2.85it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 11/91 [00:04<00:27,  2.87it/s]Capturing CUDA graphs (PIECEWISE):  13%|█▎        | 12/91 [00:04<00:28,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  14%|█▍        | 13/91 [00:04<00:27,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  15%|█▌        | 14/91 [00:05<00:27,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▋        | 15/91 [00:05<00:26,  2.83it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 16/91 [00:05<00:26,  2.86it/s]Capturing CUDA graphs (PIECEWISE):  19%|█▊        | 17/91 [00:06<00:25,  2.86it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 18/91 [00:06<00:25,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  21%|██        | 19/91 [00:06<00:25,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 20/91 [00:07<00:25,  2.83it/s]Capturing CUDA graphs (PIECEWISE):  23%|██▎       | 21/91 [00:07<00:24,  2.84it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▍       | 22/91 [00:07<00:24,  2.83it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 23/91 [00:08<00:23,  2.83it/s]Capturing CUDA graphs (PIECEWISE):  26%|██▋       | 24/91 [00:08<00:23,  2.84it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 25/91 [00:08<00:23,  2.78it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▊       | 26/91 [00:09<00:23,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  30%|██▉       | 27/91 [00:09<00:22,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  31%|███       | 28/91 [00:10<00:22,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  32%|███▏      | 29/91 [00:10<00:22,  2.80it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 30/91 [00:10<00:21,  2.78it/s]Capturing CUDA graphs (PIECEWISE):  34%|███▍      | 31/91 [00:11<00:22,  2.68it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 32/91 [00:11<00:21,  2.72it/s]Capturing CUDA graphs (PIECEWISE):  36%|███▋      | 33/91 [00:11<00:21,  2.75it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 34/91 [00:12<00:20,  2.77it/s]Capturing CUDA graphs (PIECEWISE):  38%|███▊      | 35/91 [00:12<00:20,  2.78it/s]Capturing CUDA graphs (PIECEWISE):  40%|███▉      | 36/91 [00:12<00:19,  2.80it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 37/91 [00:13<00:19,  2.75it/s]Capturing CUDA graphs (PIECEWISE):  42%|████▏     | 38/91 [00:13<00:19,  2.77it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 39/91 [00:14<00:18,  2.80it/s]Capturing CUDA graphs (PIECEWISE):  44%|████▍     | 40/91 [00:14<00:18,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 41/91 [00:14<00:17,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  46%|████▌     | 42/91 [00:15<00:17,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 43/91 [00:15<00:17,  2.77it/s]Capturing CUDA graphs (PIECEWISE):  48%|████▊     | 44/91 [00:15<00:16,  2.77it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 45/91 [00:16<00:16,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 46/91 [00:16<00:16,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  52%|█████▏    | 47/91 [00:16<00:15,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 48/91 [00:17<00:15,  2.83it/s]Capturing CUDA graphs (PIECEWISE):  54%|█████▍    | 49/91 [00:17<00:14,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 50/91 [00:17<00:14,  2.76it/s]Capturing CUDA graphs (PIECEWISE):  56%|█████▌    | 51/91 [00:18<00:14,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 52/91 [00:18<00:13,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  58%|█████▊    | 53/91 [00:19<00:13,  2.81it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 54/91 [00:19<00:13,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  60%|██████    | 55/91 [00:19<00:12,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  62%|██████▏   | 56/91 [00:20<00:12,  2.73it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 57/91 [00:20<00:12,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  64%|██████▎   | 58/91 [00:20<00:12,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 59/91 [00:21<00:11,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  66%|██████▌   | 60/91 [00:21<00:11,  2.71it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 61/91 [00:21<00:10,  2.73it/s]Capturing CUDA graphs (PIECEWISE):  68%|██████▊   | 62/91 [00:22<00:10,  2.66it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▉   | 63/91 [00:22<00:10,  2.67it/s]Capturing CUDA graphs (PIECEWISE):  70%|███████   | 64/91 [00:23<00:10,  2.68it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████▏  | 65/91 [00:23<00:09,  2.68it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 66/91 [00:23<00:09,  2.66it/s]Capturing CUDA graphs (PIECEWISE):  74%|███████▎  | 67/91 [00:24<00:08,  2.69it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 68/91 [00:24<00:08,  2.64it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▌  | 69/91 [00:25<00:08,  2.65it/s]Capturing CUDA graphs (PIECEWISE):  77%|███████▋  | 70/91 [00:25<00:07,  2.65it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 71/91 [00:25<00:07,  2.67it/s]Capturing CUDA graphs (PIECEWISE):  79%|███████▉  | 72/91 [00:26<00:07,  2.67it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 73/91 [00:26<00:06,  2.67it/s]Capturing CUDA graphs (PIECEWISE):  81%|████████▏ | 74/91 [00:26<00:06,  2.61it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 75/91 [00:27<00:06,  2.63it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▎ | 76/91 [00:27<00:05,  2.65it/s]Capturing CUDA graphs (PIECEWISE):  85%|████████▍ | 77/91 [00:28<00:05,  2.66it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▌ | 78/91 [00:28<00:04,  2.67it/s]Capturing CUDA graphs (PIECEWISE):  87%|████████▋ | 79/91 [00:28<00:04,  2.67it/s]Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 80/91 [00:29<00:04,  2.59it/s]Capturing CUDA graphs (PIECEWISE):  89%|████████▉ | 81/91 [00:29<00:03,  2.58it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 82/91 [00:29<00:03,  2.60it/s]Capturing CUDA graphs (PIECEWISE):  91%|█████████ | 83/91 [00:30<00:03,  2.62it/s]Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 84/91 [00:30<00:02,  2.62it/s]Capturing CUDA graphs (PIECEWISE):  93%|█████████▎| 85/91 [00:31<00:02,  2.53it/s]Capturing CUDA graphs (PIECEWISE):  95%|█████████▍| 86/91 [00:31<00:01,  2.54it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 87/91 [00:32<00:02,  1.95it/s]Capturing CUDA graphs (PIECEWISE):  97%|█████████▋| 88/91 [00:33<00:01,  1.76it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 89/91 [00:33<00:01,  1.68it/s]Capturing CUDA graphs (PIECEWISE):  99%|█████████▉| 90/91 [00:34<00:00,  1.40it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 91/91 [00:35<00:00,  1.13it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 91/91 [00:35<00:00,  2.53it/s]
-Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):  50%|█████     | 1/2 [00:00<00:00,  2.76it/s](Worker_DP2_EP2 pid=1670748) INFO 10-02 15:57:03 [speculator.py:153] Capturing model for DSpark speculator...
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:57:03 [speculator.py:153] Capturing model for DSpark speculator...
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:57:03 [speculator.py:153] Capturing model for DSpark speculator...
-Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00,  2.88it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00,  2.86it/s]
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:03 [speculator.py:153] Capturing model for DSpark speculator...
-Capturing dspark CUDA graphs (FULL):   0%|          | 0/80 [00:00<?, ?it/s]/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i641_None_'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i641_None_'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i641_None_'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i641_None_'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-Capturing dspark CUDA graphs (FULL):   1%|▏         | 1/80 [00:02<03:43,  2.83s/it]Capturing dspark CUDA graphs (FULL):  11%|█▏        | 9/80 [00:02<00:17,  4.15it/s]Capturing dspark CUDA graphs (FULL):  21%|██▏       | 17/80 [00:03<00:07,  8.95it/s]Capturing dspark CUDA graphs (FULL):  30%|███       | 24/80 [00:03<00:03, 14.02it/s]Capturing dspark CUDA graphs (FULL):  40%|████      | 32/80 [00:03<00:02, 20.80it/s]Capturing dspark CUDA graphs (FULL):  50%|█████     | 40/80 [00:03<00:01, 28.28it/s]Capturing dspark CUDA graphs (FULL):  60%|██████    | 48/80 [00:03<00:00, 35.47it/s]Capturing dspark CUDA graphs (FULL):  69%|██████▉   | 55/80 [00:03<00:00, 39.28it/s]Capturing dspark CUDA graphs (FULL):  78%|███████▊  | 62/80 [00:03<00:00, 42.33it/s]/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Te'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Te'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Te'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-Capturing dspark CUDA graphs (FULL):  85%|████████▌ | 68/80 [00:09<00:03,  3.87it/s]Capturing dspark CUDA graphs (FULL):  94%|█████████▍| 75/80 [00:09<00:00,  5.46it/s]/home/tomasruizt/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:2463: UserWarning: Argument aux_data (position 19) cannot be converted to a JitArgument for function 'cutlass___call___vllmvllm_flash_attncuteflash_fwd_sm100FlashAttentionForwardSm100_object_at__Tensorgmemoi64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Tensorgmemoi64i64i641_Te'. Its type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>` is not supported. If the value is known at compile time, annotate it: `aux_data: Constexpr`. Otherwise, implement the `JitArgument` or `DynamicExpression` protocol for type `<class 'vllm.vllm_flash_attn.cute.utils.AuxData'>`, or register a custom argument adapter.
-  exe_args, func_types, adapted_args = self.generate_mlir_function_types(
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:57:16 [model_runner.py:1099] Graph capturing finished in 50 secs, took 8.17 GiB
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:57:16 [model_runner.py:1099] Graph capturing finished in 50 secs, took 8.17 GiB
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:57:16 [model_runner.py:1099] Graph capturing finished in 50 secs, took 8.17 GiB
-Capturing dspark CUDA graphs (FULL): 100%|██████████| 80/80 [00:13<00:00,  3.01it/s]Capturing dspark CUDA graphs (FULL): 100%|██████████| 80/80 [00:13<00:00,  6.03it/s]
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:17 [model_runner.py:1099] Graph capturing finished in 51 secs, took 8.17 GiB
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:57:17 [gpu_worker.py:736] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.8500 is equivalent to --gpu-memory-utilization=0.8142 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.8858. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
-(EngineCore_DP2 pid=1665874) WARNING 10-02 15:57:17 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:57:17 [kv_cache_utils.py:2481] GPU KV cache size: 1,098,240 tokens, Maximum concurrency for 16,384 tokens per request: 67.03x
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:57:17 [kernel_warmup.py:172] JIT kernel warmup starting.
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:57:17 [kernel_warmup.py:185] JIT kernel warmup finished in 0.09s.
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:57:17 [gpu_worker.py:736] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.8500 is equivalent to --gpu-memory-utilization=0.8142 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.8858. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
-(EngineCore_DP1 pid=1665873) WARNING 10-02 15:57:17 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:57:17 [kv_cache_utils.py:2481] GPU KV cache size: 1,098,240 tokens, Maximum concurrency for 16,384 tokens per request: 67.03x
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:57:17 [kernel_warmup.py:172] JIT kernel warmup starting.
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:57:17 [gpu_worker.py:736] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.8500 is equivalent to --gpu-memory-utilization=0.8142 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.8858. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
-(EngineCore_DP3 pid=1665875) WARNING 10-02 15:57:17 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:57:17 [kv_cache_utils.py:2481] GPU KV cache size: 1,098,240 tokens, Maximum concurrency for 16,384 tokens per request: 67.03x
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:57:17 [kernel_warmup.py:172] JIT kernel warmup starting.
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:57:17 [kernel_warmup.py:185] JIT kernel warmup finished in 0.09s.
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:57:17 [kernel_warmup.py:185] JIT kernel warmup finished in 0.09s.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:18 [gpu_worker.py:721] Available KV cache memory: 73.93 GiB
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:18 [gpu_worker.py:736] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.8500 is equivalent to --gpu-memory-utilization=0.8142 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.8858. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
-(EngineCore_DP0 pid=1665872) WARNING 10-02 15:57:18 [kv_cache_utils.py:1949] KV cache page sizes cannot be unified; treating sliding-window layers as full attention for cache allocation. Sliding-window attention compute is unchanged.
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:57:18 [kv_cache_utils.py:2481] GPU KV cache size: 1,098,240 tokens, Maximum concurrency for 16,384 tokens per request: 67.03x
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:18 [kernel_warmup.py:172] JIT kernel warmup starting.
-JIT kernel warmup (77 compile keys):   0%|          | 0/6 [00:00<?, ?kernel/s]JIT kernel warmup (77 compile keys): 100%|██████████| 6/6 [00:00<00:00, 68.01kernel/s, ConvertReqIndexToGlobalIndexKernel (4 keys)]
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:18 [kernel_warmup.py:185] JIT kernel warmup finished in 0.09s.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:18 [kernel_warmup.py:94] Warming up ll_bf16 router GEMM kernels for shapes: ((6144, 256),).
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:18 [cutedsl_warmup.py:107] Warming up CuTeDSL compile_units=5 names=('shape-dynamic skinny GEMM',).
-Compiling CuTeDSL kernels:   0%|          | 0/5 [00:00<?, ?it/s]Compiling CuTeDSL kernels:  20%|██        | 1/5 [00:00<00:01,  3.00it/s]Compiling CuTeDSL kernels:  40%|████      | 2/5 [00:00<00:00,  3.36it/s]Compiling CuTeDSL kernels:  60%|██████    | 3/5 [00:00<00:00,  4.03it/s]Compiling CuTeDSL kernels:  80%|████████  | 4/5 [00:00<00:00,  4.45it/s]Compiling CuTeDSL kernels: 100%|██████████| 5/5 [00:01<00:00,  4.60it/s]Compiling CuTeDSL kernels: 100%|██████████| 5/5 [00:01<00:00,  4.21it/s]
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:20 [kernel_warmup.py:449] Using FlashInfer autotune cache file: /home/tomasruizt/.cache/vllm/flashinfer_autotune_cache/0.7.0.post1/103a/da4466a609e25bb73bd7395a2ba4bb448d513f3a4af67888b010c15749bbd978/autotune_configs.json
-2026-10-02 15:57:20,202 - INFO - autotuner.py:1046 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
-2026-10-02 15:57:20,202 - INFO - autotuner.py:1046 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
-2026-10-02 15:57:20,203 - INFO - autotuner.py:1046 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
-2026-10-02 15:57:20,203 - INFO - autotuner.py:1046 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:57:20 [kernel_warmup.py:359] Running FlashInfer autotune with 16384 tokens and token buckets (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096, 8192, 16384).
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:57:20 [kernel_warmup.py:359] Running FlashInfer autotune with 16384 tokens and token buckets (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096, 8192, 16384).
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:57:20 [kernel_warmup.py:359] Running FlashInfer autotune with 16384 tokens and token buckets (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096, 8192, 16384).
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:57:20 [kernel_warmup.py:359] Running FlashInfer autotune with 16384 tokens and token buckets (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096, 8192, 16384).
-[AutoTuner]: Tuning trtllm_batch_decode_mla:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   5%|▍         | 1/22 [00:00<00:03,  6.25profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   5%|▍         | 1/22 [00:00<00:03,  6.24profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   5%|▍         | 1/22 [00:00<00:03,  6.23profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:   5%|▍         | 1/22 [00:00<00:03,  6.22profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:  68%|██████▊   | 15/22 [00:00<00:00, 68.61profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:  68%|██████▊   | 15/22 [00:00<00:00, 68.53profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:  68%|██████▊   | 15/22 [00:00<00:00, 68.38profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla:  68%|██████▊   | 15/22 [00:00<00:00, 68.34profile/s][AutoTuner]: Tuning trtllm_batch_decode_mla: 100%|██████████| 22/22 [00:00<00:00, 47.08profile/s]
-[AutoTuner]: Tuning trtllm_batch_decode_mla: 100%|██████████| 22/22 [00:00<00:00, 47.07profile/s]
-[AutoTuner]: Tuning trtllm_batch_decode_mla: 100%|██████████| 22/22 [00:00<00:00, 47.06profile/s]
-[AutoTuner]: Tuning trtllm_batch_decode_mla: 100%|██████████| 22/22 [00:00<00:00, 47.03profile/s]
-[AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   0%|          | 0/22 [00:00<?, ?profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   5%|▍         | 1/22 [00:06<02:20,  6.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   5%|▍         | 1/22 [00:06<02:20,  6.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   5%|▍         | 1/22 [00:06<02:20,  6.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   5%|▍         | 1/22 [00:06<02:20,  6.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   9%|▉         | 2/22 [00:13<02:15,  6.78s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   9%|▉         | 2/22 [00:13<02:15,  6.78s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   9%|▉         | 2/22 [00:13<02:15,  6.78s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:   9%|▉         | 2/22 [00:13<02:15,  6.78s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  14%|█▎        | 3/22 [00:21<02:15,  7.13s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  14%|█▎        | 3/22 [00:21<02:15,  7.13s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  14%|█▎        | 3/22 [00:21<02:15,  7.13s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  14%|█▎        | 3/22 [00:21<02:15,  7.13s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  18%|█▊        | 4/22 [00:28<02:12,  7.34s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  18%|█▊        | 4/22 [00:28<02:12,  7.34s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  18%|█▊        | 4/22 [00:28<02:12,  7.34s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  18%|█▊        | 4/22 [00:28<02:12,  7.34s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  23%|██▎       | 5/22 [00:36<02:10,  7.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  23%|██▎       | 5/22 [00:37<02:10,  7.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  23%|██▎       | 5/22 [00:37<02:10,  7.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  23%|██▎       | 5/22 [00:37<02:10,  7.67s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  27%|██▋       | 6/22 [00:45<02:07,  7.96s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  27%|██▋       | 6/22 [00:45<02:07,  7.96s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  27%|██▋       | 6/22 [00:45<02:07,  7.96s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  27%|██▋       | 6/22 [00:45<02:07,  7.96s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  32%|███▏      | 7/22 [00:54<02:04,  8.31s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  32%|███▏      | 7/22 [00:54<02:04,  8.31s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  32%|███▏      | 7/22 [00:54<02:04,  8.31s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  32%|███▏      | 7/22 [00:54<02:04,  8.31s/profile](EngineCore_DP2 pid=1665874) INFO 10-02 15:58:18 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:58:18 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:58:18 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:58:19 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-[AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  36%|███▋      | 8/22 [01:04<02:04,  8.91s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  36%|███▋      | 8/22 [01:04<02:04,  8.91s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  36%|███▋      | 8/22 [01:04<02:04,  8.91s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  36%|███▋      | 8/22 [01:04<02:04,  8.91s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  41%|████      | 9/22 [01:13<01:54,  8.79s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  41%|████      | 9/22 [01:13<01:54,  8.79s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  41%|████      | 9/22 [01:13<01:54,  8.79s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  41%|████      | 9/22 [01:13<01:54,  8.79s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  45%|████▌     | 10/22 [01:18<01:33,  7.81s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  45%|████▌     | 10/22 [01:18<01:33,  7.81s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  45%|████▌     | 10/22 [01:18<01:33,  7.81s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  45%|████▌     | 10/22 [01:18<01:33,  7.81s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  50%|█████     | 11/22 [01:21<01:07,  6.16s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  50%|█████     | 11/22 [01:21<01:07,  6.16s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  50%|█████     | 11/22 [01:21<01:07,  6.16s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  50%|█████     | 11/22 [01:21<01:07,  6.16s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  55%|█████▍    | 12/22 [01:23<00:50,  5.02s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  55%|█████▍    | 12/22 [01:23<00:50,  5.02s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  55%|█████▍    | 12/22 [01:23<00:50,  5.02s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  55%|█████▍    | 12/22 [01:23<00:50,  5.02s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  59%|█████▉    | 13/22 [01:23<00:32,  3.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  59%|█████▉    | 13/22 [01:23<00:32,  3.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  59%|█████▉    | 13/22 [01:23<00:32,  3.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  59%|█████▉    | 13/22 [01:23<00:32,  3.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  64%|██████▎   | 14/22 [01:24<00:20,  2.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  64%|██████▎   | 14/22 [01:24<00:20,  2.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  64%|██████▎   | 14/22 [01:24<00:20,  2.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  64%|██████▎   | 14/22 [01:24<00:20,  2.57s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  68%|██████▊   | 15/22 [01:24<00:13,  1.89s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  68%|██████▊   | 15/22 [01:24<00:13,  1.89s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  68%|██████▊   | 15/22 [01:24<00:13,  1.89s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  68%|██████▊   | 15/22 [01:24<00:13,  1.89s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  73%|███████▎  | 16/22 [01:24<00:08,  1.43s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  73%|███████▎  | 16/22 [01:24<00:08,  1.43s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  73%|███████▎  | 16/22 [01:24<00:08,  1.43s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  73%|███████▎  | 16/22 [01:24<00:08,  1.43s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  77%|███████▋  | 17/22 [01:25<00:05,  1.09s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  77%|███████▋  | 17/22 [01:25<00:05,  1.09s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  77%|███████▋  | 17/22 [01:25<00:05,  1.09s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  77%|███████▋  | 17/22 [01:25<00:05,  1.09s/profile][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  82%|████████▏ | 18/22 [01:25<00:03,  1.17profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  82%|████████▏ | 18/22 [01:25<00:03,  1.17profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  82%|████████▏ | 18/22 [01:25<00:03,  1.17profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  82%|████████▏ | 18/22 [01:25<00:03,  1.17profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  86%|████████▋ | 19/22 [01:25<00:02,  1.43profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  86%|████████▋ | 19/22 [01:25<00:02,  1.43profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  86%|████████▋ | 19/22 [01:25<00:02,  1.43profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  86%|████████▋ | 19/22 [01:25<00:02,  1.43profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  91%|█████████ | 20/22 [01:26<00:01,  1.69profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  91%|█████████ | 20/22 [01:26<00:01,  1.69profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  91%|█████████ | 20/22 [01:26<00:01,  1.69profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  91%|█████████ | 20/22 [01:26<00:01,  1.69profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  95%|█████████▌| 21/22 [01:26<00:00,  1.85profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  95%|█████████▌| 21/22 [01:26<00:00,  1.85profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  95%|█████████▌| 21/22 [01:26<00:00,  1.85profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe:  95%|█████████▌| 21/22 [01:26<00:00,  1.85profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  1.71profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  3.97s/profile]
-[AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  1.71profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  3.97s/profile]
-[AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  1.71profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  3.97s/profile]
-[AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  1.71profile/s][AutoTuner]: Tuning flashinfer::trtllm_fp4_block_scale_moe: 100%|██████████| 22/22 [01:27<00:00,  3.97s/profile]
-2026-10-02 15:58:48,752 - INFO - autotuner.py:1069 - flashinfer.jit: [Autotuner]: Autotuning process ends
-2026-10-02 15:58:48,752 - INFO - autotuner.py:1069 - flashinfer.jit: [Autotuner]: Autotuning process ends
-2026-10-02 15:58:48,754 - INFO - autotuner.py:1069 - flashinfer.jit: [Autotuner]: Autotuning process ends
-2026-10-02 15:58:48,754 - INFO - autotuner.py:1069 - flashinfer.jit: [Autotuner]: Autotuning process ends
-2026-10-02 15:58:48,907 - INFO - autotuner.py:3554 - flashinfer.jit: [Autotuner]: Saved 44 configs to /home/tomasruizt/.cache/vllm/flashinfer_autotune_cache/0.7.0.post1/103a/da4466a609e25bb73bd7395a2ba4bb448d513f3a4af67888b010c15749bbd978/autotune_configs.json (44 new, 0 from previous config)
-Capturing CUDA graphs (PIECEWISE):   0%|          | 0/91 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   1%|          | 1/91 [00:00<00:29,  3.08it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 2/91 [00:00<00:28,  3.12it/s]Capturing CUDA graphs (PIECEWISE):   3%|▎         | 3/91 [00:00<00:28,  3.13it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 4/91 [00:01<00:27,  3.14it/s]Capturing CUDA graphs (PIECEWISE):   5%|▌         | 5/91 [00:01<00:27,  3.15it/s]Capturing CUDA graphs (PIECEWISE):   7%|▋         | 6/91 [00:01<00:27,  3.15it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 7/91 [00:02<00:26,  3.12it/s]Capturing CUDA graphs (PIECEWISE):   9%|▉         | 8/91 [00:02<00:26,  3.12it/s]Capturing CUDA graphs (PIECEWISE):  10%|▉         | 9/91 [00:02<00:26,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  11%|█         | 10/91 [00:03<00:25,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 11/91 [00:03<00:25,  3.15it/s]Capturing CUDA graphs (PIECEWISE):  13%|█▎        | 12/91 [00:03<00:25,  3.16it/s]Capturing CUDA graphs (PIECEWISE):  14%|█▍        | 13/91 [00:04<00:24,  3.16it/s]Capturing CUDA graphs (PIECEWISE):  15%|█▌        | 14/91 [00:04<00:24,  3.16it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▋        | 15/91 [00:04<00:24,  3.14it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 16/91 [00:05<00:23,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  19%|█▊        | 17/91 [00:05<00:23,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 18/91 [00:05<00:23,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  21%|██        | 19/91 [00:06<00:22,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 20/91 [00:06<00:22,  3.12it/s]Capturing CUDA graphs (PIECEWISE):  23%|██▎       | 21/91 [00:06<00:22,  3.13it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▍       | 22/91 [00:07<00:22,  3.12it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 23/91 [00:07<00:21,  3.12it/s]Capturing CUDA graphs (PIECEWISE):  26%|██▋       | 24/91 [00:07<00:21,  3.11it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 25/91 [00:07<00:21,  3.08it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▊       | 26/91 [00:08<00:21,  3.08it/s]Capturing CUDA graphs (PIECEWISE):  30%|██▉       | 27/91 [00:08<00:20,  3.09it/s]Capturing CUDA graphs (PIECEWISE):  31%|███       | 28/91 [00:08<00:20,  3.10it/s]Capturing CUDA graphs (PIECEWISE):  32%|███▏      | 29/91 [00:09<00:19,  3.10it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 30/91 [00:09<00:19,  3.09it/s]Capturing CUDA graphs (PIECEWISE):  34%|███▍      | 31/91 [00:09<00:19,  3.09it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 32/91 [00:10<00:19,  3.09it/s]Capturing CUDA graphs (PIECEWISE):  36%|███▋      | 33/91 [00:10<00:18,  3.09it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 34/91 [00:10<00:18,  3.09it/s]Capturing CUDA graphs (PIECEWISE):  38%|███▊      | 35/91 [00:11<00:18,  3.08it/s]Capturing CUDA graphs (PIECEWISE):  40%|███▉      | 36/91 [00:11<00:17,  3.08it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 37/91 [00:11<00:17,  3.08it/s]Capturing CUDA graphs (PIECEWISE):  42%|████▏     | 38/91 [00:12<00:17,  3.08it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 39/91 [00:12<00:16,  3.07it/s]Capturing CUDA graphs (PIECEWISE):  44%|████▍     | 40/91 [00:12<00:16,  3.07it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 41/91 [00:13<00:16,  3.07it/s]Capturing CUDA graphs (PIECEWISE):  46%|████▌     | 42/91 [00:13<00:16,  3.06it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 43/91 [00:13<00:15,  3.03it/s]Capturing CUDA graphs (PIECEWISE):  48%|████▊     | 44/91 [00:14<00:15,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 45/91 [00:14<00:15,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 46/91 [00:14<00:14,  3.05it/s]Capturing CUDA graphs (PIECEWISE):  52%|█████▏    | 47/91 [00:15<00:14,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 48/91 [00:15<00:14,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  54%|█████▍    | 49/91 [00:15<00:13,  3.03it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 50/91 [00:16<00:13,  3.03it/s]Capturing CUDA graphs (PIECEWISE):  56%|█████▌    | 51/91 [00:16<00:13,  3.03it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 52/91 [00:16<00:12,  3.03it/s]Capturing CUDA graphs (PIECEWISE):  58%|█████▊    | 53/91 [00:17<00:12,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 54/91 [00:17<00:12,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  60%|██████    | 55/91 [00:17<00:11,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  62%|██████▏   | 56/91 [00:18<00:11,  3.04it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 57/91 [00:18<00:11,  2.99it/s]Capturing CUDA graphs (PIECEWISE):  64%|██████▎   | 58/91 [00:18<00:11,  2.96it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 59/91 [00:19<00:10,  2.92it/s]Capturing CUDA graphs (PIECEWISE):  66%|██████▌   | 60/91 [00:19<00:10,  2.89it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 61/91 [00:19<00:10,  2.89it/s]Capturing CUDA graphs (PIECEWISE):  68%|██████▊   | 62/91 [00:20<00:10,  2.88it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▉   | 63/91 [00:20<00:09,  2.88it/s]Capturing CUDA graphs (PIECEWISE):  70%|███████   | 64/91 [00:20<00:09,  2.86it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████▏  | 65/91 [00:21<00:09,  2.87it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 66/91 [00:21<00:08,  2.86it/s]Capturing CUDA graphs (PIECEWISE):  74%|███████▎  | 67/91 [00:21<00:08,  2.85it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 68/91 [00:22<00:08,  2.84it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▌  | 69/91 [00:22<00:07,  2.85it/s]Capturing CUDA graphs (PIECEWISE):  77%|███████▋  | 70/91 [00:23<00:07,  2.85it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 71/91 [00:23<00:07,  2.84it/s]Capturing CUDA graphs (PIECEWISE):  79%|███████▉  | 72/91 [00:23<00:06,  2.82it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 73/91 [00:24<00:06,  2.80it/s]Capturing CUDA graphs (PIECEWISE):  81%|████████▏ | 74/91 [00:24<00:06,  2.79it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 75/91 [00:24<00:05,  2.78it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▎ | 76/91 [00:25<00:05,  2.74it/s]Capturing CUDA graphs (PIECEWISE):  85%|████████▍ | 77/91 [00:25<00:05,  2.75it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▌ | 78/91 [00:25<00:04,  2.73it/s]Capturing CUDA graphs (PIECEWISE):  87%|████████▋ | 79/91 [00:26<00:04,  2.69it/s]Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 80/91 [00:26<00:04,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  89%|████████▉ | 81/91 [00:27<00:03,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 82/91 [00:27<00:03,  2.71it/s](EngineCore_DP2 pid=1665874) INFO 10-02 15:59:18 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-Capturing CUDA graphs (PIECEWISE):  91%|█████████ | 83/91 [00:27<00:02,  2.71it/s](EngineCore_DP1 pid=1665873) INFO 10-02 15:59:18 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:59:18 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 84/91 [00:28<00:02,  2.73it/s]Capturing CUDA graphs (PIECEWISE):  93%|█████████▎| 85/91 [00:28<00:02,  2.73it/s](EngineCore_DP0 pid=1665872) INFO 10-02 15:59:19 [shm_broadcast.py:812] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
-Capturing CUDA graphs (PIECEWISE):  95%|█████████▍| 86/91 [00:28<00:01,  2.71it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 87/91 [00:29<00:01,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  97%|█████████▋| 88/91 [00:29<00:01,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 89/91 [00:30<00:00,  2.70it/s]Capturing CUDA graphs (PIECEWISE):  99%|█████████▉| 90/91 [00:30<00:00,  2.68it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 91/91 [00:30<00:00,  2.65it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 91/91 [00:30<00:00,  2.96it/s]
-Capturing CUDA graphs (FULL):   0%|          | 0/85 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):   1%|          | 1/85 [00:00<00:39,  2.15it/s]Capturing CUDA graphs (FULL):   2%|▏         | 2/85 [00:00<00:32,  2.54it/s]Capturing CUDA graphs (FULL):   4%|▎         | 3/85 [00:01<00:29,  2.79it/s]Capturing CUDA graphs (FULL):   5%|▍         | 4/85 [00:01<00:27,  2.93it/s]Capturing CUDA graphs (FULL):   6%|▌         | 5/85 [00:01<00:26,  3.02it/s]Capturing CUDA graphs (FULL):   7%|▋         | 6/85 [00:02<00:25,  3.05it/s]Capturing CUDA graphs (FULL):   8%|▊         | 7/85 [00:02<00:25,  3.10it/s]Capturing CUDA graphs (FULL):   9%|▉         | 8/85 [00:02<00:24,  3.12it/s]Capturing CUDA graphs (FULL):  11%|█         | 9/85 [00:03<00:24,  3.13it/s]Capturing CUDA graphs (FULL):  12%|█▏        | 10/85 [00:03<00:23,  3.13it/s]Capturing CUDA graphs (FULL):  13%|█▎        | 11/85 [00:03<00:23,  3.14it/s]Capturing CUDA graphs (FULL):  14%|█▍        | 12/85 [00:03<00:23,  3.13it/s]Capturing CUDA graphs (FULL):  15%|█▌        | 13/85 [00:04<00:23,  3.11it/s]Capturing CUDA graphs (FULL):  16%|█▋        | 14/85 [00:04<00:22,  3.12it/s]Capturing CUDA graphs (FULL):  18%|█▊        | 15/85 [00:04<00:22,  3.09it/s]Capturing CUDA graphs (FULL):  19%|█▉        | 16/85 [00:05<00:22,  3.02it/s]Capturing CUDA graphs (FULL):  20%|██        | 17/85 [00:05<00:25,  2.72it/s]Capturing CUDA graphs (FULL):  21%|██        | 18/85 [00:06<00:23,  2.85it/s]Capturing CUDA graphs (FULL):  22%|██▏       | 19/85 [00:06<00:22,  2.94it/s]Capturing CUDA graphs (FULL):  24%|██▎       | 20/85 [00:06<00:21,  2.98it/s]Capturing CUDA graphs (FULL):  25%|██▍       | 21/85 [00:07<00:21,  3.04it/s]Capturing CUDA graphs (FULL):  26%|██▌       | 22/85 [00:07<00:20,  3.07it/s]Capturing CUDA graphs (FULL):  27%|██▋       | 23/85 [00:07<00:20,  3.09it/s]Capturing CUDA graphs (FULL):  28%|██▊       | 24/85 [00:07<00:19,  3.09it/s]Capturing CUDA graphs (FULL):  29%|██▉       | 25/85 [00:08<00:19,  3.10it/s]Capturing CUDA graphs (FULL):  31%|███       | 26/85 [00:08<00:19,  3.08it/s]Capturing CUDA graphs (FULL):  32%|███▏      | 27/85 [00:08<00:19,  3.05it/s]Capturing CUDA graphs (FULL):  33%|███▎      | 28/85 [00:09<00:18,  3.03it/s]Capturing CUDA graphs (FULL):  34%|███▍      | 29/85 [00:09<00:20,  2.74it/s]Capturing CUDA graphs (FULL):  35%|███▌      | 30/85 [00:10<00:19,  2.88it/s]Capturing CUDA graphs (FULL):  36%|███▋      | 31/85 [00:10<00:18,  2.97it/s]Capturing CUDA graphs (FULL):  38%|███▊      | 32/85 [00:10<00:17,  3.04it/s]Capturing CUDA graphs (FULL):  39%|███▉      | 33/85 [00:11<00:17,  3.04it/s]Capturing CUDA graphs (FULL):  40%|████      | 34/85 [00:11<00:16,  3.05it/s]Capturing CUDA graphs (FULL):  41%|████      | 35/85 [00:11<00:16,  3.11it/s]Capturing CUDA graphs (FULL):  42%|████▏     | 36/85 [00:11<00:15,  3.13it/s]Capturing CUDA graphs (FULL):  44%|████▎     | 37/85 [00:12<00:15,  3.19it/s]Capturing CUDA graphs (FULL):  45%|████▍     | 38/85 [00:12<00:14,  3.19it/s]Capturing CUDA graphs (FULL):  46%|████▌     | 39/85 [00:12<00:14,  3.22it/s]Capturing CUDA graphs (FULL):  47%|████▋     | 40/85 [00:13<00:14,  3.21it/s]Capturing CUDA graphs (FULL):  48%|████▊     | 41/85 [00:13<00:13,  3.20it/s]Capturing CUDA graphs (FULL):  49%|████▉     | 42/85 [00:13<00:13,  3.22it/s]Capturing CUDA graphs (FULL):  51%|█████     | 43/85 [00:14<00:13,  3.22it/s]Capturing CUDA graphs (FULL):  52%|█████▏    | 44/85 [00:14<00:12,  3.24it/s]Capturing CUDA graphs (FULL):  53%|█████▎    | 45/85 [00:14<00:12,  3.21it/s]Capturing CUDA graphs (FULL):  54%|█████▍    | 46/85 [00:15<00:12,  3.24it/s]Capturing CUDA graphs (FULL):  55%|█████▌    | 47/85 [00:15<00:12,  3.13it/s]Capturing CUDA graphs (FULL):  56%|█████▋    | 48/85 [00:15<00:11,  3.18it/s]Capturing CUDA graphs (FULL):  58%|█████▊    | 49/85 [00:15<00:11,  3.19it/s]Capturing CUDA graphs (FULL):  59%|█████▉    | 50/85 [00:16<00:10,  3.21it/s]Capturing CUDA graphs (FULL):  60%|██████    | 51/85 [00:16<00:10,  3.19it/s]Capturing CUDA graphs (FULL):  61%|██████    | 52/85 [00:16<00:10,  3.18it/s]Capturing CUDA graphs (FULL):  62%|██████▏   | 53/85 [00:17<00:09,  3.21it/s]Capturing CUDA graphs (FULL):  64%|██████▎   | 54/85 [00:17<00:09,  3.22it/s]Capturing CUDA graphs (FULL):  65%|██████▍   | 55/85 [00:17<00:09,  3.25it/s]Capturing CUDA graphs (FULL):  66%|██████▌   | 56/85 [00:18<00:08,  3.24it/s]Capturing CUDA graphs (FULL):  67%|██████▋   | 57/85 [00:18<00:08,  3.21it/s]Capturing CUDA graphs (FULL):  68%|██████▊   | 58/85 [00:18<00:08,  3.22it/s]Capturing CUDA graphs (FULL):  69%|██████▉   | 59/85 [00:19<00:08,  3.19it/s]Capturing CUDA graphs (FULL):  71%|███████   | 60/85 [00:19<00:07,  3.15it/s]Capturing CUDA graphs (FULL):  72%|███████▏  | 61/85 [00:19<00:07,  3.16it/s]Capturing CUDA graphs (FULL):  73%|███████▎  | 62/85 [00:20<00:07,  3.15it/s]Capturing CUDA graphs (FULL):  74%|███████▍  | 63/85 [00:20<00:06,  3.16it/s]Capturing CUDA graphs (FULL):  75%|███████▌  | 64/85 [00:20<00:06,  3.15it/s]Capturing CUDA graphs (FULL):  76%|███████▋  | 65/85 [00:21<00:06,  3.15it/s]Capturing CUDA graphs (FULL):  78%|███████▊  | 66/85 [00:21<00:05,  3.18it/s]Capturing CUDA graphs (FULL):  79%|███████▉  | 67/85 [00:21<00:05,  3.13it/s]Capturing CUDA graphs (FULL):  80%|████████  | 68/85 [00:21<00:05,  3.13it/s]Capturing CUDA graphs (FULL):  81%|████████  | 69/85 [00:22<00:05,  3.12it/s]Capturing CUDA graphs (FULL):  82%|████████▏ | 70/85 [00:22<00:04,  3.12it/s]Capturing CUDA graphs (FULL):  84%|████████▎ | 71/85 [00:22<00:04,  3.13it/s]Capturing CUDA graphs (FULL):  85%|████████▍ | 72/85 [00:23<00:04,  3.16it/s]Capturing CUDA graphs (FULL):  86%|████████▌ | 73/85 [00:23<00:03,  3.15it/s]Capturing CUDA graphs (FULL):  87%|████████▋ | 74/85 [00:23<00:03,  3.15it/s]Capturing CUDA graphs (FULL):  88%|████████▊ | 75/85 [00:24<00:03,  3.17it/s]Capturing CUDA graphs (FULL):  89%|████████▉ | 76/85 [00:24<00:02,  3.12it/s]Capturing CUDA graphs (FULL):  91%|█████████ | 77/85 [00:24<00:02,  3.10it/s]Capturing CUDA graphs (FULL):  92%|█████████▏| 78/85 [00:25<00:02,  3.12it/s]Capturing CUDA graphs (FULL):  93%|█████████▎| 79/85 [00:25<00:01,  3.12it/s]Capturing CUDA graphs (FULL):  94%|█████████▍| 80/85 [00:25<00:01,  3.11it/s]Capturing CUDA graphs (FULL):  95%|█████████▌| 81/85 [00:26<00:01,  3.14it/s]Capturing CUDA graphs (FULL):  96%|█████████▋| 82/85 [00:26<00:00,  3.14it/s]Capturing CUDA graphs (FULL):  98%|█████████▊| 83/85 [00:26<00:00,  3.08it/s]Capturing CUDA graphs (FULL):  99%|█████████▉| 84/85 [00:27<00:00,  3.11it/s](Worker_DP2_EP2 pid=1670748) INFO 10-02 15:59:48 [speculator.py:153] Capturing model for DSpark speculator...
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:59:48 [speculator.py:153] Capturing model for DSpark speculator...
-Capturing CUDA graphs (FULL): 100%|██████████| 85/85 [00:27<00:00,  3.12it/s]Capturing CUDA graphs (FULL): 100%|██████████| 85/85 [00:27<00:00,  3.10it/s]
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:59:48 [speculator.py:153] Capturing model for DSpark speculator...
-Capturing dspark CUDA graphs (FULL):   0%|          | 0/80 [00:00<?, ?it/s](Worker_DP1_EP1 pid=1670648) INFO 10-02 15:59:48 [speculator.py:153] Capturing model for DSpark speculator...
-Capturing dspark CUDA graphs (FULL):  10%|█         | 8/80 [00:00<00:00, 75.46it/s]Capturing dspark CUDA graphs (FULL):  20%|██        | 16/80 [00:00<00:00, 75.63it/s]Capturing dspark CUDA graphs (FULL):  31%|███▏      | 25/80 [00:00<00:00, 78.71it/s]Capturing dspark CUDA graphs (FULL):  42%|████▎     | 34/80 [00:00<00:00, 80.78it/s]Capturing dspark CUDA graphs (FULL):  54%|█████▍    | 43/80 [00:00<00:00, 80.64it/s]Capturing dspark CUDA graphs (FULL):  65%|██████▌   | 52/80 [00:00<00:00, 83.14it/s]Capturing dspark CUDA graphs (FULL):  76%|███████▋  | 61/80 [00:00<00:00, 82.91it/s]Capturing dspark CUDA graphs (FULL):  88%|████████▊ | 70/80 [00:00<00:00, 83.18it/s]Capturing dspark CUDA graphs (FULL): 100%|██████████| 80/80 [00:00<00:00, 86.90it/s]Capturing dspark CUDA graphs (FULL): 100%|██████████| 80/80 [00:00<00:00, 83.01it/s]
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:59:50 [model_runner.py:1099] Graph capturing finished in 60 secs, took 7.14 GiB
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:59:50 [gpu_worker.py:921] CUDA graph pool memory: 7.14 GiB (actual), 9.58 GiB (estimated), difference: 2.45 GiB (34.3%).
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:59:50 [gpu_worker.py:984] Free memory on device (265.41/267.68 GiB) on startup. Desired GPU memory utilization is (0.85, 227.53 GiB). Actual usage is 134.72 GiB for consumed memory (weights + non-torch), 18.87 GiB for peak activation, and 7.14 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=71562116404` (66.65 GiB) to fit into requested memory, or `--kv-cache-memory=112235809280` (104.53 GiB) to fully utilize gpu memory. Current kv cache memory in use is 73.93 GiB.
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:59:50 [model_runner.py:1099] Graph capturing finished in 60 secs, took 7.14 GiB
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:59:50 [gpu_worker.py:921] CUDA graph pool memory: 7.14 GiB (actual), 9.58 GiB (estimated), difference: 2.45 GiB (34.3%).
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:59:50 [gpu_worker.py:984] Free memory on device (265.41/267.68 GiB) on startup. Desired GPU memory utilization is (0.85, 227.53 GiB). Actual usage is 134.72 GiB for consumed memory (weights + non-torch), 18.87 GiB for peak activation, and 7.14 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=71562116404` (66.65 GiB) to fit into requested memory, or `--kv-cache-memory=112235809280` (104.53 GiB) to fully utilize gpu memory. Current kv cache memory in use is 73.93 GiB.
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:59:50 [model_runner.py:1099] Graph capturing finished in 60 secs, took 7.14 GiB
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:59:50 [gpu_worker.py:921] CUDA graph pool memory: 7.14 GiB (actual), 9.58 GiB (estimated), difference: 2.45 GiB (34.3%).
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:59:50 [gpu_worker.py:984] Free memory on device (265.41/267.68 GiB) on startup. Desired GPU memory utilization is (0.85, 227.53 GiB). Actual usage is 134.72 GiB for consumed memory (weights + non-torch), 18.87 GiB for peak activation, and 7.14 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=71562116404` (66.65 GiB) to fit into requested memory, or `--kv-cache-memory=112235809280` (104.53 GiB) to fully utilize gpu memory. Current kv cache memory in use is 73.93 GiB.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:59:50 [model_runner.py:1099] Graph capturing finished in 60 secs, took 7.14 GiB
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:59:50 [gpu_worker.py:921] CUDA graph pool memory: 7.14 GiB (actual), 9.58 GiB (estimated), difference: 2.45 GiB (34.3%).
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:59:50 [gpu_worker.py:984] Free memory on device (265.41/267.68 GiB) on startup. Desired GPU memory utilization is (0.85, 227.53 GiB). Actual usage is 134.72 GiB for consumed memory (weights + non-torch), 18.87 GiB for peak activation, and 7.14 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=71562116404` (66.65 GiB) to fit into requested memory, or `--kv-cache-memory=112235809280` (104.53 GiB) to fully utilize gpu memory. Current kv cache memory in use is 73.93 GiB.
-(Worker_DP3_EP3 pid=1670647) INFO 10-02 15:59:50 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
-(Worker_DP2_EP2 pid=1670748) INFO 10-02 15:59:50 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
-(Worker_DP1_EP1 pid=1670648) INFO 10-02 15:59:50 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 15:59:50 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:59:50 [core.py:380] init engine (profile, create kv cache, warmup model) took 213.10 s
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:59:50 [core.py:380] init engine (profile, create kv cache, warmup model) took 213.12 s
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:59:51 [core.py:380] init engine (profile, create kv cache, warmup model) took 212.21 s
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:59:51 [core.py:380] init engine (profile, create kv cache, warmup model) took 213.38 s
-(ApiServer_0 pid=1665876) WARNING 10-02 15:59:53 [loggers.py:1302] AsyncLLM created with api_server_count more than 1; disabling stats logging to avoid incomplete stats.
-(VLLM_DP_Coordinator pid=1664432) INFO 10-02 15:59:53 [coordinator.py:258] All engine subscriptions received by DP coordinator
-(ApiServer_3 pid=1665879) WARNING 10-02 15:59:53 [loggers.py:1302] AsyncLLM created with api_server_count more than 1; disabling stats logging to avoid incomplete stats.
-(ApiServer_2 pid=1665878) WARNING 10-02 15:59:53 [loggers.py:1302] AsyncLLM created with api_server_count more than 1; disabling stats logging to avoid incomplete stats.
-(ApiServer_1 pid=1665877) WARNING 10-02 15:59:53 [loggers.py:1302] AsyncLLM created with api_server_count more than 1; disabling stats logging to avoid incomplete stats.
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:59:53 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(EngineCore_DP0 pid=1665872) INFO 10-02 15:59:53 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:59:53 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:59:53 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:59:53 [kernel.py:411] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native'])
-(EngineCore_DP1 pid=1665873) INFO 10-02 15:59:53 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(EngineCore_DP3 pid=1665875) INFO 10-02 15:59:53 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(EngineCore_DP2 pid=1665874) INFO 10-02 15:59:53 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
-(MainProcess pid=1663430) INFO 10-02 15:59:53 [utils.py:578] Waiting for API servers to complete ...
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:53 [entry.py:135] Supported tasks: ['generate']
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:53 [entry.py:135] Supported tasks: ['generate']
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:53 [entry.py:135] Supported tasks: ['generate']
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:53 [entry.py:135] Supported tasks: ['generate']
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:53 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:53 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:53 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:53 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-(ApiServer_1 pid=1665877) WARNING 10-02 15:59:55 [hf.py:654] You specified `--chat-template-content-format string` which is different from the detected format 'openai'. If our automatic detection is incorrect, please consider opening a GitHub issue so that we can improve it: https://github.com/vllm-project/vllm/issues/new/choose
-(ApiServer_1 pid=1665877) WARNING 10-02 15:59:55 [model.py:1861] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
-(ApiServer_0 pid=1665876) WARNING 10-02 15:59:55 [hf.py:654] You specified `--chat-template-content-format string` which is different from the detected format 'openai'. If our automatic detection is incorrect, please consider opening a GitHub issue so that we can improve it: https://github.com/vllm-project/vllm/issues/new/choose
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [entry.py:139] Starting vLLM server on http://127.0.0.1:8023
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:60] Available routes are:
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /openapi.json, Methods: HEAD, GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs, Methods: HEAD, GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs/oauth2-redirect, Methods: HEAD, GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /redoc, Methods: HEAD, GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /load, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /version, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /kv_event_sources, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /health, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /metrics, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /tokenize, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /detokenize, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/models, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /invocations, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions/batch, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}, Methods: GET
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}/cancel, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/completions, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages/count_tokens, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /generative_scoring, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /scale_elastic_ep, Methods: POST
-(ApiServer_1 pid=1665877) INFO 10-02 15:59:55 [launcher.py:69] Route: /is_scaling_elastic_ep, Methods: POST
-(ApiServer_3 pid=1665879) WARNING 10-02 15:59:55 [hf.py:654] You specified `--chat-template-content-format string` which is different from the detected format 'openai'. If our automatic detection is incorrect, please consider opening a GitHub issue so that we can improve it: https://github.com/vllm-project/vllm/issues/new/choose
-(ApiServer_2 pid=1665878) WARNING 10-02 15:59:55 [hf.py:654] You specified `--chat-template-content-format string` which is different from the detected format 'openai'. If our automatic detection is incorrect, please consider opening a GitHub issue so that we can improve it: https://github.com/vllm-project/vllm/issues/new/choose
-(ApiServer_0 pid=1665876) WARNING 10-02 15:59:55 [model.py:1861] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
-INFO:     Started server process [1665877]
-INFO:     Waiting for application startup.
-(ApiServer_3 pid=1665879) WARNING 10-02 15:59:55 [model.py:1861] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
-(ApiServer_2 pid=1665878) WARNING 10-02 15:59:55 [model.py:1861] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [entry.py:139] Starting vLLM server on http://127.0.0.1:8023
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:60] Available routes are:
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /openapi.json, Methods: GET, HEAD
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs, Methods: GET, HEAD
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs/oauth2-redirect, Methods: GET, HEAD
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /redoc, Methods: GET, HEAD
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /load, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /version, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /kv_event_sources, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /health, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /metrics, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /tokenize, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /detokenize, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/models, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /invocations, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions/batch, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}, Methods: GET
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}/cancel, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/completions, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages/count_tokens, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /generative_scoring, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /scale_elastic_ep, Methods: POST
-(ApiServer_0 pid=1665876) INFO 10-02 15:59:55 [launcher.py:69] Route: /is_scaling_elastic_ep, Methods: POST
-INFO:     Started server process [1665876]
-INFO:     Waiting for application startup.
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [entry.py:139] Starting vLLM server on http://127.0.0.1:8023
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:60] Available routes are:
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /openapi.json, Methods: GET, HEAD
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs, Methods: GET, HEAD
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs/oauth2-redirect, Methods: GET, HEAD
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /redoc, Methods: GET, HEAD
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /load, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /version, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /kv_event_sources, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /health, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /metrics, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /tokenize, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /detokenize, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/models, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /invocations, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions/batch, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}, Methods: GET
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}/cancel, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/completions, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages/count_tokens, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /generative_scoring, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /scale_elastic_ep, Methods: POST
-(ApiServer_3 pid=1665879) INFO 10-02 15:59:55 [launcher.py:69] Route: /is_scaling_elastic_ep, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [entry.py:139] Starting vLLM server on http://127.0.0.1:8023
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:60] Available routes are:
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /openapi.json, Methods: HEAD, GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs, Methods: HEAD, GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /docs/oauth2-redirect, Methods: HEAD, GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /redoc, Methods: HEAD, GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /load, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /version, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /kv_event_sources, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /health, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /metrics, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /tokenize, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /detokenize, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/models, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /ping, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /invocations, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/chat/completions/batch, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}, Methods: GET
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/responses/{response_id}/cancel, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/completions, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /v1/messages/count_tokens, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /generative_scoring, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /scale_elastic_ep, Methods: POST
-(ApiServer_2 pid=1665878) INFO 10-02 15:59:55 [launcher.py:69] Route: /is_scaling_elastic_ep, Methods: POST
-INFO:     Started server process [1665879]
-INFO:     Waiting for application startup.
-INFO:     Started server process [1665878]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Application startup complete.
-INFO:     Application startup complete.
-INFO:     Application startup complete.
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 16:00:01 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _compute_local_logits_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 16:00:01 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _rejection_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 16:00:01 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _resample_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 12) from engine 0 (expected > (0, 13))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 13) from engine 1 (expected > (0, 14))
-(Worker_DP0_EP0 pid=1670698) WARNING 10-02 16:00:02 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _prepare_dflash_inputs_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 19) from engine 0 (expected > (0, 20))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 20) from engine 2 (expected > (0, 21))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 21) from engine 2 (expected > (0, 22))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 23) from engine 2 (expected > (0, 24))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 24) from engine 1 (expected > (0, 25))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 26) from engine 1 (expected > (0, 27))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 30) from engine 2 (expected > (0, 31))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 32) from engine 1 (expected > (0, 33))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 33) from engine 0 (expected > (0, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:02 [coordinator.py:414] Received stats for out-of-order step (0, 33) from engine 1 (expected > (0, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:17 [coordinator.py:414] Received stats for out-of-order step (1, 1) from engine 3 (expected > (1, 2))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:17 [coordinator.py:414] Received stats for out-of-order step (1, 12) from engine 3 (expected > (1, 13))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:17 [coordinator.py:414] Received stats for out-of-order step (1, 12) from engine 0 (expected > (1, 13))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 13) from engine 2 (expected > (1, 14))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 13) from engine 1 (expected > (1, 14))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 14) from engine 3 (expected > (1, 15))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 14) from engine 1 (expected > (1, 15))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 17) from engine 2 (expected > (1, 18))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 17) from engine 1 (expected > (1, 18))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 18) from engine 2 (expected > (1, 19))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 18) from engine 1 (expected > (1, 19))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 18) from engine 3 (expected > (1, 19))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 19) from engine 2 (expected > (1, 20))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 19) from engine 0 (expected > (1, 20))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 20) from engine 1 (expected > (1, 21))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 21) from engine 2 (expected > (1, 22))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 22) from engine 1 (expected > (1, 23))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 23) from engine 2 (expected > (1, 24))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 23) from engine 0 (expected > (1, 24))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 23) from engine 1 (expected > (1, 24))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 24) from engine 1 (expected > (1, 25))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 25) from engine 2 (expected > (1, 26))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 25) from engine 1 (expected > (1, 26))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 25) from engine 3 (expected > (1, 26))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:18 [coordinator.py:414] Received stats for out-of-order step (1, 27) from engine 2 (expected > (1, 28))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 28) from engine 1 (expected > (1, 29))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 30) from engine 1 (expected > (1, 31))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 33) from engine 1 (expected > (1, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 33) from engine 0 (expected > (1, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 36) from engine 1 (expected > (1, 37))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 36) from engine 0 (expected > (1, 37))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 37) from engine 1 (expected > (1, 38))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 37) from engine 0 (expected > (1, 38))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 38) from engine 1 (expected > (1, 39))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 38) from engine 2 (expected > (1, 39))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 39) from engine 3 (expected > (1, 40))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 40) from engine 1 (expected > (1, 41))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 41) from engine 3 (expected > (1, 42))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 41) from engine 0 (expected > (1, 42))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 42) from engine 1 (expected > (1, 43))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:19 [coordinator.py:414] Received stats for out-of-order step (1, 42) from engine 2 (expected > (1, 43))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 43) from engine 3 (expected > (1, 44))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 43) from engine 0 (expected > (1, 44))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 43) from engine 1 (expected > (1, 44))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 45) from engine 1 (expected > (1, 46))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 46) from engine 2 (expected > (1, 47))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 46) from engine 0 (expected > (1, 47))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 49) from engine 2 (expected > (1, 50))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 49) from engine 0 (expected > (1, 50))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 49) from engine 1 (expected > (1, 50))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 52) from engine 1 (expected > (1, 53))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 52) from engine 3 (expected > (1, 53))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 53) from engine 3 (expected > (1, 54))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 53) from engine 1 (expected > (1, 54))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 54) from engine 3 (expected > (1, 55))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 54) from engine 1 (expected > (1, 55))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 54) from engine 2 (expected > (1, 55))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 55) from engine 3 (expected > (1, 56))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 56) from engine 3 (expected > (1, 57))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:20 [coordinator.py:414] Received stats for out-of-order step (1, 56) from engine 1 (expected > (1, 57))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 58) from engine 1 (expected > (1, 59))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 58) from engine 3 (expected > (1, 59))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 58) from engine 2 (expected > (1, 59))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 59) from engine 1 (expected > (1, 60))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 59) from engine 3 (expected > (1, 60))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 60) from engine 0 (expected > (1, 61))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 60) from engine 1 (expected > (1, 61))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 61) from engine 3 (expected > (1, 62))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 62) from engine 3 (expected > (1, 63))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 62) from engine 2 (expected > (1, 63))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 62) from engine 1 (expected > (1, 63))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 64) from engine 1 (expected > (1, 65))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 65) from engine 0 (expected > (1, 66))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 65) from engine 2 (expected > (1, 66))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 65) from engine 1 (expected > (1, 66))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 66) from engine 0 (expected > (1, 67))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 66) from engine 1 (expected > (1, 67))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 66) from engine 3 (expected > (1, 67))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 68) from engine 0 (expected > (1, 69))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 68) from engine 1 (expected > (1, 69))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 68) from engine 3 (expected > (1, 69))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 70) from engine 0 (expected > (1, 71))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 70) from engine 1 (expected > (1, 71))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 71) from engine 1 (expected > (1, 72))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:21 [coordinator.py:414] Received stats for out-of-order step (1, 71) from engine 0 (expected > (1, 72))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 74) from engine 0 (expected > (1, 75))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 74) from engine 2 (expected > (1, 75))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 75) from engine 3 (expected > (1, 76))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 75) from engine 0 (expected > (1, 76))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 76) from engine 0 (expected > (1, 77))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 76) from engine 1 (expected > (1, 77))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 77) from engine 1 (expected > (1, 78))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 78) from engine 1 (expected > (1, 79))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 82) from engine 0 (expected > (1, 83))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 82) from engine 2 (expected > (1, 83))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 83) from engine 2 (expected > (1, 84))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 84) from engine 3 (expected > (1, 85))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 85) from engine 1 (expected > (1, 86))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:22 [coordinator.py:414] Received stats for out-of-order step (1, 86) from engine 3 (expected > (1, 87))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 88) from engine 1 (expected > (1, 89))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 89) from engine 1 (expected > (1, 90))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 89) from engine 3 (expected > (1, 90))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 89) from engine 0 (expected > (1, 90))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 90) from engine 1 (expected > (1, 91))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 90) from engine 3 (expected > (1, 91))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 90) from engine 0 (expected > (1, 91))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 92) from engine 1 (expected > (1, 93))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 93) from engine 0 (expected > (1, 94))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 93) from engine 3 (expected > (1, 94))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 93) from engine 1 (expected > (1, 94))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 96) from engine 3 (expected > (1, 97))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 96) from engine 0 (expected > (1, 97))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 96) from engine 1 (expected > (1, 97))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 98) from engine 3 (expected > (1, 99))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 98) from engine 0 (expected > (1, 99))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 98) from engine 1 (expected > (1, 99))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 99) from engine 2 (expected > (1, 100))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 100) from engine 2 (expected > (1, 101))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 100) from engine 3 (expected > (1, 101))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 102) from engine 0 (expected > (1, 103))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:23 [coordinator.py:414] Received stats for out-of-order step (1, 102) from engine 1 (expected > (1, 103))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 104) from engine 1 (expected > (1, 105))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 104) from engine 0 (expected > (1, 105))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 105) from engine 1 (expected > (1, 106))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 106) from engine 2 (expected > (1, 107))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 107) from engine 2 (expected > (1, 108))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 107) from engine 1 (expected > (1, 108))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 107) from engine 0 (expected > (1, 108))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 108) from engine 2 (expected > (1, 109))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 108) from engine 0 (expected > (1, 109))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 108) from engine 1 (expected > (1, 109))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 109) from engine 2 (expected > (1, 110))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 110) from engine 2 (expected > (1, 111))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 113) from engine 0 (expected > (1, 114))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 114) from engine 0 (expected > (1, 115))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:24 [coordinator.py:414] Received stats for out-of-order step (1, 116) from engine 3 (expected > (1, 117))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 118) from engine 0 (expected > (1, 119))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 121) from engine 2 (expected > (1, 122))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 122) from engine 3 (expected > (1, 123))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 122) from engine 2 (expected > (1, 123))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 123) from engine 0 (expected > (1, 124))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 123) from engine 1 (expected > (1, 124))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 123) from engine 2 (expected > (1, 124))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 124) from engine 2 (expected > (1, 125))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 125) from engine 0 (expected > (1, 126))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 128) from engine 3 (expected > (1, 129))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 128) from engine 0 (expected > (1, 129))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 129) from engine 1 (expected > (1, 130))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 129) from engine 2 (expected > (1, 130))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 130) from engine 2 (expected > (1, 131))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 131) from engine 2 (expected > (1, 132))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 132) from engine 1 (expected > (1, 133))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:25 [coordinator.py:414] Received stats for out-of-order step (1, 132) from engine 0 (expected > (1, 133))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 133) from engine 0 (expected > (1, 134))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 134) from engine 1 (expected > (1, 135))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 134) from engine 2 (expected > (1, 135))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 135) from engine 2 (expected > (1, 136))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 135) from engine 3 (expected > (1, 136))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 135) from engine 0 (expected > (1, 136))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 137) from engine 3 (expected > (1, 138))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 137) from engine 2 (expected > (1, 138))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 138) from engine 1 (expected > (1, 139))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 140) from engine 3 (expected > (1, 141))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 140) from engine 0 (expected > (1, 141))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 141) from engine 2 (expected > (1, 142))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:26 [coordinator.py:414] Received stats for out-of-order step (1, 144) from engine 1 (expected > (1, 145))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 147) from engine 2 (expected > (1, 148))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 147) from engine 0 (expected > (1, 148))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 147) from engine 1 (expected > (1, 148))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 148) from engine 3 (expected > (1, 149))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 148) from engine 2 (expected > (1, 149))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 151) from engine 3 (expected > (1, 152))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 151) from engine 1 (expected > (1, 152))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 151) from engine 0 (expected > (1, 152))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 152) from engine 1 (expected > (1, 153))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 154) from engine 2 (expected > (1, 155))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 154) from engine 1 (expected > (1, 155))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 156) from engine 3 (expected > (1, 157))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 157) from engine 2 (expected > (1, 158))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 157) from engine 3 (expected > (1, 158))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 160) from engine 0 (expected > (1, 161))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:27 [coordinator.py:414] Received stats for out-of-order step (1, 161) from engine 2 (expected > (1, 162))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 162) from engine 0 (expected > (1, 163))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 164) from engine 1 (expected > (1, 165))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 164) from engine 2 (expected > (1, 165))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 165) from engine 0 (expected > (1, 166))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 168) from engine 0 (expected > (1, 169))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 168) from engine 2 (expected > (1, 169))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 170) from engine 1 (expected > (1, 171))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 171) from engine 1 (expected > (1, 172))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 171) from engine 0 (expected > (1, 172))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 171) from engine 3 (expected > (1, 172))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 172) from engine 1 (expected > (1, 173))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 172) from engine 0 (expected > (1, 173))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 172) from engine 2 (expected > (1, 173))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 173) from engine 1 (expected > (1, 174))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 174) from engine 0 (expected > (1, 175))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 174) from engine 1 (expected > (1, 175))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 176) from engine 1 (expected > (1, 177))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 176) from engine 3 (expected > (1, 177))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:28 [coordinator.py:414] Received stats for out-of-order step (1, 176) from engine 0 (expected > (1, 177))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 177) from engine 2 (expected > (1, 178))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 177) from engine 0 (expected > (1, 178))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 178) from engine 2 (expected > (1, 179))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 179) from engine 0 (expected > (1, 180))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 179) from engine 1 (expected > (1, 180))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 180) from engine 2 (expected > (1, 181))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 181) from engine 2 (expected > (1, 182))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 183) from engine 3 (expected > (1, 184))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 184) from engine 2 (expected > (1, 185))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 187) from engine 0 (expected > (1, 188))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 187) from engine 2 (expected > (1, 188))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 188) from engine 2 (expected > (1, 189))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:29 [coordinator.py:414] Received stats for out-of-order step (1, 189) from engine 1 (expected > (1, 190))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 192) from engine 0 (expected > (1, 193))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 193) from engine 2 (expected > (1, 194))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 196) from engine 0 (expected > (1, 197))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 197) from engine 1 (expected > (1, 198))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 197) from engine 0 (expected > (1, 198))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 197) from engine 2 (expected > (1, 198))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 198) from engine 2 (expected > (1, 199))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 199) from engine 2 (expected > (1, 200))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 200) from engine 0 (expected > (1, 201))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 200) from engine 3 (expected > (1, 201))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 201) from engine 3 (expected > (1, 202))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 201) from engine 2 (expected > (1, 202))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 202) from engine 2 (expected > (1, 203))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 202) from engine 3 (expected > (1, 203))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 203) from engine 2 (expected > (1, 204))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:30 [coordinator.py:414] Received stats for out-of-order step (1, 205) from engine 0 (expected > (1, 206))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 206) from engine 0 (expected > (1, 207))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 206) from engine 2 (expected > (1, 207))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 206) from engine 1 (expected > (1, 207))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 208) from engine 2 (expected > (1, 209))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 208) from engine 1 (expected > (1, 209))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 208) from engine 3 (expected > (1, 209))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 209) from engine 3 (expected > (1, 210))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 209) from engine 2 (expected > (1, 210))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 212) from engine 1 (expected > (1, 213))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 212) from engine 3 (expected > (1, 213))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 212) from engine 0 (expected > (1, 213))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 216) from engine 3 (expected > (1, 217))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 216) from engine 0 (expected > (1, 217))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 218) from engine 2 (expected > (1, 219))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:31 [coordinator.py:414] Received stats for out-of-order step (1, 219) from engine 2 (expected > (1, 220))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:32 [coordinator.py:414] Received stats for out-of-order step (1, 221) from engine 3 (expected > (1, 222))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:32 [coordinator.py:414] Received stats for out-of-order step (1, 221) from engine 0 (expected > (1, 222))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:32 [coordinator.py:414] Received stats for out-of-order step (1, 222) from engine 0 (expected > (1, 223))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:32 [coordinator.py:414] Received stats for out-of-order step (1, 222) from engine 1 (expected > (1, 223))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:47 [coordinator.py:414] Received stats for out-of-order step (2, 1) from engine 1 (expected > (2, 2))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:47 [coordinator.py:414] Received stats for out-of-order step (2, 2) from engine 2 (expected > (2, 3))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:47 [coordinator.py:414] Received stats for out-of-order step (2, 2) from engine 0 (expected > (2, 3))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:47 [coordinator.py:414] Received stats for out-of-order step (2, 3) from engine 0 (expected > (2, 4))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:47 [coordinator.py:414] Received stats for out-of-order step (2, 3) from engine 1 (expected > (2, 4))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 12) from engine 3 (expected > (2, 13))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 12) from engine 2 (expected > (2, 13))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 14) from engine 1 (expected > (2, 15))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 16) from engine 3 (expected > (2, 17))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 17) from engine 3 (expected > (2, 18))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 18) from engine 3 (expected > (2, 19))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:48 [coordinator.py:414] Received stats for out-of-order step (2, 19) from engine 3 (expected > (2, 20))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 20) from engine 2 (expected > (2, 21))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 20) from engine 0 (expected > (2, 21))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 20) from engine 1 (expected > (2, 21))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 21) from engine 0 (expected > (2, 22))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 21) from engine 1 (expected > (2, 22))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 21) from engine 3 (expected > (2, 22))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 22) from engine 1 (expected > (2, 23))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 22) from engine 0 (expected > (2, 23))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 22) from engine 3 (expected > (2, 23))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 23) from engine 0 (expected > (2, 24))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 23) from engine 1 (expected > (2, 24))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 24) from engine 0 (expected > (2, 25))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 24) from engine 3 (expected > (2, 25))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 25) from engine 0 (expected > (2, 26))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 25) from engine 3 (expected > (2, 26))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 26) from engine 0 (expected > (2, 27))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 26) from engine 3 (expected > (2, 27))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 26) from engine 1 (expected > (2, 27))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 27) from engine 3 (expected > (2, 28))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 27) from engine 1 (expected > (2, 28))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 27) from engine 0 (expected > (2, 28))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 28) from engine 1 (expected > (2, 29))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:49 [coordinator.py:414] Received stats for out-of-order step (2, 28) from engine 0 (expected > (2, 29))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 29) from engine 1 (expected > (2, 30))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 29) from engine 3 (expected > (2, 30))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 29) from engine 0 (expected > (2, 30))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 30) from engine 0 (expected > (2, 31))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 30) from engine 1 (expected > (2, 31))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 30) from engine 3 (expected > (2, 31))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 32) from engine 1 (expected > (2, 33))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 32) from engine 2 (expected > (2, 33))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 33) from engine 3 (expected > (2, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 33) from engine 2 (expected > (2, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 33) from engine 0 (expected > (2, 34))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:50 [coordinator.py:414] Received stats for out-of-order step (2, 34) from engine 1 (expected > (2, 35))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 41) from engine 0 (expected > (2, 42))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 41) from engine 3 (expected > (2, 42))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 42) from engine 3 (expected > (2, 43))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 43) from engine 0 (expected > (2, 44))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 43) from engine 1 (expected > (2, 44))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 44) from engine 1 (expected > (2, 45))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 44) from engine 3 (expected > (2, 45))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 44) from engine 2 (expected > (2, 45))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 45) from engine 0 (expected > (2, 46))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 46) from engine 1 (expected > (2, 47))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 46) from engine 2 (expected > (2, 47))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:51 [coordinator.py:414] Received stats for out-of-order step (2, 46) from engine 0 (expected > (2, 47))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 48) from engine 1 (expected > (2, 49))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 48) from engine 3 (expected > (2, 49))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 48) from engine 2 (expected > (2, 49))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 49) from engine 2 (expected > (2, 50))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 49) from engine 0 (expected > (2, 50))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 49) from engine 1 (expected > (2, 50))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 50) from engine 0 (expected > (2, 51))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 51) from engine 3 (expected > (2, 52))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 51) from engine 2 (expected > (2, 52))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 51) from engine 0 (expected > (2, 52))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 52) from engine 2 (expected > (2, 53))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 52) from engine 0 (expected > (2, 53))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 53) from engine 1 (expected > (2, 54))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 54) from engine 1 (expected > (2, 55))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 54) from engine 3 (expected > (2, 55))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 54) from engine 0 (expected > (2, 55))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 55) from engine 3 (expected > (2, 56))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 55) from engine 2 (expected > (2, 56))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 56) from engine 3 (expected > (2, 57))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:52 [coordinator.py:414] Received stats for out-of-order step (2, 56) from engine 2 (expected > (2, 57))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 57) from engine 1 (expected > (2, 58))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 57) from engine 0 (expected > (2, 58))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 57) from engine 2 (expected > (2, 58))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 58) from engine 1 (expected > (2, 59))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 58) from engine 0 (expected > (2, 59))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 58) from engine 2 (expected > (2, 59))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 59) from engine 2 (expected > (2, 60))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 61) from engine 2 (expected > (2, 62))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 61) from engine 1 (expected > (2, 62))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 64) from engine 1 (expected > (2, 65))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 65) from engine 1 (expected > (2, 66))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 66) from engine 0 (expected > (2, 67))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:53 [coordinator.py:414] Received stats for out-of-order step (2, 67) from engine 1 (expected > (2, 68))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 68) from engine 3 (expected > (2, 69))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 68) from engine 1 (expected > (2, 69))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 68) from engine 0 (expected > (2, 69))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 69) from engine 3 (expected > (2, 70))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 69) from engine 0 (expected > (2, 70))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 69) from engine 1 (expected > (2, 70))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 70) from engine 3 (expected > (2, 71))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 70) from engine 1 (expected > (2, 71))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 71) from engine 0 (expected > (2, 72))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 73) from engine 3 (expected > (2, 74))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 73) from engine 1 (expected > (2, 74))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 74) from engine 3 (expected > (2, 75))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 74) from engine 1 (expected > (2, 75))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 75) from engine 0 (expected > (2, 76))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 75) from engine 1 (expected > (2, 76))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 75) from engine 3 (expected > (2, 76))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:54 [coordinator.py:414] Received stats for out-of-order step (2, 76) from engine 3 (expected > (2, 77))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 77) from engine 2 (expected > (2, 78))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 77) from engine 1 (expected > (2, 78))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 77) from engine 0 (expected > (2, 78))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 78) from engine 1 (expected > (2, 79))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 78) from engine 3 (expected > (2, 79))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 81) from engine 2 (expected > (2, 82))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 81) from engine 1 (expected > (2, 82))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 82) from engine 0 (expected > (2, 83))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 82) from engine 3 (expected > (2, 83))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 83) from engine 1 (expected > (2, 84))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 84) from engine 0 (expected > (2, 85))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:55 [coordinator.py:414] Received stats for out-of-order step (2, 84) from engine 1 (expected > (2, 85))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 85) from engine 0 (expected > (2, 86))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 85) from engine 3 (expected > (2, 86))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 86) from engine 1 (expected > (2, 87))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 87) from engine 1 (expected > (2, 88))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 87) from engine 2 (expected > (2, 88))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 88) from engine 3 (expected > (2, 89))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 88) from engine 1 (expected > (2, 89))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 89) from engine 1 (expected > (2, 90))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 91) from engine 2 (expected > (2, 92))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 91) from engine 3 (expected > (2, 92))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 92) from engine 3 (expected > (2, 93))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 92) from engine 2 (expected > (2, 93))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 92) from engine 1 (expected > (2, 93))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 93) from engine 2 (expected > (2, 94))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 93) from engine 1 (expected > (2, 94))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:56 [coordinator.py:414] Received stats for out-of-order step (2, 93) from engine 3 (expected > (2, 94))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 96) from engine 1 (expected > (2, 97))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 97) from engine 2 (expected > (2, 98))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 97) from engine 1 (expected > (2, 98))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 97) from engine 3 (expected > (2, 98))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 98) from engine 0 (expected > (2, 99))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 99) from engine 2 (expected > (2, 100))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 101) from engine 3 (expected > (2, 102))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 101) from engine 2 (expected > (2, 102))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:57 [coordinator.py:414] Received stats for out-of-order step (2, 102) from engine 2 (expected > (2, 103))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 104) from engine 3 (expected > (2, 105))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 104) from engine 1 (expected > (2, 105))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 105) from engine 0 (expected > (2, 106))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 105) from engine 3 (expected > (2, 106))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 105) from engine 1 (expected > (2, 106))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 106) from engine 1 (expected > (2, 107))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 107) from engine 0 (expected > (2, 108))
-(VLLM_DP_Coordinator pid=1664432) WARNING 10-02 16:00:58 [coordinator.py:414] Received stats for out-of-order step (2, 107) from engine 1 (expected > (2, 108))
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [launcher.py:128] [shutdown] API server: shutdown triggered
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [launcher.py:144] [shutdown] API server: stopping engine client mode=abort timeout=0s
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [launcher.py:128] [shutdown] API server: shutdown triggered
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [launcher.py:144] [shutdown] API server: stopping engine client mode=abort timeout=0s
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [launcher.py:128] [shutdown] API server: shutdown triggered
-(EngineCore_DP0 pid=1665872) INFO 10-02 16:01:14 [core.py:1412] [shutdown] EngineCore: trigger received signal=SIGTERM
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [launcher.py:144] [shutdown] API server: stopping engine client mode=abort timeout=0s
-(EngineCore_DP1 pid=1665873) INFO 10-02 16:01:14 [core.py:1412] [shutdown] EngineCore: trigger received signal=SIGTERM
-(EngineCore_DP2 pid=1665874) INFO 10-02 16:01:14 [core.py:1412] [shutdown] EngineCore: trigger received signal=SIGTERM
-(EngineCore_DP3 pid=1665875) INFO 10-02 16:01:14 [core.py:1412] [shutdown] EngineCore: trigger received signal=SIGTERM
-(EngineCore_DP0 pid=1665872) INFO 10-02 16:01:14 [core.py:1561] [shutdown] EngineCore: start mode=abort timeout=0s
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [launcher.py:128] [shutdown] API server: shutdown triggered
-(EngineCore_DP0 pid=1665872) INFO 10-02 16:01:14 [core.py:1592] [shutdown] EngineCore: request processing complete; starting resource teardown
-(EngineCore_DP0 pid=1665872) INFO 10-02 16:01:14 [core.py:1425] [shutdown] EngineCore: exiting busy loop
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [launcher.py:144] [shutdown] API server: stopping engine client mode=abort timeout=0s
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [core_client.py:762] [shutdown] MPClient: start timeout=0s
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [core_client.py:767] [shutdown] MPClient: cleaning up background resources
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [core_client.py:769] [shutdown] MPClient: complete
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [core_client.py:762] [shutdown] MPClient: start timeout=0s
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [core_client.py:762] [shutdown] MPClient: start timeout=0s
-(EngineCore_DP0 pid=1665872) INFO 10-02 16:01:14 [multiproc_executor.py:474] [shutdown] Executor: waiting for worker exit count=1
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [core_client.py:767] [shutdown] MPClient: cleaning up background resources
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [core_client.py:769] [shutdown] MPClient: complete
-(Worker_DP0_EP0 pid=1670698) INFO 10-02 16:01:14 [multiproc_executor.py:838] Parent process exited, terminating worker queues
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [core_client.py:767] [shutdown] MPClient: cleaning up background resources
-(EngineCore_DP1 pid=1665873) INFO 10-02 16:01:14 [core.py:1561] [shutdown] EngineCore: start mode=abort timeout=0s
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [core_client.py:769] [shutdown] MPClient: complete
-(EngineCore_DP1 pid=1665873) INFO 10-02 16:01:14 [core.py:1592] [shutdown] EngineCore: request processing complete; starting resource teardown
-(EngineCore_DP1 pid=1665873) INFO 10-02 16:01:14 [core.py:1425] [shutdown] EngineCore: exiting busy loop
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [core_client.py:762] [shutdown] MPClient: start timeout=0s
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [core_client.py:767] [shutdown] MPClient: cleaning up background resources
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [serve.py:415] Waiting up to 0 seconds for processes to exit
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [core_client.py:769] [shutdown] MPClient: complete
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [launcher.py:153] [shutdown] API server: engine client stopped
-(EngineCore_DP1 pid=1665873) INFO 10-02 16:01:14 [multiproc_executor.py:474] [shutdown] Executor: waiting for worker exit count=1
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process ApiServer_0
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [launcher.py:156] [shutdown] API server: signalling HTTP server shutdown
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [launcher.py:153] [shutdown] API server: engine client stopped
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [launcher.py:153] [shutdown] API server: engine client stopped
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process ApiServer_1
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process ApiServer_2
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [launcher.py:156] [shutdown] API server: signalling HTTP server shutdown
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [launcher.py:156] [shutdown] API server: signalling HTTP server shutdown
-(EngineCore_DP2 pid=1665874) INFO 10-02 16:01:14 [core.py:1561] [shutdown] EngineCore: start mode=abort timeout=0s
-(EngineCore_DP2 pid=1665874) INFO 10-02 16:01:14 [core.py:1592] [shutdown] EngineCore: request processing complete; starting resource teardown
-(EngineCore_DP3 pid=1665875) INFO 10-02 16:01:14 [core.py:1561] [shutdown] EngineCore: start mode=abort timeout=0s
-(EngineCore_DP2 pid=1665874) INFO 10-02 16:01:14 [core.py:1425] [shutdown] EngineCore: exiting busy loop
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process ApiServer_3
-(EngineCore_DP3 pid=1665875) INFO 10-02 16:01:14 [core.py:1592] [shutdown] EngineCore: request processing complete; starting resource teardown
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:675] [shutdown] Process manager: force killing remaining processes count=4
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process ApiServer_0 pid 1665876
-(EngineCore_DP2 pid=1665874) INFO 10-02 16:01:14 [multiproc_executor.py:474] [shutdown] Executor: waiting for worker exit count=1
-(EngineCore_DP3 pid=1665875) INFO 10-02 16:01:14 [core.py:1425] [shutdown] EngineCore: exiting busy loop
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [launcher.py:153] [shutdown] API server: engine client stopped
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [launcher.py:156] [shutdown] API server: signalling HTTP server shutdown
-(EngineCore_DP3 pid=1665875) INFO 10-02 16:01:14 [multiproc_executor.py:474] [shutdown] Executor: waiting for worker exit count=1
-(ApiServer_1 pid=1665877) WARNING 10-02 16:01:14 [launcher.py:172] port 8023 is used by process psutil.Process(pid=1665879, name='VLLM::APIServer_3', status='running') launched with command:
-(ApiServer_1 pid=1665877) WARNING 10-02 16:01:14 [launcher.py:172] VLLM::APIServer_3                                                                                                                                  
-(ApiServer_1 pid=1665877) INFO 10-02 16:01:14 [launcher.py:178] [shutdown] API server: shutting down FastAPI HTTP server
-INFO:     Shutting down
-(ApiServer_0 pid=1665876) WARNING 10-02 16:01:14 [launcher.py:172] port 8023 is used by process psutil.Process(pid=1665879, name='VLLM::APIServer_3', status='running') launched with command:
-(ApiServer_0 pid=1665876) WARNING 10-02 16:01:14 [launcher.py:172] VLLM::APIServer_3                                                                                                                                  
-(ApiServer_0 pid=1665876) INFO 10-02 16:01:14 [launcher.py:178] [shutdown] API server: shutting down FastAPI HTTP server
-INFO:     Shutting down
-(ApiServer_3 pid=1665879) INFO 10-02 16:01:14 [launcher.py:178] [shutdown] API server: shutting down FastAPI HTTP server
-INFO:     Shutting down
-(ApiServer_2 pid=1665878) WARNING 10-02 16:01:14 [launcher.py:172] port 8023 is used by process psutil.Process(pid=1665879, name='VLLM::APIServer_3', status='sleeping') launched with command:
-(ApiServer_2 pid=1665878) WARNING 10-02 16:01:14 [launcher.py:172] VLLM::APIServer_3                                                                                                                                  
-(ApiServer_2 pid=1665878) INFO 10-02 16:01:14 [launcher.py:178] [shutdown] API server: shutting down FastAPI HTTP server
-INFO:     Shutting down
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process ApiServer_1 pid 1665877
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process ApiServer_2 pid 1665878
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process ApiServer_3 pid 1665879
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process EngineCore_DP0
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process EngineCore_DP1
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process EngineCore_DP2
-(MainProcess pid=1663430) INFO 10-02 16:01:14 [utils.py:655] [shutdown] Process manager: send sigterm to process EngineCore_DP3
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:675] [shutdown] Process manager: force killing remaining processes count=4
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process EngineCore_DP0 pid 1665872
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [system_utils.py:224] [shutdown] force killing sub process VLLM::Worker_DP0_EP0 pid 1670698
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process EngineCore_DP1 pid 1665873
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process EngineCore_DP2 pid 1665874
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [system_utils.py:224] [shutdown] force killing sub process VLLM::Worker_DP2_EP2 pid 1670748
-(MainProcess pid=1663430) WARNING 10-02 16:01:14 [utils.py:680] [shutdown] Process manager: force killing remaining process EngineCore_DP3 pid 1665875
-[rank1]:[W1002 16:01:15.173382534 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=92, addr=[localhost]:33254, remote=[localhost]:32809): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
-Exception raised from recvBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:787 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x9d (0x7f93e1f63bfd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f93e1f64bd2 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f93e1f65092 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #3: <unknown function> + 0x66acf0d (0x7f9349eacf0d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x383 (0x7f9349ea63e3 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x43d (0x7f932bd5419d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #6: <unknown function> + 0xee0e4 (0x7f93b16ee0e4 in /lib64/libstdc++.so.6)
-frame #7: <unknown function> + 0x95128 (0x7f93e2f50128 in /lib64/libc.so.6)
-frame #8: <unknown function> + 0x105afc (0x7f93e2fc0afc in /lib64/libc.so.6)
-
-[rank1]:[W1002 16:01:15.175189855 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
-[rank3]:[W1002 16:01:15.178664955 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=92, addr=[localhost]:33272, remote=[localhost]:32809): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
-Exception raised from recvBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:787 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x9d (0x7fdc48763bfd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7fdc48764bd2 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7fdc48765092 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #3: <unknown function> + 0x66acf0d (0x7fdbb06acf0d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x383 (0x7fdbb06a63e3 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x43d (0x7fdb9255419d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #6: <unknown function> + 0xee0e4 (0x7fdc17eee0e4 in /lib64/libstdc++.so.6)
-frame #7: <unknown function> + 0x95128 (0x7fdc4977a128 in /lib64/libc.so.6)
-frame #8: <unknown function> + 0x105afc (0x7fdc497eaafc in /lib64/libc.so.6)
-
-[rank3]:[W1002 16:01:15.180288229 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 3] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
-[rank1]:[W1002 16:01:16.175405789 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=92, addr=[localhost]:33254, remote=[localhost]:32809): Broken pipe
-Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x9d (0x7f93e1f63bfd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f93e1f64bd2 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f93e1f65092 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #3: <unknown function> + 0x66ac332 (0x7f9349eac332 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #4: <unknown function> + 0x66ad3e1 (0x7f9349ead3e1 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #5: <unknown function> + 0x66ad58d (0x7f9349ead58d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x35d (0x7f9349ea63bd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x43d (0x7f932bd5419d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #8: <unknown function> + 0xee0e4 (0x7f93b16ee0e4 in /lib64/libstdc++.so.6)
-frame #9: <unknown function> + 0x95128 (0x7f93e2f50128 in /lib64/libc.so.6)
-frame #10: <unknown function> + 0x105afc (0x7f93e2fc0afc in /lib64/libc.so.6)
-
-[rank1]:[W1002 16:01:16.178375377 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
-[rank3]:[W1002 16:01:16.180541725 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=92, addr=[localhost]:33272, remote=[localhost]:32809): Broken pipe
-Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x9d (0x7fdc48763bfd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7fdc48764bd2 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7fdc48765092 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #3: <unknown function> + 0x66ac332 (0x7fdbb06ac332 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #4: <unknown function> + 0x66ad3e1 (0x7fdbb06ad3e1 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #5: <unknown function> + 0x66ad58d (0x7fdbb06ad58d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x35d (0x7fdbb06a63bd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x43d (0x7fdb9255419d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #8: <unknown function> + 0xee0e4 (0x7fdc17eee0e4 in /lib64/libstdc++.so.6)
-frame #9: <unknown function> + 0x95128 (0x7fdc4977a128 in /lib64/libc.so.6)
-frame #10: <unknown function> + 0x105afc (0x7fdc497eaafc in /lib64/libc.so.6)
-
-[rank3]:[W1002 16:01:16.183232619 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 3] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
-[rank1]:[W1002 16:01:17.178581967 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=92, addr=[localhost]:33254, remote=[localhost]:32809): Broken pipe
-Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x9d (0x7f93e1f63bfd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f93e1f64bd2 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f93e1f65092 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #3: <unknown function> + 0x66ac332 (0x7f9349eac332 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #4: <unknown function> + 0x66ad3e1 (0x7f9349ead3e1 in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #5: <unknown function> + 0x66ad58d (0x7f9349ead58d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x35d (0x7f9349ea63bd in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so)
-frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x43d (0x7f932bd5419d in /home/tomasruizt/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #8: <unknown function> + 0xee0e4 (0x7f93b16ee0e4 in /lib64/libstdc++.so.6)
-frame #9: <unknown function> + 0x95128 (0x7f93e2f50128 in /lib64/libc.so.6)
-frame #10: <unknown function> + 0x105afc (0x7f93e2fc0afc in /lib64/libc.so.6)
-
-[rank1]:[W1002 16:01:17.181322453 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
-/home/tomasruizt/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 2 leaked semaphore objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '
-/home/tomasruizt/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 6 leaked shared_memory objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '
