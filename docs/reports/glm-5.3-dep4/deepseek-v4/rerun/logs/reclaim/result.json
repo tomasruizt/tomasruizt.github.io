@@ -1,0 +1,1035 @@
+{
+  "mode": "reclaim",
+  "command": [
+    "/home/tomasruizt/.venv/bin/python",
+    "-m",
+    "vllm.entrypoints.cli.main",
+    "serve",
+    "deepseek-ai/DeepSeek-V4-Flash-DSpark",
+    "--revision",
+    "62af8fffb2f7030cac4de2f0169f5b8d1101b646",
+    "--served-model-name",
+    "deepseek-v4-flash",
+    "--tokenizer-mode",
+    "deepseek_v4",
+    "--trust-remote-code",
+    "--tensor-parallel-size",
+    "1",
+    "--data-parallel-size",
+    "4",
+    "--enable-expert-parallel",
+    "--all2all-backend",
+    "allgather_reducescatter",
+    "--moe-backend",
+    "deep_gemm_mega_moe",
+    "--kv-cache-dtype",
+    "fp8",
+    "--block-size",
+    "256",
+    "--max-model-len",
+    "16384",
+    "--max-num-seqs",
+    "128",
+    "--max-num-batched-tokens",
+    "16384",
+    "--gpu-memory-utilization",
+    "0.85",
+    "--attention-config",
+    "{\"indexer_kv_dtype\":\"mxfp4\"}",
+    "--enable-prefix-caching",
+    "--disable-uvicorn-access-log",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8045",
+    "--compilation-config",
+    "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"max_cudagraph_capture_size\":1152}",
+    "--speculative-config",
+    "{\"method\": \"dspark\", \"model\": \"deepseek-ai/DeepSeek-V4-Flash-DSpark\", \"revision\": \"62af8fffb2f7030cac4de2f0169f5b8d1101b646\", \"num_speculative_tokens\": 7, \"draft_sample_method\": \"greedy\", \"enable_adaptive_verification\": true}"
+  ],
+  "repo": "/home/tomasruizt/code/pd-av-budget",
+  "commit": "b39cfba6143acbfd07d3eacc721085a9c948172b",
+  "dataset_sha256": "2f4f1edfde61590a97fe756a6b41b9b65c9588faf6ba5deac67df8a591002223",
+  "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/dataset/throughput_1k.jsonl",
+  "requests_per_run": null,
+  "output_tokens_per_request": 512,
+  "prefix_caching": true,
+  "reset_prefix_cache_before_each_run": true,
+  "cuda_visible_devices": "3,4,5,7",
+  "num_runs": 10,
+  "concurrencies": [
+    8,
+    16,
+    32,
+    64,
+    128,
+    256
+  ],
+  "status": "completed",
+  "runs": [
+    {
+      "concurrency": 8,
+      "repeat": 1,
+      "mean_acceptance_length": 3.7128582540537307,
+      "draft_acceptance_rate": 0.38755117915053294,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16713.0,
+        "vllm:spec_decode_num_draft_tokens_total": 116991.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45340.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r1/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r1.jsonl",
+      "dataset_sha256": "ff0969812c67b98604cb4dece42c6c91e57844f78f61c1b11ad4efc95316d70b"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 1,
+      "mean_acceptance_length": 3.6975570897503984,
+      "draft_acceptance_rate": 0.3853652985357712,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26362.0,
+        "vllm:spec_decode_num_draft_tokens_total": 184534.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 71113.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r1/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r1.jsonl",
+      "dataset_sha256": "35cf643f3c228e547d6051d86da53db9bd95dbce2deb5fc5a6d1aa4a4ea2c83d"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 1,
+      "mean_acceptance_length": 3.663564297502773,
+      "draft_acceptance_rate": 0.380509185357539,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36961.0,
+        "vllm:spec_decode_num_draft_tokens_total": 258727.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98448.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r1/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r1.jsonl",
+      "dataset_sha256": "cec01855dc64d2b974d862d7325e028af6c6c49ed73d0d8c1c599c5066eb97e8"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 1,
+      "mean_acceptance_length": 3.613758854327071,
+      "draft_acceptance_rate": 0.37339412204672445,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51952.0,
+        "vllm:spec_decode_num_draft_tokens_total": 363664.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 135790.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r1/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r1.jsonl",
+      "dataset_sha256": "9797d748955efa3c6d2a16cbffdfbac3facb0f1700dd0adf0bd7d6fe450bac41"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 1,
+      "mean_acceptance_length": 3.4733551340745583,
+      "draft_acceptance_rate": 0.35333644772493694,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 76450.0,
+        "vllm:spec_decode_num_draft_tokens_total": 535150.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 189088.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r1/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r1.jsonl",
+      "dataset_sha256": "a8982391295f355631e8bda38b54adf2149c78f7faf334aa89b62e3ae770e2e6"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 1,
+      "mean_acceptance_length": 3.4285245770507538,
+      "draft_acceptance_rate": 0.34693208243582196,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 125015.0,
+        "vllm:spec_decode_num_draft_tokens_total": 875105.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 303602.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r1/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r1.jsonl",
+      "dataset_sha256": "3aa7397025435e91e07e48b84adf82379a8474148c3315292553778a250ab478"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 2,
+      "mean_acceptance_length": 3.619330768333916,
+      "draft_acceptance_rate": 0.374190109761988,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 17154.0,
+        "vllm:spec_decode_num_draft_tokens_total": 120078.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 44932.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r2/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r2.jsonl",
+      "dataset_sha256": "910c01b5ca6d232cfe47ae52963b428fe0dcccb42d94c6e6f36e2c736e29b94f"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 2,
+      "mean_acceptance_length": 3.6575224227868053,
+      "draft_acceptance_rate": 0.37964606039811505,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26647.0,
+        "vllm:spec_decode_num_draft_tokens_total": 186529.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 70815.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r2/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r2.jsonl",
+      "dataset_sha256": "f0941604ac7cf5fec3f39cc684f91cdf93e8620857a431c81a2ab5ffd8f24e1a"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 2,
+      "mean_acceptance_length": 3.6751805005157157,
+      "draft_acceptance_rate": 0.38216864293081654,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36842.0,
+        "vllm:spec_decode_num_draft_tokens_total": 257894.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98559.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r2/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r2.jsonl",
+      "dataset_sha256": "5d9800feda0eac26e0011838e20182412fa86a197d0508011ebc5644835ec203"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 2,
+      "mean_acceptance_length": 3.639141477790488,
+      "draft_acceptance_rate": 0.3770202111129269,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51577.0,
+        "vllm:spec_decode_num_draft_tokens_total": 361039.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136119.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r2/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r2.jsonl",
+      "dataset_sha256": "9cd02fba47637fd75fb9d034a1bd507d2200d2a6021e569723d17e2fdaacf236"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 2,
+      "mean_acceptance_length": 3.497044769439362,
+      "draft_acceptance_rate": 0.3567206813484803,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 75967.0,
+        "vllm:spec_decode_num_draft_tokens_total": 531769.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 189693.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r2/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r2.jsonl",
+      "dataset_sha256": "d59ba2115902de1f2f2dc911cc377c2e92b006c492b5f52d1a190d6a1b46ce28"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 2,
+      "mean_acceptance_length": 3.4412066917124235,
+      "draft_acceptance_rate": 0.34874381310177477,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 124572.0,
+        "vllm:spec_decode_num_draft_tokens_total": 872004.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 304106.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r2/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r2.jsonl",
+      "dataset_sha256": "190f76b6d47eaabdefac758313400ce63133e885fd9d0be6d14c703f01c9a5e4"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 3,
+      "mean_acceptance_length": 3.7252865974431306,
+      "draft_acceptance_rate": 0.3893266567775901,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16661.0,
+        "vllm:spec_decode_num_draft_tokens_total": 116627.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45406.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r3/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r3.jsonl",
+      "dataset_sha256": "8d36ed445acdb43e3f0331ca79e34ad2398ae98f603912db1e333989927679b8"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 3,
+      "mean_acceptance_length": 3.6754799532304907,
+      "draft_acceptance_rate": 0.3822114218900701,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26513.0,
+        "vllm:spec_decode_num_draft_tokens_total": 185591.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 70935.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r3/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r3.jsonl",
+      "dataset_sha256": "ebf1810defca8c56250e5902e71e0f513e7b13230cb0ec0eb8b9f2dbc256d2f8"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 3,
+      "mean_acceptance_length": 3.6816748232735184,
+      "draft_acceptance_rate": 0.38309640332478834,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36780.0,
+        "vllm:spec_decode_num_draft_tokens_total": 257460.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98632.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r3/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r3.jsonl",
+      "dataset_sha256": "23ad35398d1cb4d2417b9145883169ecd09a8c208e24e6a650ec6ce97a9c7979"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 3,
+      "mean_acceptance_length": 3.6365995855042708,
+      "draft_acceptance_rate": 0.3766570836434673,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51629.0,
+        "vllm:spec_decode_num_draft_tokens_total": 361403.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136125.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r3/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r3.jsonl",
+      "dataset_sha256": "260106dcf0ea47b58e350a35f237ffabdb8ddb8381934a850f89d0814cc6b14d"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 3,
+      "mean_acceptance_length": 3.5015357844365056,
+      "draft_acceptance_rate": 0.3573622549195008,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 75857.0,
+        "vllm:spec_decode_num_draft_tokens_total": 530999.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 189759.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r3/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r3.jsonl",
+      "dataset_sha256": "f3bbc7cbe1033e2fc336968e94e30c646eab0812384c6f40217ea41fe1c721f9"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 3,
+      "mean_acceptance_length": 3.441422997254203,
+      "draft_acceptance_rate": 0.34877471389345754,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 124554.0,
+        "vllm:spec_decode_num_draft_tokens_total": 871878.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 304089.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r3/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r3.jsonl",
+      "dataset_sha256": "bf39fa675c5e724b744ddb87daad18ccc430728c2d0b1eca29b22514966bc7d6"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 4,
+      "mean_acceptance_length": 3.694743734746116,
+      "draft_acceptance_rate": 0.38496339067801655,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16799.0,
+        "vllm:spec_decode_num_draft_tokens_total": 117593.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45269.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r4/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r4.jsonl",
+      "dataset_sha256": "0491c63c4bf9bb996f9ee6aa61aca600e73273c416d945f0233c42436afb896b"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 4,
+      "mean_acceptance_length": 3.677183183636501,
+      "draft_acceptance_rate": 0.3824547405195001,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26498.0,
+        "vllm:spec_decode_num_draft_tokens_total": 185486.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 70940.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r4/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r4.jsonl",
+      "dataset_sha256": "25ea7004fce90ed9852224a79c866fae37d2dbd1e741db7d85847f593baac8d5"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 4,
+      "mean_acceptance_length": 3.6937973923953957,
+      "draft_acceptance_rate": 0.38482819891362796,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36662.0,
+        "vllm:spec_decode_num_draft_tokens_total": 256634.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98760.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r4/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r4.jsonl",
+      "dataset_sha256": "f2b29abd98e4bf75f46c91f8688c2600f82e1873e7e16f466cbb559fc9cdace4"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 4,
+      "mean_acceptance_length": 3.601208865010074,
+      "draft_acceptance_rate": 0.37160126643001057,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 52115.0,
+        "vllm:spec_decode_num_draft_tokens_total": 364805.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 135562.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r4/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r4.jsonl",
+      "dataset_sha256": "239de23f090eb5ccf4ee6b222b7f6f341012bc550520ef98614d2317d0f49a5b"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 4,
+      "mean_acceptance_length": 3.494330737661791,
+      "draft_acceptance_rate": 0.35633296252311303,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 76024.0,
+        "vllm:spec_decode_num_draft_tokens_total": 532168.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 189629.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r4/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r4.jsonl",
+      "dataset_sha256": "8b4bcf640f3f955affad25a48c937f4d91df19e654cbd9bec675c132f734110a"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 4,
+      "mean_acceptance_length": 3.425454051505781,
+      "draft_acceptance_rate": 0.3464934359293973,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 125151.0,
+        "vllm:spec_decode_num_draft_tokens_total": 876057.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 303548.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r4/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r4.jsonl",
+      "dataset_sha256": "a3242dc95895be46eff527607272c9ad8ac506404e545c016134ad9398d286bd"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 5,
+      "mean_acceptance_length": 3.686586669834858,
+      "draft_acceptance_rate": 0.383798095690694,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16834.0,
+        "vllm:spec_decode_num_draft_tokens_total": 117838.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45226.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r5/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r5.jsonl",
+      "dataset_sha256": "1cf8d6e2ff4ab8c386abff1b3712a69df99adce34ded38e69eedce0394341a03"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 5,
+      "mean_acceptance_length": 3.71265899916216,
+      "draft_acceptance_rate": 0.38752271416602285,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26258.0,
+        "vllm:spec_decode_num_draft_tokens_total": 183806.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 71229.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r5/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r5.jsonl",
+      "dataset_sha256": "dd7a5c73dcd2cf33100c7e9d4fd16ef5235b136e2d227d45ee0fa41ecdfad929"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 5,
+      "mean_acceptance_length": 3.6941330496686033,
+      "draft_acceptance_rate": 0.3848761499526576,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36663.0,
+        "vllm:spec_decode_num_draft_tokens_total": 256641.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98775.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r5/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r5.jsonl",
+      "dataset_sha256": "31e565823bf2f2290aa2744cbcf4890df5ec3c8015503f03f1ebe24120a51e4e"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 5,
+      "mean_acceptance_length": 3.6518534365397333,
+      "draft_acceptance_rate": 0.37883620521996186,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51418.0,
+        "vllm:spec_decode_num_draft_tokens_total": 359926.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136353.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r5/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r5.jsonl",
+      "dataset_sha256": "ac9784949ebc6aedcce72d69f2035b3e4e67bf01a4528063517f04d342d4776d"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 5,
+      "mean_acceptance_length": 3.478639416593566,
+      "draft_acceptance_rate": 0.35409134522765234,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 76379.0,
+        "vllm:spec_decode_num_draft_tokens_total": 534653.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 189316.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r5/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r5.jsonl",
+      "dataset_sha256": "cdf5691149382283bb91c94ad54fce6aadced43a9e36f60c61a0e30d502a1d04"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 5,
+      "mean_acceptance_length": 3.4282584359507435,
+      "draft_acceptance_rate": 0.34689406227867764,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 125060.0,
+        "vllm:spec_decode_num_draft_tokens_total": 875420.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 303678.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r5/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r5.jsonl",
+      "dataset_sha256": "718e8fc8346da8a298cab77b6d4495277001b61d22a04cd69c950f1c44ef623d"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 6,
+      "mean_acceptance_length": 3.647480745487683,
+      "draft_acceptance_rate": 0.378211535069669,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 17009.0,
+        "vllm:spec_decode_num_draft_tokens_total": 119063.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45031.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r6/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r6.jsonl",
+      "dataset_sha256": "cce21fe8e5388b3ce22075271a2382356a885d2d2a198567fc12d62369138632"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 6,
+      "mean_acceptance_length": 3.7141768583076162,
+      "draft_acceptance_rate": 0.3877395511868023,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26247.0,
+        "vllm:spec_decode_num_draft_tokens_total": 183729.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 71239.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r6/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r6.jsonl",
+      "dataset_sha256": "64913898b14c234978272e96adffabc7344cb7b5797715605762797a0359e65e"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 6,
+      "mean_acceptance_length": 3.6975531159539026,
+      "draft_acceptance_rate": 0.3853647308505575,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36618.0,
+        "vllm:spec_decode_num_draft_tokens_total": 256326.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98779.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r6/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r6.jsonl",
+      "dataset_sha256": "a04c5e7086316a7f96b951d02e5f64987b4b3648dff941266cf0489535ad7839"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 6,
+      "mean_acceptance_length": 3.643686192306199,
+      "draft_acceptance_rate": 0.37766945604374275,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51522.0,
+        "vllm:spec_decode_num_draft_tokens_total": 360654.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136208.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r6/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r6.jsonl",
+      "dataset_sha256": "eae3647eb5bb38a47041adfab1b908e23423860c632581b9f69f7482dc16e029"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 6,
+      "mean_acceptance_length": 3.5160978580317193,
+      "draft_acceptance_rate": 0.35944255114738843,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 75538.0,
+        "vllm:spec_decode_num_draft_tokens_total": 528766.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 190061.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r6/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r6.jsonl",
+      "dataset_sha256": "d1d566ff41df66ccdda65d3d7a2a9b69fc69c2cc31c5187734d00624ccc165f0"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 6,
+      "mean_acceptance_length": 3.4140001592737117,
+      "draft_acceptance_rate": 0.34485716561053026,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 125570.0,
+        "vllm:spec_decode_num_draft_tokens_total": 878990.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 303126.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r6/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r6.jsonl",
+      "dataset_sha256": "d8aa0cb5ca578fec92eeaa1498d7afa50acba34bd4488f3ea6c46fd1c8d9b45a"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 7,
+      "mean_acceptance_length": 3.6631852245235144,
+      "draft_acceptance_rate": 0.38045503207478776,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16947.0,
+        "vllm:spec_decode_num_draft_tokens_total": 118629.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45133.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r7/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r7.jsonl",
+      "dataset_sha256": "c41f1fd37e3a8814955c788814e5417e97c86e941059fe3c7df5f500921c36a9"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 7,
+      "mean_acceptance_length": 3.698550064525924,
+      "draft_acceptance_rate": 0.38550715207513203,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26346.0,
+        "vllm:spec_decode_num_draft_tokens_total": 184422.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 71096.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r7/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r7.jsonl",
+      "dataset_sha256": "aa07c8785273825ba094170a33b534b1056e1fcf0c1f1fa03f42b8259577da92"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 7,
+      "mean_acceptance_length": 3.6616931560168666,
+      "draft_acceptance_rate": 0.380241879430981,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36996.0,
+        "vllm:spec_decode_num_draft_tokens_total": 258972.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98472.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r7/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r7.jsonl",
+      "dataset_sha256": "162fb8c55af35c8e284f02b82678afea8dab0637985257472d7f5e8cfd034a4e"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 7,
+      "mean_acceptance_length": 3.6397269836345303,
+      "draft_acceptance_rate": 0.3771038548049329,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51572.0,
+        "vllm:spec_decode_num_draft_tokens_total": 361004.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136136.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r7/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r7.jsonl",
+      "dataset_sha256": "2fa387ff1ff72c3216c960d316ee40215c2a3d71c7fe190fea2657661f43c67a"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 7,
+      "mean_acceptance_length": 3.5268418956591,
+      "draft_acceptance_rate": 0.3609774136655857,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 75330.0,
+        "vllm:spec_decode_num_draft_tokens_total": 527310.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 190347.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r7/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r7.jsonl",
+      "dataset_sha256": "e48d2e1938aaf09049671662dff895b663e9eff536f9cfb415ac95336ed1eb2e"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 7,
+      "mean_acceptance_length": 3.4400946992496286,
+      "draft_acceptance_rate": 0.3485849570356613,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 124605.0,
+        "vllm:spec_decode_num_draft_tokens_total": 872235.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 304048.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r7/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r7.jsonl",
+      "dataset_sha256": "32f25a96d9df505fb34866207f9f69f5b46ed6e7b80f6e6c48a4e072a14ff89d"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 8,
+      "mean_acceptance_length": 3.687314407886922,
+      "draft_acceptance_rate": 0.38390205826956036,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16838.0,
+        "vllm:spec_decode_num_draft_tokens_total": 117866.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45249.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r8/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r8.jsonl",
+      "dataset_sha256": "b0413084b84c273afaef3ca6df5f143d9ab3757b1491cbd3bd705d8cf4e4a2aa"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6566335147307187,
+      "draft_acceptance_rate": 0.3795190735329598,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26645.0,
+        "vllm:spec_decode_num_draft_tokens_total": 186515.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 70786.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r8/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r8.jsonl",
+      "dataset_sha256": "8328bf335fc8ef642576628eba524d585fe98c07bbaedf80138091e31a6ab785"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6560913705583755,
+      "draft_acceptance_rate": 0.37944162436548223,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 37036.0,
+        "vllm:spec_decode_num_draft_tokens_total": 259252.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98371.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r8/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r8.jsonl",
+      "dataset_sha256": "9db9d783fb4f508d35d6baa228a62cb25a54bcbd0df4c04368af76e1ba41e6c5"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6074358728023825,
+      "draft_acceptance_rate": 0.37249083897176893,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 52045.0,
+        "vllm:spec_decode_num_draft_tokens_total": 364315.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 135704.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r8/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r8.jsonl",
+      "dataset_sha256": "6035f42a43d566f2317ea819ffd383ab50f76c340d8b653ca6ac4bdb3f7c7e6f"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 8,
+      "mean_acceptance_length": 3.5578828949483046,
+      "draft_acceptance_rate": 0.36541184213547206,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 74668.0,
+        "vllm:spec_decode_num_draft_tokens_total": 522676.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 190992.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r8/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r8.jsonl",
+      "dataset_sha256": "44dca1419cb0419fd6f5bc3c587258f8118a91f439a1cde5f2b1979dd8818be7"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 8,
+      "mean_acceptance_length": 3.450153707489015,
+      "draft_acceptance_rate": 0.3500219582127164,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 124262.0,
+        "vllm:spec_decode_num_draft_tokens_total": 869834.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 304461.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r8/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r8.jsonl",
+      "dataset_sha256": "4a62294422e88e6084b60c48d00974f042d7e7df717aa5cfffb7dbe102537b61"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 9,
+      "mean_acceptance_length": 3.735945588058264,
+      "draft_acceptance_rate": 0.39084936972260914,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16614.0,
+        "vllm:spec_decode_num_draft_tokens_total": 116298.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45455.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r9/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r9.jsonl",
+      "dataset_sha256": "bde87b1236edd6913525cf6edd850bd76c1c187c0e2f73adbe4b38324bbbe7d6"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 9,
+      "mean_acceptance_length": 3.6407067085014195,
+      "draft_acceptance_rate": 0.37724381550020275,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26772.0,
+        "vllm:spec_decode_num_draft_tokens_total": 187404.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 70697.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r9/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r9.jsonl",
+      "dataset_sha256": "09eabbc3d2d20fe9fa002b32e8b84c4f50e6914f46b17979b870e80daf11993b"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 9,
+      "mean_acceptance_length": 3.688821669936778,
+      "draft_acceptance_rate": 0.3841173814195397,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36696.0,
+        "vllm:spec_decode_num_draft_tokens_total": 256872.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98669.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r9/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r9.jsonl",
+      "dataset_sha256": "c358384a2e7b9c11d51ec913787c4a59cdc900424b3943a794855a0936b0ec65"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 9,
+      "mean_acceptance_length": 3.634356541105839,
+      "draft_acceptance_rate": 0.3763366487294056,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51635.0,
+        "vllm:spec_decode_num_draft_tokens_total": 361445.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136025.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r9/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r9.jsonl",
+      "dataset_sha256": "461dc27ecdf9bd1b554be97556a777fe1c2a4b11746d7c6a8febfb95730b68a0"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 9,
+      "mean_acceptance_length": 3.51581985225979,
+      "draft_acceptance_rate": 0.3594028360371128,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 75538.0,
+        "vllm:spec_decode_num_draft_tokens_total": 528766.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 190040.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r9/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r9.jsonl",
+      "dataset_sha256": "5e92488f262459aaecc68ead186ba1616c7d06a0d5fa5327185d4e46a5032024"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 9,
+      "mean_acceptance_length": 3.4237757881200928,
+      "draft_acceptance_rate": 0.3462536840171561,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 125203.0,
+        "vllm:spec_decode_num_draft_tokens_total": 876421.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 303464.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r9/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r9.jsonl",
+      "dataset_sha256": "421f3a627300fe86d168106d68a052e8a44a0d55a8e0c815275cb63ee2054998"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 10,
+      "mean_acceptance_length": 3.6656231541642055,
+      "draft_acceptance_rate": 0.3808033077377436,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 16930.0,
+        "vllm:spec_decode_num_draft_tokens_total": 118510.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 45129.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r10/profile_export_aiperf.json",
+      "request_count": 121,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c8-r10.jsonl",
+      "dataset_sha256": "3c71e4532f13a83dc11c17dc9f44787ec009a72e9603d12c12759a9a2e8965a2"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 10,
+      "mean_acceptance_length": 3.7317633543940265,
+      "draft_acceptance_rate": 0.3902519077705752,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 26115.0,
+        "vllm:spec_decode_num_draft_tokens_total": 182805.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 71340.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r10/profile_export_aiperf.json",
+      "request_count": 190,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c16-r10.jsonl",
+      "dataset_sha256": "1a0b44779ff14690d54948e3d4bde00be677102e621898f668e7eca33af30b50"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 10,
+      "mean_acceptance_length": 3.6749341944587663,
+      "draft_acceptance_rate": 0.38213345635125234,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 36851.0,
+        "vllm:spec_decode_num_draft_tokens_total": 257957.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 98574.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r10/profile_export_aiperf.json",
+      "request_count": 264,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c32-r10.jsonl",
+      "dataset_sha256": "04b30b9fde00ca8876fba10d8181b0a7f7b72a42e7520e0a68f173d03bef88c5"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 10,
+      "mean_acceptance_length": 3.6645843907390776,
+      "draft_acceptance_rate": 0.3806549129627254,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 51226.0,
+        "vllm:spec_decode_num_draft_tokens_total": 358582.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 136496.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r10/profile_export_aiperf.json",
+      "request_count": 366,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c64-r10.jsonl",
+      "dataset_sha256": "51d2cdc09b0d05442316b007035ebbb6132c3a4072ee6b2932af141f7d30c7a6"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 10,
+      "mean_acceptance_length": 3.5424684936987396,
+      "draft_acceptance_rate": 0.36320978481410565,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 74985.0,
+        "vllm:spec_decode_num_draft_tokens_total": 524895.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 190647.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r10/profile_export_aiperf.json",
+      "request_count": 518,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c128-r10.jsonl",
+      "dataset_sha256": "64463ff52953fbc3ef5b88df9ce07f2a664c5f7cd74e72de017e9265e9eb916c"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 10,
+      "mean_acceptance_length": 3.424009523276902,
+      "draft_acceptance_rate": 0.3462870747538431,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 125167.0,
+        "vllm:spec_decode_num_draft_tokens_total": 876169.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 303406.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r10/profile_export_aiperf.json",
+      "request_count": 836,
+      "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workloads/c256-r10.jsonl",
+      "dataset_sha256": "acf1e4098534c3a3ae63f4b080d4936e85c1bfadb896d8939d189dc5d177e4d8"
+    }
+  ],
+  "target_measurement_seconds": 30.0,
+  "workload_plan": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/short-sweep-20261008/workload-plan.json",
+  "server_startup_seconds": 235.0325821369188,
+  "budget_expansion_seen": true
+}
