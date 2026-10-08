@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek-V4-Flash · DEP4 · adaptive verification</title>
+<style>:root { color-scheme: light; font-family: system-ui, sans-serif; color: #111827; background: #f5f7fa; }
+body { max-width: 1120px; margin: 0 auto; padding: 40px 24px; color: #111827; }
+h1 { font-size: 32px; margin-bottom: 8px; letter-spacing: -.8px; }
+h2 { font-size: 20px; margin: 28px 0 12px; }
+.subtitle, .metric-note, footer { color: #263448; }
+.subtitle { margin-bottom: 26px; }
+a { color: #225ac6; }
+.card { background: white; border: 1px solid #dce3ed; border-radius: 12px; padding: 24px; margin: 22px 0; }
+.metric-tabs { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #dce3ed; padding-bottom: 12px; }
+.metric-tabs label { cursor: pointer; padding: 10px 18px; border: 1px solid transparent; border-radius: 7px; font: inherit; font-weight: 600; background: #eef2f7; color: #1e293b; }
+.metric-choice { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+.tab-panel { display: none; }
+.model-tabs label { min-width: 76px; text-align: center; font-size: 18px; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 12px 14px; text-align: right; border-bottom: 1px solid #e7ecf3; white-space: nowrap; }
+thead th { font-size: 13px; color: #1e293b; background: #f5f7fa; }
+th:first-child { text-align: left; }
+tbody tr:hover { background: #f1f6ff; }
+summary { cursor: pointer; font-weight: 650; }
+li { margin: 10px 0; line-height: 1.5; overflow-wrap: anywhere; }
+figure { margin: 24px 0; background: white; border-radius: 12px; overflow: hidden; }
+figure svg { display: block; width: 100%; height: auto; }
+figcaption { padding: 12px 20px 18px; font-size: 14px; }
+footer { font-size: 13px; line-height: 1.6; }
+@media (max-width: 600px) { body { padding: 20px 12px; } .card { padding: 14px; } th, td { padding: 10px; } }
+@media print { body { max-width: none; background: white; } .metric-tabs { display: none; } .tab-panel { display: block !important; } }
+
+#throughput-table:checked~.metric-tabs label[for="throughput-table"],#accuracy-table:checked~.metric-tabs label[for="accuracy-table"],#al-table:checked~.metric-tabs label[for="al-table"]{background:#235cca;color:white}
+#throughput-table:checked~.panels #throughput-panel,#accuracy-table:checked~.panels #accuracy-panel,#al-table:checked~.panels #al-panel{display:block}
+#throughput-table:focus-visible~.metric-tabs label[for="throughput-table"],#accuracy-table:focus-visible~.metric-tabs label[for="accuracy-table"],#al-table:focus-visible~.metric-tabs label[for="al-table"]{outline:3px solid #e4ad31;outline-offset:3px}
+</style></head><body>
+<h1>DeepSeek-V4-Flash: throughput versus interactivity</h1>
+<p class="subtitle">4× B300 · TP1 / DP4 / EP4 · vLLM main 58b329845 · AIPerf · SPEED-Bench throughput_1k</p>
+<p>Target: <a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-DSpark/tree/62af8fffb2f7030cac4de2f0169f5b8d1101b646">deepseek-ai/DeepSeek-V4-Flash-DSpark</a><br>Draft: native DSpark module bundled in the same checkpoint · 7 draft tokens</p>
+<p class="metric-note">The first three baseline repeats were slower across most concurrency levels. Full averages include all ten repeats; the apparent gain may reflect that slowdown. These runs do not establish a reliable reclamation benefit.</p>
+<section class="card"><figure aria-label="Throughput versus interactivity"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="756pt" height="453.6pt" viewBox="0 0 756 453.6" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-10-08T13:28:06.774709</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 453.6 
+L 756 453.6 
+L 756 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 58.991646 397.397796 
+L 752.99976 397.397796 
+L 752.99976 18.118365 
+L 58.991646 18.118365 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 58.991646 397.397796 
+L 58.991646 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_2">
+      <defs>
+       <path id="mc995978fd4" d="M 0 0 
+L 0 3.5 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#mc995978fd4" x="58.991646" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="58.991646" y="411.995452" transform="rotate(-0 58.991646 411.995452)">0</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 166.671996 397.397796 
+L 166.671996 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#mc995978fd4" x="166.671996" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="166.671996" y="411.995452" transform="rotate(-0 166.671996 411.995452)">50</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 274.352345 397.397796 
+L 274.352345 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#mc995978fd4" x="274.352345" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="274.352345" y="411.995452" transform="rotate(-0 274.352345 411.995452)">100</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 382.032694 397.397796 
+L 382.032694 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8">
+      <g>
+       <use xlink:href="#mc995978fd4" x="382.032694" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="382.032694" y="411.995452" transform="rotate(-0 382.032694 411.995452)">150</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 489.713044 397.397796 
+L 489.713044 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#mc995978fd4" x="489.713044" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="489.713044" y="411.995452" transform="rotate(-0 489.713044 411.995452)">200</text>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_11">
+      <path d="M 597.393393 397.397796 
+L 597.393393 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#mc995978fd4" x="597.393393" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="597.393393" y="411.995452" transform="rotate(-0 597.393393 411.995452)">250</text>
+     </g>
+    </g>
+    <g id="xtick_7">
+     <g id="line2d_13">
+      <path d="M 705.073742 397.397796 
+L 705.073742 18.118365 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#mc995978fd4" x="705.073742" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="705.073742" y="411.995452" transform="rotate(-0 705.073742 411.995452)">300</text>
+     </g>
+    </g>
+    <g id="text_8">
+     <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="405.995703" y="425.996233" transform="rotate(-0 405.995703 425.996233)">Interactivity: 1 / mean request TPOT (tok/s/user) →</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_15">
+      <path d="M 58.991646 397.397796 
+L 752.99976 397.397796 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_16">
+      <defs>
+       <path id="m22346acbe9" d="M 0 0 
+L -3.5 0 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="397.397796" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_9">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="401.196624" transform="rotate(-0 51.991646 401.196624)">0</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_17">
+      <path d="M 58.991646 346.458094 
+L 752.99976 346.458094 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_18">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="346.458094" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_10">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="350.256923" transform="rotate(-0 51.991646 350.256923)">2,000</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_19">
+      <path d="M 58.991646 295.518393 
+L 752.99976 295.518393 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_20">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="295.518393" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_11">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="299.317221" transform="rotate(-0 51.991646 299.317221)">4,000</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_21">
+      <path d="M 58.991646 244.578692 
+L 752.99976 244.578692 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_22">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="244.578692" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_12">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="248.37752" transform="rotate(-0 51.991646 248.37752)">6,000</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_23">
+      <path d="M 58.991646 193.638991 
+L 752.99976 193.638991 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_24">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="193.638991" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_13">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="197.437819" transform="rotate(-0 51.991646 197.437819)">8,000</text>
+     </g>
+    </g>
+    <g id="ytick_6">
+     <g id="line2d_25">
+      <path d="M 58.991646 142.69929 
+L 752.99976 142.69929 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_26">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="142.69929" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_14">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="146.498118" transform="rotate(-0 51.991646 146.498118)">10,000</text>
+     </g>
+    </g>
+    <g id="ytick_7">
+     <g id="line2d_27">
+      <path d="M 58.991646 91.759588 
+L 752.99976 91.759588 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_28">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="91.759588" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_15">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="95.558417" transform="rotate(-0 51.991646 95.558417)">12,000</text>
+     </g>
+    </g>
+    <g id="ytick_8">
+     <g id="line2d_29">
+      <path d="M 58.991646 40.819887 
+L 752.99976 40.819887 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #dbeafe; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_30">
+      <g>
+       <use xlink:href="#m22346acbe9" x="58.991646" y="40.819887" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_16">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="51.991646" y="44.618715" transform="rotate(-0 51.991646 44.618715)">14,000</text>
+     </g>
+    </g>
+    <g id="text_17">
+     <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="10.598678" y="207.75808" transform="rotate(-90 10.598678 207.75808)">Aggregate output throughput (tok/s) ↑</text>
+    </g>
+   </g>
+   <g id="line2d_31">
+    <path d="M 638.907508 345.091188 
+L 501.337694 317.151034 
+L 366.679744 285.348889 
+L 262.399358 249.043825 
+L 197.28509 195.848346 
+L 158.731472 102.974461 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-width: 2; stroke-linecap: square"/>
+   </g>
+   <g id="LineCollection_1">
+    <path d="M 625.93757 345.091188 
+L 652.484761 345.091188 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_2">
+    <path d="M 638.907508 346.45721 
+L 638.907508 343.725167 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_32">
+    <defs>
+     <path id="md666301009" d="M 0 3 
+L 0 -3 
+" style="stroke: #08916d; stroke-opacity: 0.4"/>
+    </defs>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="625.93757" y="345.091188" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_33">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="652.484761" y="345.091188" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_34">
+    <defs>
+     <path id="m183194d597" d="M 3 0 
+L -3 -0 
+" style="stroke: #08916d; stroke-opacity: 0.4"/>
+    </defs>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="638.907508" y="346.45721" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_35">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="638.907508" y="343.725167" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-avon-8"><title>DSpark · AV on · concurrency 8 · 2,053.7 tok/s · 269.3 tok/s/user</title>
+    <defs>
+     <path id="mf69dafc130" d="M -0 4.949747 
+L 4.949747 0 
+L 0 -4.949747 
+L -4.949747 -0 
+z
+" style="stroke: #08916d; stroke-linejoin: miter"/>
+    </defs>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mf69dafc130" x="638.907508" y="345.091188" style="fill: #08916d; stroke: #08916d; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_3">
+    <path d="M 485.695458 317.151034 
+L 518.170406 317.151034 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_4">
+    <path d="M 501.337694 320.195208 
+L 501.337694 314.10686 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_36">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="485.695458" y="317.151034" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_37">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="518.170406" y="317.151034" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_38">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="501.337694" y="320.195208" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_39">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="501.337694" y="314.10686" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-avon-16"><title>DSpark · AV on · concurrency 16 · 3,150.7 tok/s · 205.4 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mf69dafc130" x="501.337694" y="317.151034" style="fill: #08916d; stroke: #08916d; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_5">
+    <path d="M 348.041234 285.348889 
+L 387.887632 285.348889 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_6">
+    <path d="M 366.679744 292.569414 
+L 366.679744 278.128363 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_40">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="348.041234" y="285.348889" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_41">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="387.887632" y="285.348889" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_42">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="366.679744" y="292.569414" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_43">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="366.679744" y="278.128363" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-avon-32"><title>DSpark · AV on · concurrency 32 · 4,399.3 tok/s · 142.9 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mf69dafc130" x="366.679744" y="285.348889" style="fill: #08916d; stroke: #08916d; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_7">
+    <path d="M 250.541508 249.043825 
+L 275.822203 249.043825 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_8">
+    <path d="M 262.399358 257.59082 
+L 262.399358 240.496831 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_44">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="250.541508" y="249.043825" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_45">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="275.822203" y="249.043825" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_46">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="262.399358" y="257.59082" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_47">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="262.399358" y="240.496831" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-avon-64"><title>DSpark · AV on · concurrency 64 · 5,824.7 tok/s · 94.4 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mf69dafc130" x="262.399358" y="249.043825" style="fill: #08916d; stroke: #08916d; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_9">
+    <path d="M 184.691942 195.848346 
+L 212.682434 195.848346 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_10">
+    <path d="M 197.28509 214.624005 
+L 197.28509 177.072688 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_48">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="184.691942" y="195.848346" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_49">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="212.682434" y="195.848346" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_50">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="197.28509" y="214.624005" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_51">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="197.28509" y="177.072688" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-avon-128"><title>DSpark · AV on · concurrency 128 · 7,913.3 tok/s · 64.2 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mf69dafc130" x="197.28509" y="195.848346" style="fill: #08916d; stroke: #08916d; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_11">
+    <path d="M 138.006055 102.974461 
+L 194.195278 102.974461 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_12">
+    <path d="M 158.731472 160.895411 
+L 158.731472 45.053511 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_52">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="138.006055" y="102.974461" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_53">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#md666301009" x="194.195278" y="102.974461" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_54">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="158.731472" y="160.895411" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_55">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m183194d597" x="158.731472" y="45.053511" style="fill: #08916d; fill-opacity: 0.4; stroke: #08916d; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-avon-256"><title>DSpark · AV on · concurrency 256 · 11,559.7 tok/s · 46.3 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mf69dafc130" x="158.731472" y="102.974461" style="fill: #08916d; stroke: #08916d; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="line2d_56">
+    <path d="M 647.134116 344.202467 
+L 511.28694 315.322519 
+L 378.270238 281.294186 
+L 267.888581 245.50485 
+L 206.613449 184.004218 
+L 176.187874 64.696541 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-width: 2; stroke-linecap: square"/>
+   </g>
+   <g id="LineCollection_13">
+    <path d="M 645.409019 344.202467 
+L 648.869392 344.202467 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_14">
+    <path d="M 647.134116 344.382299 
+L 647.134116 344.022635 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_57">
+    <defs>
+     <path id="m3bef59df34" d="M 0 3 
+L 0 -3 
+" style="stroke: #2563eb; stroke-opacity: 0.4"/>
+    </defs>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="645.409019" y="344.202467" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_58">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="648.869392" y="344.202467" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_59">
+    <defs>
+     <path id="m8ba877b07a" d="M 3 0 
+L -3 -0 
+" style="stroke: #2563eb; stroke-opacity: 0.4"/>
+    </defs>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="647.134116" y="344.382299" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_60">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="647.134116" y="344.022635" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-reclaim-8"><title>DSpark · AV on + padding reclaim · concurrency 8 · 2,088.6 tok/s · 273.1 tok/s/user</title>
+    <defs>
+     <path id="mfa059ea63f" d="M -3.5 3.5 
+L 3.5 3.5 
+L 3.5 -3.5 
+L -3.5 -3.5 
+z
+" style="stroke: #2563eb; stroke-linejoin: miter"/>
+    </defs>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mfa059ea63f" x="647.134116" y="344.202467" style="fill: #2563eb; stroke: #2563eb; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_15">
+    <path d="M 509.681088 315.322519 
+L 512.904276 315.322519 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_16">
+    <path d="M 511.28694 315.636539 
+L 511.28694 315.008499 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_61">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="509.681088" y="315.322519" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_62">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="512.904276" y="315.322519" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_63">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="511.28694" y="315.636539" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_64">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="511.28694" y="315.008499" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-reclaim-16"><title>DSpark · AV on + padding reclaim · concurrency 16 · 3,222.4 tok/s · 210.0 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mfa059ea63f" x="511.28694" y="315.322519" style="fill: #2563eb; stroke: #2563eb; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_17">
+    <path d="M 376.955714 281.294186 
+L 379.595677 281.294186 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_18">
+    <path d="M 378.270238 281.742547 
+L 378.270238 280.845826 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_65">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="376.955714" y="281.294186" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_66">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="379.595677" y="281.294186" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_67">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="378.270238" y="281.742547" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_68">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="378.270238" y="280.845826" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-reclaim-32"><title>DSpark · AV on + padding reclaim · concurrency 32 · 4,558.5 tok/s · 148.3 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mfa059ea63f" x="378.270238" y="281.294186" style="fill: #2563eb; stroke: #2563eb; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_19">
+    <path d="M 265.976662 245.50485 
+L 269.836149 245.50485 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_20">
+    <path d="M 267.888581 246.926158 
+L 267.888581 244.083542 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_69">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="265.976662" y="245.50485" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_70">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="269.836149" y="245.50485" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_71">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="267.888581" y="246.926158" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_72">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="267.888581" y="244.083542" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-reclaim-64"><title>DSpark · AV on + padding reclaim · concurrency 64 · 5,963.6 tok/s · 97.0 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mfa059ea63f" x="267.888581" y="245.50485" style="fill: #2563eb; stroke: #2563eb; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_21">
+    <path d="M 204.663468 184.004218 
+L 208.616343 184.004218 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_22">
+    <path d="M 206.613449 186.90595 
+L 206.613449 181.102486 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_73">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="204.663468" y="184.004218" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_74">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="208.616343" y="184.004218" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_75">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="206.613449" y="186.90595" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_76">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="206.613449" y="181.102486" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-reclaim-128"><title>DSpark · AV on + padding reclaim · concurrency 128 · 8,378.3 tok/s · 68.5 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mfa059ea63f" x="206.613449" y="184.004218" style="fill: #2563eb; stroke: #2563eb; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="LineCollection_23">
+    <path d="M 172.135827 64.696541 
+L 180.540934 64.696541 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="LineCollection_24">
+    <path d="M 176.187874 75.454926 
+L 176.187874 53.938156 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4"/>
+   </g>
+   <g id="line2d_77">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="172.135827" y="64.696541" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_78">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m3bef59df34" x="180.540934" y="64.696541" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_79">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="176.187874" y="75.454926" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="line2d_80">
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#m8ba877b07a" x="176.187874" y="53.938156" style="fill: #2563eb; fill-opacity: 0.4; stroke: #2563eb; stroke-opacity: 0.4"/>
+    </g>
+   </g>
+   <g id="point-mean-reclaim-256"><title>DSpark · AV on + padding reclaim · concurrency 256 · 13,062.6 tok/s · 54.4 tok/s/user</title>
+    <g clip-path="url(#pe8f44910dd)">
+     <use xlink:href="#mfa059ea63f" x="176.187874" y="64.696541" style="fill: #2563eb; stroke: #2563eb; stroke-linejoin: miter"/>
+    </g>
+   </g>
+   <g id="line2d_81">
+    <path d="M 638.907508 345.091188 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_82">
+    <path d="M 501.337694 317.151034 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_83">
+    <path d="M 366.679744 285.348889 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_84">
+    <path d="M 262.399358 249.043825 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_85">
+    <path d="M 197.28509 195.848346 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_86">
+    <path d="M 158.731472 102.974461 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #08916d; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_87">
+    <path d="M 647.134116 344.202467 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_88">
+    <path d="M 511.28694 315.322519 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_89">
+    <path d="M 378.270238 281.294186 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_90">
+    <path d="M 267.888581 245.50485 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_91">
+    <path d="M 206.613449 184.004218 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_92">
+    <path d="M 176.187874 64.696541 
+" clip-path="url(#pe8f44910dd)" style="fill: none; stroke: #2563eb; stroke-opacity: 0.4; stroke-linecap: square"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 58.991646 397.397796 
+L 58.991646 18.118365 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 58.991646 397.397796 
+L 752.99976 397.397796 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="644.907508" y="338.091188" transform="rotate(-0 644.907508 338.091188)">c8</text>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="507.337694" y="310.151034" transform="rotate(-0 507.337694 310.151034)">c16</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="372.679744" y="278.348889" transform="rotate(-0 372.679744 278.348889)">c32</text>
+   </g>
+   <g id="text_21">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="268.399358" y="242.043825" transform="rotate(-0 268.399358 242.043825)">c64</text>
+   </g>
+   <g id="text_22">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="203.28509" y="188.848346" transform="rotate(-0 203.28509 188.848346)">c128</text>
+   </g>
+   <g id="text_23">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="164.731472" y="95.974461" transform="rotate(-0 164.731472 95.974461)">c256</text>
+   </g>
+   <g id="text_24">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="653.134116" y="362.202467" transform="rotate(-0 653.134116 362.202467)">c8</text>
+   </g>
+   <g id="text_25">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="517.28694" y="333.322519" transform="rotate(-0 517.28694 333.322519)">c16</text>
+   </g>
+   <g id="text_26">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="384.270238" y="299.294186" transform="rotate(-0 384.270238 299.294186)">c32</text>
+   </g>
+   <g id="text_27">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="273.888581" y="263.50485" transform="rotate(-0 273.888581 263.50485)">c64</text>
+   </g>
+   <g id="text_28">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="212.613449" y="202.004218" transform="rotate(-0 212.613449 202.004218)">c128</text>
+   </g>
+   <g id="text_29">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="182.187874" y="82.696541" transform="rotate(-0 182.187874 82.696541)">c256</text>
+   </g>
+   <g id="text_30">
+    <text style="font-weight: 700; font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: middle" x="405.995703" y="12.118365" transform="rotate(-0 405.995703 12.118365)">Throughput versus interactivity</text>
+   </g>
+  </g>
+  <g id="legend_1">
+   <g id="line2d_93">
+    <path d="M 233.642812 440.187891 
+L 242.642812 440.187891 
+L 251.642812 440.187891 
+" style="fill: none; stroke: #08916d; stroke-width: 2; stroke-linecap: square"/>
+   </g>
+   <g id="text_31">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="258.842812" y="443.337891" transform="rotate(-0 258.842812 443.337891)">DSpark · AV on</text>
+   </g>
+   <g id="line2d_94">
+    <path d="M 344.016562 440.187891 
+L 353.016562 440.187891 
+L 362.016562 440.187891 
+" style="fill: none; stroke: #2563eb; stroke-width: 2; stroke-linecap: square"/>
+   </g>
+   <g id="text_32">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="369.216562" y="443.337891" transform="rotate(-0 369.216562 443.337891)">DSpark · AV on + padding reclaim</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pe8f44910dd">
+   <rect x="58.991646" y="18.118365" width="694.008114" height="379.279431"/>
+  </clipPath>
+ </defs>
+</svg>
+<figcaption>Ten runs per point; error bars show ±1 standard deviation on both axes. Each run uses 1,536 SPEED-Bench prompts and exactly 512 output tokens per request. Prefix caching enabled and cleared before every run. Interactivity is 1 / mean request TPOT. Labels show total client concurrency. Methods ran in separate blocks; this is a performance workload, not an accuracy evaluation.</figcaption></figure></section>
+<section class="card"><h2>Results</h2>
+<input class="metric-choice" type="radio" name="table" id="throughput-table" checked aria-controls="throughput-panel">
+<input class="metric-choice" type="radio" name="table" id="accuracy-table" aria-controls="accuracy-panel">
+<input class="metric-choice" type="radio" name="table" id="al-table" aria-controls="al-panel">
+<div class="metric-tabs"><label for="throughput-table">Throughput (output tokens/sec)</label><label for="accuracy-table">TPOT (ms/token)</label><label for="al-table">AL</label></div>
+<div class="panels">
+<section class="tab-panel" id="throughput-panel"><div class="table-scroll"><table><thead><tr><th>Bsz</th><th>DSpark + AV</th><th>DSpark + AV + padding reclaim</th></tr></thead><tbody><tr><td>8</td><td>2,053.7</td><td>2,088.6</td></tr>
+<tr><td>16</td><td>3,150.7</td><td>3,222.4</td></tr>
+<tr><td>32</td><td>4,399.3</td><td>4,558.5</td></tr>
+<tr><td>64</td><td>5,824.7</td><td>5,963.6</td></tr>
+<tr><td>128</td><td>7,913.3</td><td>8,378.3</td></tr>
+<tr><td>256</td><td>11,559.7</td><td>13,062.6</td></tr></tbody></table></div></section>
+<section class="tab-panel" id="accuracy-panel"><div class="table-scroll"><table><thead><tr><th>Bsz</th><th>DSpark + AV</th><th>DSpark + AV + padding reclaim</th></tr></thead><tbody><tr><td>8</td><td>3.714</td><td>3.662</td></tr>
+<tr><td>16</td><td>4.869</td><td>4.762</td></tr>
+<tr><td>32</td><td>6.999</td><td>6.745</td></tr>
+<tr><td>64</td><td>10.588</td><td>10.309</td></tr>
+<tr><td>128</td><td>15.573</td><td>14.589</td></tr>
+<tr><td>256</td><td>21.592</td><td>18.376</td></tr></tbody></table></div></section>
+<section class="tab-panel" id="al-panel"><div class="table-scroll"><table><thead><tr><th>Bsz</th><th>DSpark + AV</th><th>DSpark + AV + padding reclaim</th></tr></thead><tbody><tr><td>8</td><td>3.660</td><td>3.671</td></tr>
+<tr><td>16</td><td>3.651</td><td>3.678</td></tr>
+<tr><td>32</td><td>3.645</td><td>3.672</td></tr>
+<tr><td>64</td><td>3.620</td><td>3.637</td></tr>
+<tr><td>128</td><td>3.467</td><td>3.525</td></tr>
+<tr><td>256</td><td>3.413</td><td>3.407</td></tr></tbody></table></div></section>
+</div></section>
+<p><a href="benchmark-logs.html">Benchmark and server logs</a> · <a href="benchmark-logs.tar.gz" download>Download all logs and raw results</a></p>
+</body></html>

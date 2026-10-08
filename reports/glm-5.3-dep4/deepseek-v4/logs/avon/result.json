@@ -1,0 +1,853 @@
+{
+  "mode": "avon",
+  "command": [
+    "/home/tomasruizt/.venv/bin/python",
+    "-m",
+    "vllm.entrypoints.cli.main",
+    "serve",
+    "deepseek-ai/DeepSeek-V4-Flash-DSpark",
+    "--revision",
+    "62af8fffb2f7030cac4de2f0169f5b8d1101b646",
+    "--served-model-name",
+    "deepseek-v4-flash",
+    "--tokenizer-mode",
+    "deepseek_v4",
+    "--trust-remote-code",
+    "--tensor-parallel-size",
+    "1",
+    "--data-parallel-size",
+    "4",
+    "--enable-expert-parallel",
+    "--all2all-backend",
+    "allgather_reducescatter",
+    "--moe-backend",
+    "deep_gemm_mega_moe",
+    "--kv-cache-dtype",
+    "fp8",
+    "--block-size",
+    "256",
+    "--max-model-len",
+    "16384",
+    "--max-num-seqs",
+    "128",
+    "--max-num-batched-tokens",
+    "16384",
+    "--gpu-memory-utilization",
+    "0.85",
+    "--attention-config",
+    "{\"indexer_kv_dtype\":\"mxfp4\"}",
+    "--enable-prefix-caching",
+    "--disable-uvicorn-access-log",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8034",
+    "--compilation-config",
+    "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"max_cudagraph_capture_size\":1152}",
+    "--speculative-config",
+    "{\"method\": \"dspark\", \"model\": \"deepseek-ai/DeepSeek-V4-Flash-DSpark\", \"revision\": \"62af8fffb2f7030cac4de2f0169f5b8d1101b646\", \"num_speculative_tokens\": 7, \"draft_sample_method\": \"greedy\", \"enable_adaptive_verification\": true}"
+  ],
+  "repo": "/home/tomasruizt/code/vllm",
+  "commit": "58b3298457dde7b4554b3b4e20b238c0ac2c3a65",
+  "dataset_sha256": "2f4f1edfde61590a97fe756a6b41b9b65c9588faf6ba5deac67df8a591002223",
+  "dataset": "/data/tomasruizt/benchmarks/deepseek-v4-dep4-av/dataset/throughput_1k.jsonl",
+  "requests_per_run": 1536,
+  "output_tokens_per_request": 512,
+  "prefix_caching": true,
+  "reset_prefix_cache_before_each_run": true,
+  "cuda_visible_devices": "3,4,5,7",
+  "num_runs": 10,
+  "concurrencies": [
+    8,
+    16,
+    32,
+    64,
+    128,
+    256
+  ],
+  "status": "completed",
+  "runs": [
+    {
+      "concurrency": 8,
+      "repeat": 1,
+      "mean_acceptance_length": 3.6670777794325713,
+      "draft_acceptance_rate": 0.3810111113475102,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 214864.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1504048.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 573059.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r1/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 1,
+      "mean_acceptance_length": 3.650444405312474,
+      "draft_acceptance_rate": 0.37863491504463914,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215794.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1510558.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571950.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r1/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 1,
+      "mean_acceptance_length": 3.6504543495688195,
+      "draft_acceptance_rate": 0.3786363356526885,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215803.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1510621.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571976.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r1/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 1,
+      "mean_acceptance_length": 3.6139186207086396,
+      "draft_acceptance_rate": 0.37341694581551993,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217967.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1525769.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 569748.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r1/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 1,
+      "mean_acceptance_length": 3.4820637517131616,
+      "draft_acceptance_rate": 0.35458053595902306,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 226190.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1583330.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 561418.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r1/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 1,
+      "mean_acceptance_length": 3.419315769596416,
+      "draft_acceptance_rate": 0.3456165385137737,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 230361.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1612527.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 557316.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r1/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 2,
+      "mean_acceptance_length": 3.6739263245766622,
+      "draft_acceptance_rate": 0.38198947493952323,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 214427.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1500989.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 573362.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r2/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 2,
+      "mean_acceptance_length": 3.6424449520497904,
+      "draft_acceptance_rate": 0.37749213600711296,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216266.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1513862.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571471.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r2/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 2,
+      "mean_acceptance_length": 3.6376104212747684,
+      "draft_acceptance_rate": 0.3768014887535383,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216557.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1515899.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571193.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r2/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 2,
+      "mean_acceptance_length": 3.6207649519606493,
+      "draft_acceptance_rate": 0.37439499313723557,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217530.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1522710.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570095.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r2/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 2,
+      "mean_acceptance_length": 3.457769387799899,
+      "draft_acceptance_rate": 0.35110991254284274,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 227785.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1594495.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 559843.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r2/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 2,
+      "mean_acceptance_length": 3.4133344313168,
+      "draft_acceptance_rate": 0.3447620616166857,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 230726.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1615082.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 556819.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r2/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 3,
+      "mean_acceptance_length": 3.6531427087487596,
+      "draft_acceptance_rate": 0.3790203869641085,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215642.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1509494.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572129.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r3/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 3,
+      "mean_acceptance_length": 3.6442292566923595,
+      "draft_acceptance_rate": 0.3777470366703371,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216142.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1512994.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571529.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r3/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 3,
+      "mean_acceptance_length": 3.641711353550296,
+      "draft_acceptance_rate": 0.37738733622147086,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216320.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1514240.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571455.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r3/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 3,
+      "mean_acceptance_length": 3.619836951526626,
+      "draft_acceptance_rate": 0.3742624216466609,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217604.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1523228.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570087.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r3/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 3,
+      "mean_acceptance_length": 3.465366489036352,
+      "draft_acceptance_rate": 0.35219521271947885,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 227251.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1590757.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 560257.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r3/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 3,
+      "mean_acceptance_length": 3.404346548176836,
+      "draft_acceptance_rate": 0.34347807831097654,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 231356.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1619492.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 556260.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r3/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 4,
+      "mean_acceptance_length": 3.6682513223571482,
+      "draft_acceptance_rate": 0.3811787603367355,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 214768.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1503376.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 573055.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r4/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 4,
+      "mean_acceptance_length": 3.651058780999875,
+      "draft_acceptance_rate": 0.37872268299998213,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215767.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1510369.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572011.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r4/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 4,
+      "mean_acceptance_length": 3.646446787436707,
+      "draft_acceptance_rate": 0.3780638267766724,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216058.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1512406.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571786.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r4/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 4,
+      "mean_acceptance_length": 3.61237312933126,
+      "draft_acceptance_rate": 0.3731961613330372,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 218037.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1526259.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 569594.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r4/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 4,
+      "mean_acceptance_length": 3.455869770299028,
+      "draft_acceptance_rate": 0.3508385386141469,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 227905.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1595335.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 559705.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r4/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 4,
+      "mean_acceptance_length": 3.415521331639004,
+      "draft_acceptance_rate": 0.3450744759484291,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 230573.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1614011.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 556954.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r4/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 5,
+      "mean_acceptance_length": 3.646177341725287,
+      "draft_acceptance_rate": 0.37802533453218384,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216080.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1512560.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571786.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r5/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 5,
+      "mean_acceptance_length": 3.6538053031673368,
+      "draft_acceptance_rate": 0.37911504330961954,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215607.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1509249.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572179.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r5/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 5,
+      "mean_acceptance_length": 3.6361496170943486,
+      "draft_acceptance_rate": 0.3765928024420498,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216633.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1516431.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571077.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r5/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 5,
+      "mean_acceptance_length": 3.6230274988846833,
+      "draft_acceptance_rate": 0.3747182141263833,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217427.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1521989.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570317.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r5/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 5,
+      "mean_acceptance_length": 3.457836879121265,
+      "draft_acceptance_rate": 0.3511195541601807,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 227782.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1594474.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 559851.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r5/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 5,
+      "mean_acceptance_length": 3.4262052582805085,
+      "draft_acceptance_rate": 0.34660075118292977,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 229847.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1608929.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 557656.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r5/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 6,
+      "mean_acceptance_length": 3.6660633105174747,
+      "draft_acceptance_rate": 0.3808661872167821,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 214909.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1504363.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572961.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r6/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 6,
+      "mean_acceptance_length": 3.6422528178716402,
+      "draft_acceptance_rate": 0.37746468826737717,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216298.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1514086.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571514.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r6/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 6,
+      "mean_acceptance_length": 3.644304242446669,
+      "draft_acceptance_rate": 0.3777577489209527,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216196.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1513372.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571688.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r6/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 6,
+      "mean_acceptance_length": 3.622271063618473,
+      "draft_acceptance_rate": 0.37461015194549613,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217484.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1522388.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570302.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r6/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 6,
+      "mean_acceptance_length": 3.477534564755651,
+      "draft_acceptance_rate": 0.3539335092508073,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 226459.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1585213.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 561060.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r6/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 6,
+      "mean_acceptance_length": 3.4133169803634344,
+      "draft_acceptance_rate": 0.3447595686233478,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 230743.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1615201.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 556856.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r6/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 7,
+      "mean_acceptance_length": 3.668124121103754,
+      "draft_acceptance_rate": 0.3811605887291077,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 214758.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1503306.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 573001.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r7/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 7,
+      "mean_acceptance_length": 3.652559543403977,
+      "draft_acceptance_rate": 0.3789370776291396,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215683.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1509781.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572112.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r7/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 7,
+      "mean_acceptance_length": 3.6435489690006384,
+      "draft_acceptance_rate": 0.3776498527143769,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216198.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1513386.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571530.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r7/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 7,
+      "mean_acceptance_length": 3.632529314932056,
+      "draft_acceptance_rate": 0.3760756164188651,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216869.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1518083.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570914.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r7/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 7,
+      "mean_acceptance_length": 3.4578085282922784,
+      "draft_acceptance_rate": 0.351115504041754,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 227783.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1594481.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 559847.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r7/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 7,
+      "mean_acceptance_length": 3.41303433898643,
+      "draft_acceptance_rate": 0.3447191912837757,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 230729.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1615103.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 556757.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r7/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6575114788042544,
+      "draft_acceptance_rate": 0.37964449697203634,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215397.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1507779.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572420.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r8/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6644497258279807,
+      "draft_acceptance_rate": 0.380635675118283,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215011.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1505077.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572886.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r8/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6497199223473706,
+      "draft_acceptance_rate": 0.3785314174781958,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215833.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1510831.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571897.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r8/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 8,
+      "mean_acceptance_length": 3.6207216731785796,
+      "draft_acceptance_rate": 0.3743888104540828,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217550.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1522850.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570138.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r8/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 8,
+      "mean_acceptance_length": 3.480755634114008,
+      "draft_acceptance_rate": 0.35439366201628686,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 226300.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1584100.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 561395.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r8/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 8,
+      "mean_acceptance_length": 3.405311678428117,
+      "draft_acceptance_rate": 0.3436159540611595,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 231264.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1618848.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 556262.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r8/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 9,
+      "mean_acceptance_length": 3.64324961842653,
+      "draft_acceptance_rate": 0.37760708834664714,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 216210.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1513470.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571497.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r9/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 9,
+      "mean_acceptance_length": 3.651424968941796,
+      "draft_acceptance_rate": 0.3787749955631137,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215724.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1510068.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571976.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r9/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 9,
+      "mean_acceptance_length": 3.649181330442276,
+      "draft_acceptance_rate": 0.37845447577746805,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215838.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1510866.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 571794.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r9/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 9,
+      "mean_acceptance_length": 3.62802350643848,
+      "draft_acceptance_rate": 0.3754319294912114,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 217132.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1519924.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 570628.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r9/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 9,
+      "mean_acceptance_length": 3.4765072820141536,
+      "draft_acceptance_rate": 0.3537867545734505,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 226517.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1585619.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 560971.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r9/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 9,
+      "mean_acceptance_length": 3.4220361664595624,
+      "draft_acceptance_rate": 0.34600516663708036,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 230158.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1611106.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 557451.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r9/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 8,
+      "repeat": 10,
+      "mean_acceptance_length": 3.6603573718395452,
+      "draft_acceptance_rate": 0.38005105311993503,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215238.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1506666.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572610.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c8-r10/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 16,
+      "repeat": 10,
+      "mean_acceptance_length": 3.6537523304239747,
+      "draft_acceptance_rate": 0.37910747577485354,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215626.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1509382.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572218.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c16-r10/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 32,
+      "repeat": 10,
+      "mean_acceptance_length": 3.6555250361901934,
+      "draft_acceptance_rate": 0.3793607194557419,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 215528.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1508696.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 572340.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c32-r10/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 64,
+      "repeat": 10,
+      "mean_acceptance_length": 3.607485323344354,
+      "draft_acceptance_rate": 0.37249790333490773,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 218374.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1528618.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 569407.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c64-r10/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 128,
+      "repeat": 10,
+      "mean_acceptance_length": 3.459664984119035,
+      "draft_acceptance_rate": 0.351380712017005,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 227631.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1593417.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 559896.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c128-r10/profile_export_aiperf.json"
+    },
+    {
+      "concurrency": 256,
+      "repeat": 10,
+      "mean_acceptance_length": 3.3973669339706065,
+      "draft_acceptance_rate": 0.3424809905672295,
+      "counter_deltas": {
+        "vllm:spec_decode_num_drafts_total": 231821.0,
+        "vllm:spec_decode_num_draft_tokens_total": 1622747.0,
+        "vllm:spec_decode_num_accepted_tokens_total": 555760.0
+      },
+      "prefix_cache_reset": true,
+      "aiperf_summary": "speedbench-c256-r10/profile_export_aiperf.json"
+    }
+  ],
+  "server_startup_seconds": 240.0313752349466,
+  "budget_expansion_seen": false
+}
